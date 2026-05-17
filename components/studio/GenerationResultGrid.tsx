@@ -1,19 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState, type CSSProperties, type ReactNode } from "react";
 import {
   Download,
-  Eraser,
   ExternalLink,
   ImageOff,
   RefreshCw,
-  ThumbsDown,
-  ThumbsUp,
+  RotateCcw,
 } from "lucide-react";
 import type { StudioResultImage } from "./types";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
-import { ProductShotCreativeReview } from "./ProductShotCreativeReview";
 import { cn } from "@/lib/utils";
 
 type GenerationResultGridProps = {
@@ -22,11 +18,117 @@ type GenerationResultGridProps = {
   showRegenerate?: boolean;
   regenerateLoading?: boolean;
   isProductShotMode?: boolean;
-  onAccept: (resultId: string) => void;
-  onReject: (resultId: string) => void;
+  onStartOver: () => void;
   onRegenerate?: () => void;
-  onRemoveBackground: (resultId: string) => void;
 };
+
+const checkerboardStyle = {
+  backgroundImage:
+    "linear-gradient(45deg, #e2e8f0 25%, transparent 25%), linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e2e8f0 75%), linear-gradient(-45deg, transparent 75%, #e2e8f0 75%)",
+  backgroundColor: "#f8fafc",
+  backgroundSize: "12px 12px",
+  backgroundPosition: "0 0, 6px 6px",
+} as const;
+
+function getExportPreviewSize(
+  width: number,
+  height: number,
+  maxWidth = 340,
+  maxHeight = 560
+): { width: number; height: number } {
+  const scale = Math.min(1, maxWidth / width, maxHeight / height);
+  return {
+    width: Math.round(width * scale),
+    height: Math.round(height * scale),
+  };
+}
+
+function ExportSizeFrame({
+  width,
+  height,
+  className,
+  style,
+  children,
+}: {
+  width: number;
+  height: number;
+  className?: string;
+  style?: CSSProperties;
+  children: ReactNode;
+}) {
+  const preview = getExportPreviewSize(width, height);
+
+  return (
+    <div
+      className={cn("mx-auto shrink-0 overflow-hidden rounded-[18px]", className)}
+      style={{
+        width: preview.width,
+        height: preview.height,
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function ExactCardResultPanel({
+  title,
+  exportPreviewSize,
+  onDownload,
+  onStartOver,
+  children,
+}: {
+  title: string;
+  exportPreviewSize: { width: number; height: number };
+  onDownload: () => void;
+  onStartOver: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <article className="flex flex-col overflow-hidden rounded-[24px] border border-border bg-white p-4 shadow-xl shadow-slate-200/60">
+      <p className="text-sm font-semibold text-slate-900">{title}</p>
+      <div className="mt-3 flex w-full flex-col items-center">{children}</div>
+      <div
+        className="mt-4 w-full"
+        style={{ maxWidth: exportPreviewSize.width }}
+      >
+        <ResultColumnActions onDownload={onDownload} onStartOver={onStartOver} />
+      </div>
+    </article>
+  );
+}
+
+function ResultColumnActions({
+  onDownload,
+  onStartOver,
+}: {
+  onDownload: () => void;
+  onStartOver: () => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <Button
+        variant="secondary"
+        size="sm"
+        className="w-full"
+        onClick={onDownload}
+      >
+        <Download className="h-4 w-4" />
+        Скачать
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full"
+        onClick={onStartOver}
+      >
+        <RotateCcw className="h-4 w-4" />
+        Начать сначала
+      </Button>
+    </div>
+  );
+}
 
 function downloadPng(url: string, filename: string) {
   const link = document.createElement("a");
@@ -38,18 +140,6 @@ function downloadPng(url: string, filename: string) {
   link.click();
   document.body.removeChild(link);
 }
-
-const STATUS_LABELS = {
-  pending_review: "На проверке",
-  accepted: "Принято",
-  rejected: "Отклонено",
-} as const;
-
-const STATUS_VARIANTS = {
-  pending_review: "warning",
-  accepted: "success",
-  rejected: "danger",
-} as const;
 
 function ResultImage({
   imageKey,
@@ -108,10 +198,8 @@ export function GenerationResultGrid({
   showRegenerate = true,
   regenerateLoading,
   isProductShotMode = false,
-  onAccept,
-  onReject,
+  onStartOver,
   onRegenerate,
-  onRemoveBackground,
 }: GenerationResultGridProps) {
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
 
@@ -126,8 +214,8 @@ export function GenerationResultGrid({
           Создаём изображение. Обычно это занимает от нескольких секунд до
           минуты — не закрывайте страницу, пока идёт обработка.
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {Array.from({ length: 2 }).map((_, index) => (
+        <div className="grid grid-cols-1 gap-4">
+          {Array.from({ length: 1 }).map((_, index) => (
             <div
               key={index}
               className="aspect-[3/4] animate-pulse rounded-[24px] bg-slate-200"
@@ -168,73 +256,97 @@ export function GenerationResultGrid({
         </Button>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {results.map((result, index) => {
           const label = result.label ?? `Вариант ${index + 1}`;
-          const canAccept = result.reviewStatus !== "accepted";
-          const canReject = result.reviewStatus !== "rejected";
-          const canDownload = result.reviewStatus === "accepted";
           const removedUrl =
             result.cutoutPreviewUrl ?? result.backgroundRemovedUrl;
-          const fidelityBadge =
-            result.productShotFidelity === "exact-card"
-              ? "Точная карточка"
-              : result.productShotFidelity === "creative-scene"
-                ? "Креативная сцена — проверьте товар"
-                : null;
-          const manualMaskBadge = result.manualMaskUsed
-            ? "Товар выделен вручную"
-            : null;
-          const selectedPreview = result.selectedProductPreviewUrl;
-          const providerLabel =
-            result.provider === "mock"
-              ? "Превью"
-              : result.provider === "fal"
-                ? "AI"
-                : result.provider;
-          const providerVariant =
-            result.provider === "mock"
-              ? "violet"
-              : result.provider === "fal"
-                ? "success"
-                : "outline";
+          const showExactCardRow =
+            isProductShotMode &&
+            result.productShotFidelity === "exact-card" &&
+            Boolean(removedUrl && result.width && result.height);
+          const exportPreviewSize =
+            result.width && result.height
+              ? getExportPreviewSize(result.width, result.height)
+              : null;
+
+          if (showExactCardRow && result.width && result.height && exportPreviewSize) {
+            return (
+              <Fragment key={result.id}>
+                {result.provider === "mock" && (
+                  <div
+                    key={`${result.id}-mock`}
+                    className="col-span-full rounded-[18px] border border-violet-100 bg-violet-50 px-4 py-3 text-xs leading-5 text-violet-800 lg:col-span-2"
+                  >
+                    Показан тестовый пример. Для финального результата запустите
+                    генерацию в студии.
+                  </div>
+                )}
+                {result.exactCardWithoutMask && (
+                  <div
+                    key={`${result.id}-warn`}
+                    className="col-span-full rounded-[18px] border border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900 lg:col-span-2"
+                  >
+                    Карточка создана без ручного выделения. Проверьте, не попали
+                    ли лишние предметы.
+                  </div>
+                )}
+                <ExactCardResultPanel
+                  key={`${result.id}-card`}
+                  title="Готовая карточка"
+                  exportPreviewSize={exportPreviewSize}
+                  onDownload={() => downloadPng(result.url, `${result.id}.png`)}
+                  onStartOver={onStartOver}
+                >
+                  <ExportSizeFrame
+                    width={result.width}
+                    height={result.height}
+                    className="bg-white ring-1 ring-slate-200"
+                  >
+                    <ResultImage
+                      imageKey={`${result.id}:main`}
+                      url={result.url}
+                      alt={`${label}: готовая карточка`}
+                      className="block h-full w-full"
+                      failed={Boolean(failedImages[`${result.id}:main`])}
+                      onFail={markImageFailed}
+                    />
+                  </ExportSizeFrame>
+                </ExactCardResultPanel>
+                <ExactCardResultPanel
+                  key={`${result.id}-cutout`}
+                  title="PNG без фона"
+                  exportPreviewSize={exportPreviewSize}
+                  onDownload={() =>
+                    downloadPng(removedUrl!, `${result.id}-no-bg.png`)
+                  }
+                  onStartOver={onStartOver}
+                >
+                  <ExportSizeFrame
+                    width={result.width}
+                    height={result.height}
+                    style={checkerboardStyle}
+                    className="bg-[length:12px_12px] bg-[position:0_0,6px_6px]"
+                  >
+                    <ResultImage
+                      imageKey={`${result.id}:removed`}
+                      url={removedUrl!}
+                      alt={`${label}: PNG без фона`}
+                      className="block h-full w-full"
+                      failed={Boolean(failedImages[`${result.id}:removed`])}
+                      onFail={markImageFailed}
+                    />
+                  </ExportSizeFrame>
+                </ExactCardResultPanel>
+              </Fragment>
+            );
+          }
 
           return (
             <article
               key={result.id}
-              className={cn(
-                "overflow-hidden rounded-[24px] border bg-white shadow-xl shadow-slate-200/60",
-                result.reviewStatus === "rejected"
-                  ? "border-red-200"
-                  : "border-border"
-              )}
+              className="overflow-hidden rounded-[24px] border border-border bg-white shadow-xl shadow-slate-200/60"
             >
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 px-4 py-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline">{label}</Badge>
-                  {providerLabel && (
-                    <Badge variant={providerVariant}>{providerLabel}</Badge>
-                  )}
-                  {fidelityBadge && (
-                    <Badge
-                      variant={
-                        result.productShotFidelity === "exact-card"
-                          ? "success"
-                          : "warning"
-                      }
-                    >
-                      {fidelityBadge}
-                    </Badge>
-                  )}
-                  {manualMaskBadge && (
-                    <Badge variant="violet">{manualMaskBadge}</Badge>
-                  )}
-                </div>
-                <Badge variant={STATUS_VARIANTS[result.reviewStatus]}>
-                  {STATUS_LABELS[result.reviewStatus]}
-                </Badge>
-              </div>
-
               {result.provider === "mock" && (
                 <div className="border-b border-violet-100 bg-violet-50 px-4 py-3 text-xs leading-5 text-violet-800">
                   Показан тестовый пример. Для финального результата запустите
@@ -251,185 +363,56 @@ export function GenerationResultGrid({
                 )}
 
               <div className="space-y-3 p-3">
-                {selectedPreview && (
-                  <div>
-                    <p className="px-1 pb-2 text-xs font-semibold text-slate-500">
-                      Выделенный товар
-                    </p>
-                    <div
-                      className="rounded-[18px] bg-[length:12px_12px] bg-[position:0_0,6px_6px]"
-                      style={{
-                        backgroundImage:
-                          "linear-gradient(45deg, #e2e8f0 25%, transparent 25%), linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e2e8f0 75%), linear-gradient(-45deg, transparent 75%, #e2e8f0 75%)",
-                        backgroundColor: "#f8fafc",
-                      }}
-                    >
-                      <ResultImage
-                        imageKey={`${result.id}:selected`}
-                        url={selectedPreview}
-                        alt={`${label}: выделенный товар`}
-                        className="max-h-[360px] min-h-[180px] w-full rounded-[18px] object-contain"
-                        failed={Boolean(failedImages[`${result.id}:selected`])}
-                        onFail={markImageFailed}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {removedUrl && isProductShotMode && (
-                  <div>
-                    <p className="px-1 pb-2 text-xs font-semibold text-slate-500">
-                      Вырезка без фона
-                    </p>
-                    <div
-                      className="rounded-[18px] bg-[length:12px_12px] bg-[position:0_0,6px_6px]"
-                      style={{
-                        backgroundImage:
-                          "linear-gradient(45deg, #e2e8f0 25%, transparent 25%), linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e2e8f0 75%), linear-gradient(-45deg, transparent 75%, #e2e8f0 75%)",
-                        backgroundColor: "#f8fafc",
-                      }}
-                    >
-                      <ResultImage
-                        imageKey={`${result.id}:removed`}
-                        url={removedUrl}
-                        alt={`${label}: вырезка без фона`}
-                        className="max-h-[360px] min-h-[180px] w-full rounded-[18px] object-contain"
-                        failed={Boolean(failedImages[`${result.id}:removed`])}
-                        onFail={markImageFailed}
-                      />
-                    </div>
-                  </div>
-                )}
-
+                <>
                 <div>
                   <p className="px-1 pb-2 text-xs font-semibold text-slate-500">
-                    {isProductShotMode &&
-                    result.productShotFidelity === "exact-card"
-                      ? "Готовая карточка"
-                      : "Готовый вариант"}
+                    {isProductShotMode ? "Готовая карточка" : "Готовый вариант"}
                   </p>
-                  <ResultImage
-                    imageKey={`${result.id}:main`}
-                    url={result.url}
-                    alt={`${label}: готовый вариант`}
-                    className="max-h-[560px] min-h-[260px] w-full rounded-[18px] bg-slate-50 object-contain"
-                    failed={Boolean(failedImages[`${result.id}:main`])}
-                    onFail={markImageFailed}
-                  />
+                  <div
+                    className={cn(
+                      "rounded-[18px]",
+                      isProductShotMode
+                        ? "bg-white ring-1 ring-slate-200"
+                        : "bg-slate-50"
+                    )}
+                  >
+                    <ResultImage
+                      imageKey={`${result.id}:main`}
+                      url={result.url}
+                      alt={`${label}: готовый вариант`}
+                      className="max-h-[560px] min-h-[260px] w-full rounded-[18px] object-contain"
+                      failed={Boolean(failedImages[`${result.id}:main`])}
+                      onFail={markImageFailed}
+                    />
+                  </div>
                 </div>
 
-                {removedUrl && !isProductShotMode && (
-                  <div>
-                    <p className="px-1 pb-2 text-xs font-semibold text-slate-500">
-                      PNG без фона
-                    </p>
-                    <div
-                      className="rounded-[18px] bg-[length:12px_12px] bg-[position:0_0,6px_6px]"
-                      style={{
-                        backgroundImage:
-                          "linear-gradient(45deg, #e2e8f0 25%, transparent 25%), linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e2e8f0 75%), linear-gradient(-45deg, transparent 75%, #e2e8f0 75%)",
-                        backgroundColor: "#f8fafc",
-                      }}
-                    >
-                      <ResultImage
-                        imageKey={`${result.id}:removed`}
-                        url={removedUrl}
-                        alt={`${label}: изображение без фона`}
-                        className="max-h-[560px] min-h-[260px] w-full rounded-[18px] object-contain"
-                        failed={Boolean(failedImages[`${result.id}:removed`])}
-                        onFail={markImageFailed}
-                      />
-                    </div>
-                  </div>
-                )}
+                  </>
               </div>
 
+              {!showExactCardRow && (
               <div className="space-y-3 border-t border-border/70 p-4">
-                {isProductShotMode &&
-                  result.productShotFidelity === "creative-scene" && (
-                    <ProductShotCreativeReview />
-                  )}
-
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    disabled={!canAccept}
-                    onClick={() => onAccept(result.id)}
-                  >
-                    <ThumbsUp className="h-4 w-4" />
-                    Принять
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={!canReject}
-                    onClick={() => onReject(result.id)}
-                  >
-                    <ThumbsDown className="h-4 w-4" />
-                    Отклонить
-                  </Button>
-                </div>
-
                 <Button
                   variant="secondary"
                   size="sm"
                   className="w-full"
-                  disabled={!canDownload}
-                  title={
-                    !canDownload ? "Сначала нажмите «Принять»" : undefined
-                  }
-                  onClick={() =>
-                    canDownload
-                      ? downloadPng(result.url, `${result.id}.png`)
-                      : undefined
-                  }
+                  onClick={() => downloadPng(result.url, `${result.id}.png`)}
                 >
                   <Download className="h-4 w-4" />
                   Скачать
                 </Button>
 
-                {!removedUrl && !isProductShotMode && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    loading={result.backgroundRemoveLoading}
-                    onClick={() => onRemoveBackground(result.id)}
-                  >
-                    <Eraser className="h-4 w-4" />
-                    Удалить фон
-                  </Button>
-                )}
-
-                {result.backgroundRemoveError && (
-                  <p className="rounded-[14px] border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700">
-                    {result.backgroundRemoveError}
-                  </p>
-                )}
-
-                {removedUrl && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    disabled={!canDownload}
-                    title={
-                      !canDownload
-                        ? "Сначала примите результат после проверки"
-                        : undefined
-                    }
-                    onClick={() =>
-                      canDownload
-                        ? downloadPng(removedUrl, `${result.id}-no-bg.png`)
-                        : undefined
-                    }
-                  >
-                    <Download className="h-4 w-4" />
-                    Скачать PNG без фона
-                  </Button>
-                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={onStartOver}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Начать сначала
+                </Button>
               </div>
+              )}
             </article>
           );
         })}

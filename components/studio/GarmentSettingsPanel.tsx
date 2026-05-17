@@ -16,8 +16,6 @@ type GarmentSettingsPanelProps = {
   onGarmentPhotoTypeChange: (v: GarmentPhotoType) => void;
   qualityMode: QualityMode;
   onQualityModeChange: (v: QualityMode) => void;
-  numSamples: number;
-  onNumSamplesChange: (v: number) => void;
   lingerieMode?: boolean;
 };
 
@@ -103,29 +101,6 @@ export function GarmentSettingsPanel(props: GarmentSettingsPanelProps) {
         options={QUALITY_MODES.filter((mode) => mode.id !== "performance")}
         onChange={props.onQualityModeChange}
       />
-
-      <div className="space-y-2">
-        <div className="flex items-center justify-between gap-3">
-          <label className="text-sm font-semibold text-slate-950">
-            Количество вариантов
-          </label>
-          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-            {props.numSamples}
-          </span>
-        </div>
-        <input
-          type="range"
-          min={1}
-          max={4}
-          value={props.numSamples}
-          onChange={(event) => props.onNumSamplesChange(Number(event.target.value))}
-          className="w-full accent-teal-700"
-          aria-label="Количество вариантов"
-        />
-        <p className="text-xs leading-5 text-slate-500">
-          Больше вариантов — дольше генерация, но проще выбрать лучший кадр.
-        </p>
-      </div>
     </div>
   );
 }

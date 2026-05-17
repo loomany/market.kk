@@ -1,216 +1,42 @@
 import { NextResponse } from "next/server";
 import {
-  getFalClientOrThrow,
-  PRODUCT_SHOT_MODEL,
-} from "@/lib/ai/falClient";
-import { buildProductShotSceneDescription } from "@/lib/ai/productShotPrompts";
-import { isMarketplaceScenePreset } from "@/lib/ai/productShotFidelity";
-import {
   buildProductShotFormPayload,
   productShotRequestSchema,
-  shotSizePresetToDimensions,
   type ProductShotFormPayload,
   type ProductShotRequest,
 } from "@/lib/ai/productShotSchemas";
-import { uploadImageToFalStorage } from "@/lib/ai/falUpload";
-import { MOCK_PRODUCT_SHOT_IMAGES } from "@/lib/ai/mockResults";
 
 export const runtime = "nodejs";
 
-function isMockMode() {
-  return process.env.AI_MOCK_MODE !== "0";
-}
-
-async function resolveProductImageUrl(
-  payload: ProductShotFormPayload,
-  mockMode: boolean
-): Promise<string> {
-  let productImageUrl = payload.productImageUrl;
-
-  if (payload.productImageFile) {
-    if (mockMode) {
-      productImageUrl = productImageUrl ?? "https://mock.local/product";
-    } else {
-      try {
-        productImageUrl = await uploadImageToFalStorage(
-          payload.productImageFile,
-          "Product image"
-        );
-      } catch (uploadError) {
-        console.error(
-          "[fal product-shot] upload failed:",
-          uploadError instanceof Error ? uploadError.message : "Unknown error"
-        );
-        throw new Error("Fal storage upload failed for product image");
-      }
-    }
-  }
-
-  if (!productImageUrl) {
-    throw new Error("Product image file or URL is required.");
-  }
-
-  return productImageUrl;
-}
-
-function mockResponse(data: ProductShotRequest, sceneDescription: string) {
-  const images = MOCK_PRODUCT_SHOT_IMAGES.slice(0, data.numResults);
-  return NextResponse.json({
-    ok: true,
-    provider: "mock",
-    model: "mock-product-shot",
-    images,
-    requestId: "mock-product-shot-request",
-    sceneDescription,
-  });
-}
-
 async function runProductShot(
-  data: ProductShotRequest,
-  productImageUrl: string
+  _data: ProductShotRequest,
+  _productImageUrl?: string
 ) {
-  if (data.fidelityMode === "exact-card") {
-    return NextResponse.json(
-      {
-        ok: false,
-        errorCode: "VALIDATION_ERROR",
-        message:
-          "Exact-card mode uses background removal and client compositing. Do not call creative product-shot.",
-      },
-      { status: 400 }
-    );
-  }
-
-  if (isMarketplaceScenePreset(data.scenePreset)) {
-    return NextResponse.json(
-      {
-        ok: false,
-        errorCode: "VALIDATION_ERROR",
-        message:
-          "Marketplace presets must use the exact-card pipeline, not Bria product-shot.",
-      },
-      { status: 400 }
-    );
-  }
-
-  const sceneDescription = buildProductShotSceneDescription(data);
-  const shotSize = shotSizePresetToDimensions(data.shotSizePreset);
-
-  if (isMockMode()) {
-    return mockResponse(data, sceneDescription);
-  }
-
-  try {
-    const fal = getFalClientOrThrow();
-    const result = await fal.subscribe(PRODUCT_SHOT_MODEL, {
-      input: {
-        image_url: productImageUrl,
-        scene_description: sceneDescription,
-        optimize_description: true,
-        num_results: data.numResults,
-        fast: data.fast,
-        placement_type: data.placementType,
-        shot_size: shotSize,
-        manual_placement_selection: data.manualPlacementSelection,
-        sync_mode: data.syncMode,
-      },
-      logs: true,
-      onQueueUpdate(update) {
-        if (update.status === "IN_PROGRESS") {
-          console.log(
-            "[fal product-shot]",
-            update.logs?.map((log) => log.message).join("\n")
-          );
-        }
-      },
-    });
-
-    const resultData = result.data as {
-      images?: {
-        url: string;
-        width?: number;
-        height?: number;
-        content_type?: string;
-        file_name?: string;
-        file_size?: number;
-      }[];
-    };
-
-    const images = resultData.images ?? [];
-
-    return NextResponse.json({
-      ok: true,
-      provider: "fal",
-      model: PRODUCT_SHOT_MODEL,
-      images,
-      requestId: result.requestId,
-      sceneDescription,
-    });
-  } catch (error) {
-    return handleProductShotError(error);
-  }
+  return NextResponse.json(
+    {
+      ok: false,
+      errorCode: "FEATURE_DISABLED",
+      message:
+        "Креативная сцена отключена. Используйте точную карточку в студии.",
+    },
+    { status: 400 }
+  );
 }
 
 function handleProductShotError(error: unknown) {
   const message = error instanceof Error ? error.message : "Unknown error";
-
-  if (message.includes("FAL_KEY")) {
-    console.error("[fal product-shot] FAL_KEY missing");
-    return NextResponse.json(
-      {
-        ok: false,
-        errorCode: "FAL_KEY_MISSING",
-        message:
-          "Fal API key is not configured. Add FAL_KEY to .env.local or enable AI_MOCK_MODE=1.",
-      },
-      { status: 500 }
-    );
-  }
-
-  if (
-    message.includes("too large") ||
-    message.includes("must be JPEG") ||
-    message.includes("is required")
-  ) {
-    return NextResponse.json(
-      {
-        ok: false,
-        errorCode: "VALIDATION_ERROR",
-        message,
-      },
-      { status: 400 }
-    );
-  }
-
-  if (message.includes("upload") || message.includes("storage")) {
-    console.error("[fal product-shot] upload failed:", message);
-    return NextResponse.json(
-      {
-        ok: false,
-        errorCode: "FAL_UPLOAD_FAILED",
-        message:
-          "Failed to upload image. Please try a smaller JPEG, PNG, or WEBP file.",
-      },
-      { status: 500 }
-    );
-  }
-
-  console.error("[fal product-shot] failed:", message);
   return NextResponse.json(
     {
       ok: false,
-      errorCode: "FAL_PRODUCT_SHOT_FAILED",
-      message: "Failed to generate product shot. Please try again.",
+      errorCode: "VALIDATION_ERROR",
+      message,
     },
-    { status: 500 }
+    { status: 400 }
   );
 }
 
 async function processFormPayload(payload: ProductShotFormPayload) {
-  const mockMode = isMockMode();
-
   try {
-    const productImageUrl = await resolveProductImageUrl(payload, mockMode);
     const params: ProductShotRequest = {
       scenePreset: payload.scenePreset,
       customSceneDescription: payload.customSceneDescription,
@@ -222,7 +48,7 @@ async function processFormPayload(payload: ProductShotFormPayload) {
       syncMode: payload.syncMode,
       fidelityMode: payload.fidelityMode,
     };
-    return runProductShot(params, productImageUrl);
+    return runProductShot(params);
   } catch (error) {
     return handleProductShotError(error);
   }

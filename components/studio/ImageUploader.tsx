@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ImagePlus, LinkIcon, Upload, X } from "lucide-react";
+import { ImagePlus, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatFileSize } from "@/lib/ai/clientImageValidation";
 
@@ -12,9 +12,6 @@ type ImageUploaderProps = {
   selectedFile?: File | null;
   onFileSelect?: (file: File) => void;
   onClearFile?: () => void;
-  onUrlChange?: (url: string) => void;
-  urlValue?: string;
-  urlLabel?: string;
   className?: string;
 };
 
@@ -25,15 +22,10 @@ export function ImageUploader({
   selectedFile,
   onFileSelect,
   onClearFile,
-  onUrlChange,
-  urlValue = "",
-  urlLabel = "Или вставьте ссылку на изображение",
   className,
 }: ImageUploaderProps) {
   const [dragActive, setDragActive] = useState(false);
   const canUploadFile = Boolean(onFileSelect);
-  const showUrlInput = Boolean(onUrlChange);
-  const urlDisabled = Boolean(selectedFile);
 
   const selectFile = (file: File | undefined) => {
     if (!file || !onFileSelect) return;
@@ -82,9 +74,6 @@ export function ImageUploader({
           <span className="text-sm font-semibold text-slate-800">
             Выберите файл или перетащите его сюда
           </span>
-          <span className="mt-1 text-xs leading-5 text-slate-500">
-            Если выбран файл и ссылка одновременно, используем файл.
-          </span>
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp"
@@ -121,30 +110,6 @@ export function ImageUploader({
             >
               <X className="h-4 w-4" />
             </button>
-          )}
-        </div>
-      )}
-
-      {showUrlInput && (
-        <div className="space-y-1.5">
-          <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
-            <LinkIcon className="h-3.5 w-3.5" />
-            {urlLabel}
-          </label>
-          <input
-            type="url"
-            value={urlValue}
-            onChange={(event) => onUrlChange?.(event.target.value)}
-            onInput={(event) => onUrlChange?.(event.currentTarget.value)}
-            disabled={urlDisabled}
-            placeholder="https://example.com/image.png"
-            className="w-full rounded-[16px] border border-border bg-white px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100 disabled:bg-slate-50 disabled:text-slate-400"
-          />
-          {urlDisabled && (
-            <p className="text-xs leading-5 text-slate-500">
-              Сейчас выбран файл. Очистите файл, если хотите использовать
-              ссылку.
-            </p>
           )}
         </div>
       )}

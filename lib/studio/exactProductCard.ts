@@ -1,6 +1,7 @@
 import type { ShotSizePreset } from "@/lib/ai/productShotSchemas";
 import type { ProductShotScenePreset } from "@/components/studio/types";
 import { shotSizePresetToDimensions } from "@/lib/ai/productShotSchemas";
+import { prepareCutoutCanvas } from "@/lib/studio/cutoutImage";
 
 export type ExactCardBackground = "white" | "light-gray";
 
@@ -20,7 +21,9 @@ function backgroundColorHex(background: ExactCardBackground): string {
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.crossOrigin = "anonymous";
+    if (/^https?:\/\//i.test(url)) {
+      img.crossOrigin = "anonymous";
+    }
     img.onload = () => resolve(img);
     img.onerror = () =>
       reject(new Error("Не удалось загрузить изображение для карточки"));
@@ -31,8 +34,6 @@ function loadImage(url: string): Promise<HTMLImageElement> {
 export type ComposeExactProductCardOptions = {
   background: ExactCardBackground;
   shotSizePreset: ShotSizePreset;
-  /** Off by default — marketplace cards use a flat background without drop shadow. */
-  showShadow?: boolean;
 };
 
 export async function composeExactProductCard(
@@ -41,6 +42,10 @@ export async function composeExactProductCard(
 ): Promise<string> {
   const [width, height] = shotSizePresetToDimensions(options.shotSizePreset);
   const img = await loadImage(cutoutUrl);
+  const cutout = prepareCutoutCanvas(img);
+  const srcW = cutout.width;
+  const srcH = cutout.height;
+
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -49,39 +54,31 @@ export async function composeExactProductCard(
     throw new Error("Canvas не поддерживается в этом браузере");
   }
 
-  ctx.fillStyle = backgroundColorHex(options.background);
+  const bg = backgroundColorHex(options.background);
+  ctx.fillStyle = bg;
   ctx.fillRect(0, 0, width, height);
 
   const padding = Math.round(Math.min(width, height) * 0.08);
   const maxW = width - padding * 2;
   const maxH = height - padding * 2;
-  const scale = Math.min(maxW / img.width, maxH / img.height, 1);
-  const drawW = img.width * scale;
-  const drawH = img.height * scale;
+  const scale = Math.min(maxW / srcW, maxH / srcH, 1);
+  const drawW = srcW * scale;
+  const drawH = srcH * scale;
   const x = (width - drawW) / 2;
   const y = (height - drawH) / 2;
 
-  if (options.showShadow) {
-    ctx.save();
-    ctx.fillStyle = "rgba(15, 23, 42, 0.12)";
-    ctx.filter = "blur(18px)";
-    const shadowW = drawW * 0.72;
-    const shadowH = Math.max(12, drawH * 0.08);
-    ctx.beginPath();
-    ctx.ellipse(
-      width / 2,
-      y + drawH - shadowH * 0.2,
-      shadowW / 2,
-      shadowH,
-      0,
-      0,
-      Math.PI * 2
-    );
-    ctx.fill();
-    ctx.restore();
+  ctx.drawImage(cutout, x, y, drawW, drawH);
+
+  const flat = document.createElement("canvas");
+  flat.width = width;
+  flat.height = height;
+  const flatCtx = flat.getContext("2d");
+  if (!flatCtx) {
+    throw new Error("Canvas не поддерживается в этом браузере");
   }
+  flatCtx.fillStyle = bg;
+  flatCtx.fillRect(0, 0, width, height);
+  flatCtx.drawImage(canvas, 0, 0);
 
-  ctx.drawImage(img, x, y, drawW, drawH);
-
-  return canvas.toDataURL("image/png");
+  return flat.toDataURL("image/png");
 }

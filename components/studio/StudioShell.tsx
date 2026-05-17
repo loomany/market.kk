@@ -14,10 +14,14 @@ import {
 import { MOCK_MODEL_IMAGE } from "@/lib/ai/mockResults";
 import type { GenerateModelResponse } from "@/lib/ai/modelGenerationSchemas";
 import type { RemoveBackgroundResponse } from "@/lib/ai/backgroundRemovalSchemas";
-import type { ProductShotResponse } from "@/lib/ai/productShotSchemas";
 import { mapCategoryForTryOn, type TryOnResponse } from "@/lib/ai/falSchemas";
 import { validateImageFileClient } from "@/lib/ai/clientImageValidation";
-import { isMarketplaceScenePreset } from "@/lib/ai/productShotFidelity";
+import {
+  centerTransparentCutout,
+  fitCutoutToShotSize,
+  refineCutoutWithUserMask,
+} from "@/lib/studio/cutoutImage";
+import { shotSizePresetToDimensions } from "@/lib/ai/productShotSchemas";
 import {
   composeExactProductCard,
   scenePresetToExactBackground,
@@ -31,7 +35,6 @@ import { Button } from "@/components/ui/Button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/Card";
@@ -42,11 +45,9 @@ import { GarmentSettingsPanel } from "./GarmentSettingsPanel";
 import { ProductShotSettingsPanel } from "./ProductShotSettingsPanel";
 import { StudioModeSelector } from "./StudioModeSelector";
 import { GenerationResultGrid } from "./GenerationResultGrid";
-import { BeforeAfterPreview } from "./BeforeAfterPreview";
-import {
-  ProductMaskEditor,
-  type ProductMaskApplyResult,
-} from "./ProductMaskEditor";
+import type { ProductMaskApplyResult } from "./ProductMaskEditor";
+import { ProductSelectionPanel } from "./ProductSelectionPanel";
+import { StudioWorkflowStep } from "./StudioWorkflowStep";
 import {
   DEFAULT_MODEL_GENERATION_SETTINGS,
   DEFAULT_PRODUCT_SHOT_SETTINGS,
@@ -97,8 +98,8 @@ const MODE_STEPS: Record<
   ],
   "background-remove-only": [
     {
-      title: "Вставьте ссылку",
-      description: "Нужна ссылка на готовое изображение.",
+      title: "Загрузите фото",
+      description: "Выберите файл JPEG, PNG или WEBP.",
     },
     {
       title: "Удалите фон",
@@ -111,10 +112,6 @@ const MODE_STEPS: Record<
   ],
 };
 
-function isHttpUrl(value: string): boolean {
-  return /^https?:\/\//i.test(value);
-}
-
 function friendlyAiError(errorCode?: string, message?: string): string {
   if (errorCode === "FAL_KEY_MISSING") {
     return "AI-сервис не настроен на сервере. Обратитесь к администратору.";
@@ -125,7 +122,7 @@ function friendlyAiError(errorCode?: string, message?: string): string {
   }
 
   if (message?.includes("Product image file or URL is required")) {
-    return "Загрузите фото товара или вставьте ссылку.";
+    return "Загрузите фото товара.";
   }
 
   if (message?.includes("Product and model image sources are required")) {
@@ -183,9 +180,6 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
     null
   );
   const [modelPreviewUrl, setModelPreviewUrl] = useState<string | null>(null);
-  const [productUrl, setProductUrl] = useState("");
-  const [modelUrl, setModelUrl] = useState("");
-
   const [productCategory, setProductCategory] =
     useState<ProductCategory>("auto");
   const [garmentPhotoType, setGarmentPhotoType] =
@@ -204,8 +198,6 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
   const [modelGenerateError, setModelGenerateError] = useState<string | null>(
     null
   );
-  const [numSamples, setNumSamples] = useState(2);
-
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<StudioResultImage[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -222,8 +214,6 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
     string | null
   >(null);
   const selectedProductPreviewRef = useRef<string | null>(null);
-  const [useSelectedForCreative, setUseSelectedForCreative] = useState(false);
-
   const clearSelectedProduct = useCallback(() => {
     if (selectedProductPreviewRef.current) {
       URL.revokeObjectURL(selectedProductPreviewRef.current);
@@ -298,15 +288,12 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
   const resolveModelImageUrl = useCallback((): string | null => {
     if (modelFile) return null;
     if (generatedModelUrl) return generatedModelUrl;
-    const trimmed = modelUrl.trim();
-    if (trimmed && isHttpUrl(trimmed)) return trimmed;
     return mockMode ? MOCK_MODEL_IMAGE : null;
-  }, [modelFile, generatedModelUrl, modelUrl, mockMode]);
+  }, [modelFile, generatedModelUrl, mockMode]);
 
   const effectiveModelPreview =
     modelPreviewUrl ??
     (generatedModelUrl && !modelFile ? generatedModelUrl : null) ??
-    (modelUrl && isHttpUrl(modelUrl) ? modelUrl : null) ??
     (mockMode ? MOCK_MODEL_IMAGE : null);
 
   const handlePresetChange = useCallback((preset: ModelPreset) => {
@@ -368,7 +355,6 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
 
       setGeneratedModelUrl(url);
       setModelFile(null);
-      setModelUrl("");
       setModelPreviewUrl(modelPreview.setFromHttpUrl(url));
       setModelGenerationSeed(nextGenerationSeed());
     } catch {
@@ -382,17 +368,9 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
 
   const handleGenerateTryOn = async (seedOverride?: number) => {
     const useSeed = seedOverride ?? generationSeed;
-    const productUrlTrimmed = productUrl.trim();
 
-    if (!productFile && !productUrlTrimmed) {
-      setError("Загрузите фото товара или вставьте ссылку.");
-      return;
-    }
-
-    if (!modelFile && modelUrlTrimmed && !isHttpUrl(modelUrlTrimmed)) {
-      setError(
-        "Вставьте ссылку на модель, которая начинается с https://, или загрузите файл модели."
-      );
+    if (!productFile) {
+      setError("Загрузите фото товара.");
       return;
     }
 
@@ -403,64 +381,27 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
       return;
     }
 
-    const useMultipart = Boolean(productFile || modelFile);
-
-    if (
-      useMultipart === false &&
-      productUrlTrimmed &&
-      !isHttpUrl(productUrlTrimmed)
-    ) {
-      setError(
-        "Вставьте ссылку, которая начинается с https://, или загрузите файл товара."
-      );
-      return;
-    }
-
     setLoading(true);
     setError(null);
     setResults([]);
 
     try {
-      let res: Response;
-
-      if (useMultipart) {
-        const formData = new FormData();
-        if (productFile) formData.append("productImageFile", productFile);
-        if (modelFile) formData.append("modelImageFile", modelFile);
-        if (!productFile && productUrlTrimmed) {
-          formData.append("productImageUrl", productUrlTrimmed);
-        }
-        if (!modelFile && resolvedModelUrl) {
-          formData.append("modelImageUrl", resolvedModelUrl);
-        }
-        formData.append("category", mapCategoryForTryOn(productCategory));
-        formData.append("garmentPhotoType", garmentPhotoType);
-        formData.append("mode", qualityMode);
-        formData.append("moderationLevel", "permissive");
-        formData.append("numSamples", String(numSamples));
-        formData.append("segmentationFree", "true");
-        formData.append("outputFormat", "png");
-        formData.append("seed", String(useSeed));
-
-        res = await fetch("/api/ai/tryon", { method: "POST", body: formData });
-      } else {
-        res = await fetch("/api/ai/tryon", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            productImageUrl: productUrlTrimmed,
-            modelImageUrl: resolvedModelUrl,
-            category: mapCategoryForTryOn(productCategory),
-            garmentPhotoType,
-            mode: qualityMode,
-            moderationLevel: "permissive",
-            numSamples,
-            segmentationFree: true,
-            outputFormat: "png",
-            seed: useSeed,
-          }),
-        });
+      const formData = new FormData();
+      formData.append("productImageFile", productFile);
+      if (modelFile) formData.append("modelImageFile", modelFile);
+      else if (resolvedModelUrl) {
+        formData.append("modelImageUrl", resolvedModelUrl);
       }
+      formData.append("category", mapCategoryForTryOn(productCategory));
+      formData.append("garmentPhotoType", garmentPhotoType);
+      formData.append("mode", qualityMode);
+      formData.append("moderationLevel", "permissive");
+      formData.append("numSamples", "1");
+      formData.append("segmentationFree", "true");
+      formData.append("outputFormat", "png");
+      formData.append("seed", String(useSeed));
+
+      const res = await fetch("/api/ai/tryon", { method: "POST", body: formData });
 
       const data = (await res.json()) as TryOnResponse;
 
@@ -479,48 +420,25 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
     }
   };
 
-  const usesExactProductCard = () =>
-    productShotSettings.fidelityMode === "exact-card" ||
-    isMarketplaceScenePreset(productShotSettings.scenePreset);
 
   const removeBackgroundForProduct = async (
-    productUrlTrimmed: string,
-    imageFileOverride?: File | null
+    imageFile: File
   ): Promise<RemoveBackgroundResponse> => {
-    let res: Response;
-    const fileForBg = imageFileOverride ?? productFile;
-
-    if (fileForBg) {
-      const formData = new FormData();
-      formData.append("imageFile", fileForBg);
-      if (productUrlTrimmed && !imageFileOverride) {
-        formData.append("imageUrl", productUrlTrimmed);
-      }
-      formData.append("syncMode", "false");
-      res = await fetch("/api/ai/remove-background", {
-        method: "POST",
-        body: formData,
-      });
-    } else {
-      res = await fetch("/api/ai/remove-background", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageUrl: productUrlTrimmed,
-          provider: "bria",
-          syncMode: false,
-        }),
-      });
-    }
-
+    const formData = new FormData();
+    formData.append("imageFile", imageFile);
+    formData.append("syncMode", "false");
+    const res = await fetch("/api/ai/remove-background", {
+      method: "POST",
+      body: formData,
+    });
     return (await res.json()) as RemoveBackgroundResponse;
   };
 
   const handleExactProductCard = async () => {
-    const productUrlTrimmed = productUrl.trim();
+    const bgSourceFile = selectedProductFile ?? productFile;
 
-    if (!productFile && !productUrlTrimmed) {
-      setError("Загрузите фото товара или вставьте ссылку.");
+    if (!bgSourceFile) {
+      setError("Загрузите фото товара.");
       return;
     }
 
@@ -530,36 +448,55 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
 
     try {
       const maskUsed = Boolean(selectedProductFile);
-      const bgSourceFile = selectedProductFile ?? productFile;
-      const bgData = await removeBackgroundForProduct(
-        productUrlTrimmed,
-        bgSourceFile
-      );
+      let cutoutUrl: string;
+
+      const bgData = await removeBackgroundForProduct(bgSourceFile);
 
       if (!bgData.ok) {
         setError(friendlyAiError(bgData.errorCode, bgData.message));
         return;
       }
 
-      const cutoutUrl = bgData.image.url;
+      const bgProvider = bgData.provider;
+
+      if (selectedProductFile) {
+        cutoutUrl = await refineCutoutWithUserMask(
+          bgData.image.url,
+          selectedProductFile
+        );
+      } else {
+        cutoutUrl = bgData.image.url;
+      }
+      const [exportWidth, exportHeight] = shotSizePresetToDimensions(
+        productShotSettings.shotSizePreset
+      );
+      let sizedCutoutUrl = cutoutUrl;
+      try {
+        sizedCutoutUrl = await fitCutoutToShotSize(
+          cutoutUrl,
+          productShotSettings.shotSizePreset
+        );
+      } catch {
+        /* keep API url if canvas processing fails */
+      }
       const background = scenePresetToExactBackground(
         productShotSettings.scenePreset
       );
-      const cardUrl = await composeExactProductCard(cutoutUrl, {
+      const cardUrl = await composeExactProductCard(sizedCutoutUrl, {
         background,
         shotSizePreset: productShotSettings.shotSizePreset,
       });
 
       setResults(
         mapProductShotStudioResults(
-          [{ url: cardUrl }],
+          [{ url: cardUrl, width: exportWidth, height: exportHeight }],
           "exact-card",
           {
-            cutoutPreviewUrl: cutoutUrl,
+            cutoutPreviewUrl: sizedCutoutUrl,
             selectedProductPreviewUrl: selectedProductPreviewUrl ?? undefined,
             manualMaskUsed: maskUsed,
             exactCardWithoutMask: !maskUsed,
-            provider: bgData.provider,
+            provider: bgProvider,
           }
         )
       );
@@ -575,107 +512,13 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
     }
   };
 
-  const handleCreativeProductShot = async () => {
-    const productUrlTrimmed = productUrl.trim();
-
-    if (!productFile && !productUrlTrimmed) {
-      setError("Загрузите фото товара или вставьте ссылку.");
-      return;
-    }
-
-    if (isMarketplaceScenePreset(productShotSettings.scenePreset)) {
-      setError("Пресеты маркетплейса работают только в режиме «Точная карточка».");
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    setResults([]);
-
-    try {
-      let res: Response;
-      const creativeProductFile =
-        useSelectedForCreative && selectedProductFile
-          ? selectedProductFile
-          : productFile;
-
-      if (creativeProductFile) {
-        const formData = new FormData();
-        formData.append("productImageFile", creativeProductFile);
-        if (productUrlTrimmed) {
-          formData.append("productImageUrl", productUrlTrimmed);
-        }
-        formData.append("scenePreset", productShotSettings.scenePreset);
-        if (productShotSettings.customSceneDescription) {
-          formData.append(
-            "customSceneDescription",
-            productShotSettings.customSceneDescription
-          );
-        }
-        formData.append("numResults", String(productShotSettings.numResults));
-        formData.append("fast", "true");
-        formData.append("placementType", "manual_placement");
-        formData.append("manualPlacementSelection", "center_vertical");
-        formData.append("shotSizePreset", productShotSettings.shotSizePreset);
-        formData.append("syncMode", "false");
-        formData.append("fidelityMode", "creative-scene");
-
-        res = await fetch("/api/ai/product-shot", {
-          method: "POST",
-          body: formData,
-        });
-      } else {
-        res = await fetch("/api/ai/product-shot", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            productImageUrl: productUrlTrimmed,
-            scenePreset: productShotSettings.scenePreset,
-            customSceneDescription:
-              productShotSettings.customSceneDescription || undefined,
-            numResults: productShotSettings.numResults,
-            fast: true,
-            placementType: "manual_placement",
-            manualPlacementSelection: "center_vertical",
-            shotSizePreset: productShotSettings.shotSizePreset,
-            syncMode: false,
-            fidelityMode: "creative-scene",
-          }),
-        });
-      }
-
-      const data = (await res.json()) as ProductShotResponse;
-
-      if (!data.ok) {
-        setError(friendlyAiError(data.errorCode, data.message));
-        return;
-      }
-
-      setResults(
-        mapProductShotStudioResults(data.images, "creative-scene", {
-          provider: data.provider,
-        })
-      );
-      setLastGenerationMode("product-shot");
-    } catch {
-      setError("Не удалось создать товарное фото. Проверьте фото и попробуйте ещё раз.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleProductShot = async () => {
-    if (usesExactProductCard()) {
-      await handleExactProductCard();
-      return;
-    }
-    await handleCreativeProductShot();
+    await handleExactProductCard();
   };
 
   const handleBackgroundRemoveOnly = async () => {
-    const imageUrl = productUrl.trim();
-    if (!imageUrl || !isHttpUrl(imageUrl)) {
-      setError("Вставьте ссылку на изображение (https://…).");
+    if (!productFile) {
+      setError("Загрузите изображение.");
       return;
     }
 
@@ -684,17 +527,7 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
     setResults([]);
 
     try {
-      const res = await fetch("/api/ai/remove-background", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageUrl,
-          provider: "bria",
-          syncMode: false,
-        }),
-      });
-
-      const data = (await res.json()) as RemoveBackgroundResponse;
+      const data = await removeBackgroundForProduct(productFile);
 
       if (!data.ok) {
         setError(friendlyAiError(data.errorCode, data.message));
@@ -716,98 +549,9 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
     }
   };
 
-  const handleAcceptResult = useCallback((resultId: string) => {
-    setResults((prev) =>
-      prev.map((r) =>
-        r.id === resultId ? { ...r, reviewStatus: "accepted" as const } : r
-      )
-    );
-  }, []);
-
-  const handleRejectResult = useCallback((resultId: string) => {
-    setResults((prev) =>
-      prev.map((r) =>
-        r.id === resultId ? { ...r, reviewStatus: "rejected" as const } : r
-      )
-    );
-  }, []);
-
-  const handleRemoveBackground = useCallback(async (resultId: string) => {
-    let imageUrl: string | undefined;
-    setResults((prev) => {
-      const result = prev.find((r) => r.id === resultId);
-      if (!result) return prev;
-      imageUrl = result.url;
-      return prev.map((r) =>
-        r.id === resultId
-          ? {
-              ...r,
-              backgroundRemoveLoading: true,
-              backgroundRemoveError: undefined,
-            }
-          : r
-      );
-    });
-
-    if (!imageUrl) return;
-
-    try {
-      const res = await fetch("/api/ai/remove-background", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageUrl,
-          provider: "bria",
-          syncMode: false,
-        }),
-      });
-
-      const data = (await res.json()) as RemoveBackgroundResponse;
-
-      if (!data.ok) {
-        setResults((prev) =>
-          prev.map((r) =>
-            r.id === resultId
-              ? {
-                  ...r,
-                  backgroundRemoveLoading: false,
-                  backgroundRemoveError: friendlyAiError(
-                    data.errorCode,
-                    data.message
-                  ),
-                }
-              : r
-          )
-        );
-        return;
-      }
-
-      setResults((prev) =>
-        prev.map((r) =>
-          r.id === resultId
-            ? {
-                ...r,
-                backgroundRemoveLoading: false,
-                backgroundRemovedUrl: data.image.url,
-                backgroundRemoveError: undefined,
-              }
-            : r
-        )
-      );
-    } catch {
-      setResults((prev) =>
-        prev.map((r) =>
-          r.id === resultId
-            ? {
-                ...r,
-                backgroundRemoveLoading: false,
-                backgroundRemoveError:
-                  "Не удалось удалить фон. Попробуйте ещё раз.",
-              }
-            : r
-        )
-      );
-    }
+  const handleStartOver = useCallback(() => {
+    setResults([]);
+    setError(null);
   }, []);
 
   const handleRegenerate = () => {
@@ -827,41 +571,16 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
     return handleBackgroundRemoveOnly();
   };
 
-  const productUrlTrimmed = productUrl.trim();
-  const modelUrlTrimmed = modelUrl.trim();
-  const firstResultUrl = results[0]?.url ?? null;
   const isClothingMode = studioMode === "clothing-tryon";
   const isProductShotMode = studioMode === "product-shot";
   const isBgOnlyMode = studioMode === "background-remove-only";
-  const productUrlPreview =
-    productUrlTrimmed && isHttpUrl(productUrlTrimmed) ? productUrlTrimmed : null;
-  const effectiveProductPreviewUrl = isBgOnlyMode
-    ? productUrlPreview
-    : productPreviewUrl ?? productUrlPreview;
-  const productUrlIsValid = Boolean(productUrlPreview);
-  const modelUrlIsValid = Boolean(modelUrlTrimmed && isHttpUrl(modelUrlTrimmed));
-  const hasProductInput = isBgOnlyMode
-    ? productUrlIsValid
-    : Boolean(productFile || productUrlIsValid);
+  const effectiveProductPreviewUrl = productPreviewUrl;
+  const hasProductInput = Boolean(productFile);
   const hasModelInput = Boolean(
-    modelFile || generatedModelUrl || modelUrlIsValid || mockMode
+    modelFile || generatedModelUrl || mockMode
   );
   const primaryBlocker = (() => {
-    if (isBgOnlyMode) {
-      if (!productUrlTrimmed) return "Сначала вставьте ссылку на изображение.";
-      if (!productUrlIsValid) return "Ссылка должна начинаться с https:// или http://.";
-      return null;
-    }
-
-    if (!productFile && productUrlTrimmed && !productUrlIsValid) {
-      return "Ссылка на товар должна начинаться с https:// или http://.";
-    }
-
-    if (!hasProductInput) return "Сначала загрузите фото товара.";
-
-    if (isClothingMode && !modelFile && modelUrlTrimmed && !modelUrlIsValid) {
-      return "Ссылка на модель должна начинаться с https:// или http://.";
-    }
+    if (!hasProductInput) return "Сначала загрузите фото.";
 
     if (isClothingMode && !hasModelInput) {
       return "Загрузите фото модели или сгенерируйте AI-модель.";
@@ -875,7 +594,7 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
   const primaryButtonLabel = isClothingMode
     ? "Создать фото на модели"
     : isProductShotMode
-      ? "Создать Product Shot"
+      ? "Создать карточку"
       : "Удалить фон";
 
   const PrimaryIcon = isClothingMode
@@ -934,196 +653,149 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
         <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
           <aside className="space-y-4">
             <Card>
-            <CardHeader>
-              <CardTitle>Рабочая область</CardTitle>
-              <CardDescription>
-                Загрузите фото, выберите понятные настройки и запустите
-                генерацию.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <ImageUploader
-                label={
-                  isBgOnlyMode
-                    ? "Изображение для удаления фона"
-                    : "Загрузите фото товара"
-                }
-                hint={
-                  isBgOnlyMode
-                    ? "В этом режиме используйте ссылку на готовое изображение."
-                    : "Лучше всего: товар хорошо виден, без сильного размытия и без лишних предметов."
-                }
-                previewUrl={
-                  effectiveProductPreviewUrl
-                }
-                selectedFile={isBgOnlyMode ? null : productFile}
-                onFileSelect={isBgOnlyMode ? undefined : handleProductFile}
-                onClearFile={isBgOnlyMode ? undefined : clearProductFile}
-                onUrlChange={(url) => {
-                  if (productFile && !isBgOnlyMode) return;
-                  setProductUrl(url);
-                  clearSelectedProduct();
-                  setProductPreviewUrl(
-                    url && isHttpUrl(url)
-                      ? productPreview.setFromHttpUrl(url)
-                      : productPreview.setFromHttpUrl(null)
-                  );
-                }}
-                urlValue={productUrl}
-                urlLabel="Или вставьте ссылку на изображение"
-              />
-
-              {isClothingMode && (
-                <>
-                  <ImageUploader
-                    label="Загрузите фото модели или сгенерируйте AI-модель"
-                    hint="Для одежды лучше подходит фото в полный рост или по пояс, где одежду легко заменить."
-                    previewUrl={
-                      modelPreviewUrl ??
-                      (modelUrlTrimmed && isHttpUrl(modelUrlTrimmed)
-                        ? modelUrlTrimmed
-                        : null)
-                    }
-                    selectedFile={modelFile}
-                    onFileSelect={handleModelFile}
-                    onClearFile={clearModelFile}
-                    onUrlChange={(url) => {
-                      if (modelFile) return;
-                      setModelUrl(url);
-                      setGeneratedModelUrl(null);
-                      setModelGenerateError(null);
-                      setModelPreviewUrl(
-                        url && isHttpUrl(url)
-                          ? modelPreview.setFromHttpUrl(url)
-                          : modelPreview.setFromHttpUrl(null)
-                      );
-                    }}
-                    urlValue={modelUrl}
-                    urlLabel="Или вставьте ссылку на изображение модели"
-                  />
-
-                  <ModelPresetSelector
-                    value={modelPreset}
-                    onChange={handlePresetChange}
-                    settings={modelSettings}
-                    onSettingsChange={handleModelSettingsChange}
-                    onGenerate={() => void handleGenerateModel()}
-                    generating={modelGenerating}
-                    generateError={modelGenerateError}
-                    generatedPreviewUrl={
-                      generatedModelUrl && !modelFile
-                        ? generatedModelUrl
-                        : null
-                    }
-                  />
-
-                  <GarmentSettingsPanel
-                    productCategory={productCategory}
-                    onProductCategoryChange={setProductCategory}
-                    garmentPhotoType={garmentPhotoType}
-                    onGarmentPhotoTypeChange={setGarmentPhotoType}
-                    qualityMode={qualityMode}
-                    onQualityModeChange={setQualityMode}
-                    numSamples={numSamples}
-                    onNumSamplesChange={setNumSamples}
-                    lingerieMode={modelSettings.categoryContext === "lingerie"}
-                  />
-                </>
-              )}
-
-              {isProductShotMode && (
-                <ProductShotSettingsPanel
-                  settings={productShotSettings}
-                  onChange={setProductShotSettings}
-                  hasSelectedProduct={Boolean(selectedProductFile)}
-                  useSelectedForCreative={useSelectedForCreative}
-                  onUseSelectedForCreativeChange={setUseSelectedForCreative}
-                />
-              )}
-
-              {isProductShotMode &&
-                usesExactProductCard() &&
-                hasProductInput &&
-                effectiveProductPreviewUrl &&
-                !maskEditorOpen && (
-                  <div className="space-y-3 rounded-[22px] border border-teal-100 bg-teal-50/50 p-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full"
-                      size="lg"
-                      onClick={() => setMaskEditorOpen(true)}
+            <CardContent className="pt-6">
+              <>
+                    <StudioWorkflowStep
+                      step={1}
+                      label={
+                        isBgOnlyMode ? "Исходное фото" : "Фото товара"
+                      }
                     >
-                      Выделить товар
-                    </Button>
-                    <p className="text-xs leading-5 text-slate-600">
-                      Если на фото есть ветки, руки, декор или лишние предметы
-                      — выделите только товар. Так карточка получится точнее.
-                    </p>
-                    {!selectedProductFile && (
-                      <p className="text-xs leading-5 text-amber-800">
-                        Без выделения AI может оставить лишние объекты рядом с
-                        товаром.
-                      </p>
+                      <ImageUploader
+                        label={
+                          isBgOnlyMode
+                            ? "Изображение для удаления фона"
+                            : "Загрузите фото товара"
+                        }
+                        hint={
+                          isBgOnlyMode
+                            ? "Загрузите готовое фото — сервис уберёт фон и вернёт PNG."
+                            : "Лучше всего: товар хорошо виден, без сильного размытия и без лишних предметов."
+                        }
+                        previewUrl={effectiveProductPreviewUrl}
+                        selectedFile={productFile}
+                        onFileSelect={handleProductFile}
+                        onClearFile={clearProductFile}
+                      />
+                    </StudioWorkflowStep>
+
+                    {isProductShotMode && (
+                      <StudioWorkflowStep
+                        step={2}
+                        label="Выделение товара"
+                        optional
+                      >
+                        <ProductSelectionPanel
+                          active={
+                            hasProductInput &&
+                            Boolean(effectiveProductPreviewUrl)
+                          }
+                          previewUrl={effectiveProductPreviewUrl}
+                          maskEditorOpen={maskEditorOpen}
+                          hasSelectedProduct={Boolean(selectedProductFile)}
+                          selectedProductPreviewUrl={
+                            selectedProductPreviewUrl
+                          }
+                          onOpenEditor={() => setMaskEditorOpen(true)}
+                          onApply={handleMaskApply}
+                          onCancelEditor={() => setMaskEditorOpen(false)}
+                          onClearSelection={clearSelectedProduct}
+                        />
+                      </StudioWorkflowStep>
                     )}
-                    {selectedProductPreviewUrl && (
-                      <div>
-                        <p className="mb-2 text-xs font-semibold text-slate-700">
-                          Выбранный товар
-                        </p>
-                        <div className="overflow-hidden rounded-[16px] border border-border bg-[length:12px_12px] bg-[position:0_0,6px_6px]"
-                          style={{
-                            backgroundImage:
-                              "linear-gradient(45deg, #e2e8f0 25%, transparent 25%), linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e2e8f0 75%), linear-gradient(-45deg, transparent 75%, #e2e8f0 75%)",
-                            backgroundColor: "#f8fafc",
-                          }}
+
+                    {isClothingMode && (
+                      <>
+                        <StudioWorkflowStep
+                          step={2}
+                          label="Фото модели"
                         >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={selectedProductPreviewUrl}
-                            alt="Выбранный товар"
-                            className="max-h-48 w-full object-contain"
+                          <ImageUploader
+                            label="Загрузите фото модели или сгенерируйте AI-модель"
+                            hint="Для одежды лучше подходит фото в полный рост или по пояс, где одежду легко заменить."
+                            previewUrl={effectiveModelPreview}
+                            selectedFile={modelFile}
+                            onFileSelect={handleModelFile}
+                            onClearFile={clearModelFile}
                           />
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="mt-2 w-full"
-                          onClick={() => setMaskEditorOpen(true)}
+                        </StudioWorkflowStep>
+
+                        <StudioWorkflowStep
+                          step={3}
+                          label="AI-модель"
                         >
-                          Изменить выделение
-                        </Button>
-                      </div>
+                          <ModelPresetSelector
+                            value={modelPreset}
+                            onChange={handlePresetChange}
+                            settings={modelSettings}
+                            onSettingsChange={handleModelSettingsChange}
+                            onGenerate={() => void handleGenerateModel()}
+                            generating={modelGenerating}
+                            generateError={modelGenerateError}
+                            generatedPreviewUrl={
+                              generatedModelUrl && !modelFile
+                                ? generatedModelUrl
+                                : null
+                            }
+                          />
+                        </StudioWorkflowStep>
+
+                        <StudioWorkflowStep
+                          step={4}
+                          label="Настройки примерки"
+                        >
+                          <GarmentSettingsPanel
+                            productCategory={productCategory}
+                            onProductCategoryChange={setProductCategory}
+                            garmentPhotoType={garmentPhotoType}
+                            onGarmentPhotoTypeChange={setGarmentPhotoType}
+                            qualityMode={qualityMode}
+                            onQualityModeChange={setQualityMode}
+                            lingerieMode={
+                              modelSettings.categoryContext === "lingerie"
+                            }
+                          />
+                        </StudioWorkflowStep>
+                      </>
                     )}
-                  </div>
-                )}
 
-              {isProductShotMode && maskEditorOpen && effectiveProductPreviewUrl && (
-                <ProductMaskEditor
-                  key={effectiveProductPreviewUrl}
-                  imageUrl={effectiveProductPreviewUrl}
-                  onApply={handleMaskApply}
-                  onCancel={() => setMaskEditorOpen(false)}
-                />
-              )}
+                    {isProductShotMode && (
+                      <StudioWorkflowStep
+                        step={3}
+                        label="Карточка маркетплейса"
+                      >
+                        <ProductShotSettingsPanel
+                          settings={productShotSettings}
+                          onChange={setProductShotSettings}
+                        />
+                      </StudioWorkflowStep>
+                    )}
 
-              <Button
-                className="w-full"
-                size="lg"
-                loading={loading}
-                disabled={!canRunPrimary}
-                title={primaryBlocker ?? undefined}
-                onClick={handlePrimaryAction}
-              >
-                <PrimaryIcon className="h-5 w-5" />
-                {primaryButtonLabel}
-              </Button>
-              {primaryHelper ? (
-                <p className="text-xs leading-5 text-amber-800">
-                  {primaryHelper}
-                </p>
-              ) : null}
+                    <StudioWorkflowStep
+                      step={
+                        isClothingMode ? 5 : isProductShotMode ? 4 : 2
+                      }
+                      label="Готово"
+                      isLast
+                    >
+                      <Button
+                        className="w-full"
+                        size="lg"
+                        loading={loading}
+                        disabled={!canRunPrimary}
+                        title={primaryBlocker ?? undefined}
+                        onClick={handlePrimaryAction}
+                      >
+                        <PrimaryIcon className="h-5 w-5" />
+                        {primaryButtonLabel}
+                      </Button>
+                      {primaryHelper ? (
+                        <p className="mt-2 text-xs leading-5 text-amber-800">
+                          {primaryHelper}
+                        </p>
+                      ) : null}
+                    </StudioWorkflowStep>
+              </>
             </CardContent>
             </Card>
           </aside>
@@ -1150,14 +822,8 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
             ) : (
               <PreviewCard
                 title={isBgOnlyMode ? "Исходник" : "Товар"}
-                url={
-                  effectiveProductPreviewUrl
-                }
-                empty={
-                  isBgOnlyMode
-                    ? "Вставьте URL изображения"
-                    : "Загрузите фото товара"
-                }
+                url={effectiveProductPreviewUrl}
+                empty="Загрузите фото"
               />
             )}
 
@@ -1180,22 +846,14 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
               <GenerationResultGrid
                 results={results}
                 loading={loading}
-                showRegenerate={!isBgOnlyMode && results.length > 0}
+                showRegenerate={
+                  !isBgOnlyMode && !isProductShotMode && results.length > 0
+                }
                 regenerateLoading={loading}
                 isProductShotMode={isProductShotMode}
-                onAccept={handleAcceptResult}
-                onReject={handleRejectResult}
+                onStartOver={handleStartOver}
                 onRegenerate={handleRegenerate}
-                onRemoveBackground={handleRemoveBackground}
               />
-              {isClothingMode && (
-                <BeforeAfterPreview
-                  beforeUrl={
-                    effectiveProductPreviewUrl
-                  }
-                  afterUrl={firstResultUrl}
-                />
-              )}
             </CardContent>
             </Card>
           </section>

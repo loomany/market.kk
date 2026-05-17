@@ -121,7 +121,7 @@ export const STUDIO_MODES: {
   {
     id: "background-remove-only",
     label: "Удалить фон",
-    description: "Быстро убрать фон у готового изображения по ссылке.",
+    description: "Быстро убрать фон у готового изображения.",
     recommendedFor: "Рекомендуем для готовых фото",
   },
 ];
@@ -129,31 +129,21 @@ export const STUDIO_MODES: {
 export type ProductShotScenePreset =
   | "marketplace-clean"
   | "white-studio"
-  | "light-gray-studio"
-  | "luxury-boutique"
-  | "jewelry-display"
-  | "flat-lay"
-  | "custom";
+  | "light-gray-studio";
 
 import type { ShotSizePreset } from "@/lib/ai/productShotSchemas";
 
 export type { ShotSizePreset };
 
-export type ProductShotFidelityMode = "exact-card" | "creative-scene";
+export type ProductShotFidelityMode = "exact-card";
 
 export type ProductShotSettings = {
-  fidelityMode: ProductShotFidelityMode;
   scenePreset: ProductShotScenePreset;
-  customSceneDescription: string;
-  numResults: number;
   shotSizePreset: ShotSizePreset;
 };
 
 export const DEFAULT_PRODUCT_SHOT_SETTINGS: ProductShotSettings = {
-  fidelityMode: "exact-card",
   scenePreset: "marketplace-clean",
-  customSceneDescription: "",
-  numResults: 1,
   shotSizePreset: "square",
 };
 
