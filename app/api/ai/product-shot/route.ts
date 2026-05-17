@@ -4,6 +4,7 @@ import {
   PRODUCT_SHOT_MODEL,
 } from "@/lib/ai/falClient";
 import { buildProductShotSceneDescription } from "@/lib/ai/productShotPrompts";
+import { isMarketplaceScenePreset } from "@/lib/ai/productShotFidelity";
 import {
   buildProductShotFormPayload,
   productShotRequestSchema,
@@ -68,6 +69,30 @@ async function runProductShot(
   data: ProductShotRequest,
   productImageUrl: string
 ) {
+  if (data.fidelityMode === "exact-card") {
+    return NextResponse.json(
+      {
+        ok: false,
+        errorCode: "VALIDATION_ERROR",
+        message:
+          "Exact-card mode uses background removal and client compositing. Do not call creative product-shot.",
+      },
+      { status: 400 }
+    );
+  }
+
+  if (isMarketplaceScenePreset(data.scenePreset)) {
+    return NextResponse.json(
+      {
+        ok: false,
+        errorCode: "VALIDATION_ERROR",
+        message:
+          "Marketplace presets must use the exact-card pipeline, not Bria product-shot.",
+      },
+      { status: 400 }
+    );
+  }
+
   const sceneDescription = buildProductShotSceneDescription(data);
   const shotSize = shotSizePresetToDimensions(data.shotSizePreset);
 
@@ -195,6 +220,7 @@ async function processFormPayload(payload: ProductShotFormPayload) {
       manualPlacementSelection: payload.manualPlacementSelection,
       shotSizePreset: payload.shotSizePreset,
       syncMode: payload.syncMode,
+      fidelityMode: payload.fidelityMode,
     };
     return runProductShot(params, productImageUrl);
   } catch (error) {

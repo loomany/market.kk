@@ -3,7 +3,11 @@ import {
   BACKGROUND_REMOVE_MODEL,
   getFalClientOrThrow,
 } from "@/lib/ai/falClient";
-import { removeBackgroundRequestSchema } from "@/lib/ai/backgroundRemovalSchemas";
+import {
+  buildRemoveBackgroundFormPayload,
+  removeBackgroundRequestSchema,
+} from "@/lib/ai/backgroundRemovalSchemas";
+import { uploadImageToFalStorage } from "@/lib/ai/falUpload";
 import { MOCK_BACKGROUND_REMOVED_IMAGE } from "@/lib/ai/mockResults";
 
 export const runtime = "nodejs";
@@ -12,36 +16,29 @@ function isMockMode() {
   return process.env.AI_MOCK_MODE !== "0";
 }
 
-export async function POST(request: Request) {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json(
-      {
-        ok: false,
-        errorCode: "VALIDATION_ERROR",
-        message: "Invalid JSON body",
-      },
-      { status: 400 }
-    );
+async function resolveImageUrl(
+  imageUrl: string | undefined,
+  imageFile: File | null,
+  mockMode: boolean
+): Promise<string> {
+  let resolved = imageUrl;
+
+  if (imageFile) {
+    if (mockMode) {
+      resolved = resolved ?? "https://mock.local/product";
+    } else {
+      resolved = await uploadImageToFalStorage(imageFile, "Product image");
+    }
   }
 
-  const parsed = removeBackgroundRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      {
-        ok: false,
-        errorCode: "VALIDATION_ERROR",
-        message: "Invalid background removal request",
-        issues: parsed.error.issues,
-      },
-      { status: 400 }
-    );
+  if (!resolved) {
+    throw new Error("Image file or URL is required.");
   }
 
-  const data = parsed.data;
+  return resolved;
+}
 
+async function runRemoveBackground(imageUrl: string, syncMode: boolean) {
   if (isMockMode()) {
     return NextResponse.json({
       ok: true,
@@ -56,8 +53,8 @@ export async function POST(request: Request) {
     const fal = getFalClientOrThrow();
     const result = await fal.subscribe(BACKGROUND_REMOVE_MODEL, {
       input: {
-        image_url: data.imageUrl,
-        sync_mode: data.syncMode,
+        image_url: imageUrl,
+        sync_mode: syncMode,
       },
       logs: true,
       onQueueUpdate(update) {
@@ -119,4 +116,86 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+}
+
+export async function POST(request: Request) {
+  const contentType = request.headers.get("content-type") ?? "";
+
+  if (contentType.includes("multipart/form-data")) {
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch {
+      return NextResponse.json(
+        {
+          ok: false,
+          errorCode: "VALIDATION_ERROR",
+          message: "Invalid multipart form data",
+        },
+        { status: 400 }
+      );
+    }
+
+    try {
+      const payload = buildRemoveBackgroundFormPayload(formData);
+      const mockMode = isMockMode();
+      const imageUrl = await resolveImageUrl(
+        payload.imageUrl,
+        payload.imageFile,
+        mockMode
+      );
+      return runRemoveBackground(imageUrl, payload.syncMode);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Invalid form data";
+      return NextResponse.json(
+        {
+          ok: false,
+          errorCode: "VALIDATION_ERROR",
+          message,
+        },
+        { status: 400 }
+      );
+    }
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        ok: false,
+        errorCode: "VALIDATION_ERROR",
+        message: "Invalid JSON body",
+      },
+      { status: 400 }
+    );
+  }
+
+  const parsed = removeBackgroundRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      {
+        ok: false,
+        errorCode: "VALIDATION_ERROR",
+        message: "Invalid background removal request",
+        issues: parsed.error.issues,
+      },
+      { status: 400 }
+    );
+  }
+
+  if (!parsed.data.imageUrl) {
+    return NextResponse.json(
+      {
+        ok: false,
+        errorCode: "VALIDATION_ERROR",
+        message: "imageUrl is required for JSON requests",
+      },
+      { status: 400 }
+    );
+  }
+
+  return runRemoveBackground(parsed.data.imageUrl, parsed.data.syncMode);
 }

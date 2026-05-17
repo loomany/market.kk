@@ -1,3 +1,5 @@
+import type { ProductShotChecklistState as ProductShotChecklistStateType } from "@/lib/ai/productShotChecklist";
+
 export type ProductCategory =
   | "auto"
   | "tops"
@@ -135,7 +137,10 @@ export type ProductShotScenePreset =
 
 export type ShotSizePreset = "square" | "portrait" | "vertical" | "wide";
 
+export type ProductShotFidelityMode = "exact-card" | "creative-scene";
+
 export type ProductShotSettings = {
+  fidelityMode: ProductShotFidelityMode;
   scenePreset: ProductShotScenePreset;
   customSceneDescription: string;
   numResults: number;
@@ -143,6 +148,7 @@ export type ProductShotSettings = {
 };
 
 export const DEFAULT_PRODUCT_SHOT_SETTINGS: ProductShotSettings = {
+  fidelityMode: "exact-card",
   scenePreset: "marketplace-clean",
   customSceneDescription: "",
   numResults: 1,
@@ -166,6 +172,8 @@ export type QualityChecklistKey =
 
 export type QualityChecklistState = Record<QualityChecklistKey, boolean>;
 
+export type ProductShotChecklistState = ProductShotChecklistStateType;
+
 export type StudioResultImage = {
   id: string;
   url: string;
@@ -175,6 +183,9 @@ export type StudioResultImage = {
   provider?: string;
   reviewStatus: ResultReviewStatus;
   checklist: QualityChecklistState;
+  productShotFidelity?: ProductShotFidelityMode;
+  productShotChecklist?: ProductShotChecklistState;
+  cutoutPreviewUrl?: string;
   backgroundRemovedUrl?: string;
   backgroundRemoveError?: string;
   backgroundRemoveLoading?: boolean;

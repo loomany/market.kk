@@ -17,8 +17,15 @@ import type { RemoveBackgroundResponse } from "@/lib/ai/backgroundRemovalSchemas
 import type { ProductShotResponse } from "@/lib/ai/productShotSchemas";
 import { mapCategoryForTryOn, type TryOnResponse } from "@/lib/ai/falSchemas";
 import { validateImageFileClient } from "@/lib/ai/clientImageValidation";
+import { isMarketplaceScenePreset } from "@/lib/ai/productShotFidelity";
+import type { ProductShotChecklistKey } from "@/lib/ai/productShotChecklist";
+import {
+  composeExactProductCard,
+  scenePresetToExactBackground,
+} from "@/lib/studio/exactProductCard";
 import {
   mapApiImagesToStudioResults,
+  mapProductShotStudioResults,
   nextGenerationSeed,
 } from "@/lib/studio/resultUtils";
 import { Button } from "@/components/ui/Button";
@@ -427,11 +434,102 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
     }
   };
 
-  const handleProductShot = async () => {
+  const usesExactProductCard = () =>
+    productShotSettings.fidelityMode === "exact-card" ||
+    isMarketplaceScenePreset(productShotSettings.scenePreset);
+
+  const removeBackgroundForProduct = async (
+    productUrlTrimmed: string
+  ): Promise<RemoveBackgroundResponse> => {
+    let res: Response;
+
+    if (productFile) {
+      const formData = new FormData();
+      formData.append("imageFile", productFile);
+      if (productUrlTrimmed) {
+        formData.append("imageUrl", productUrlTrimmed);
+      }
+      formData.append("syncMode", "false");
+      res = await fetch("/api/ai/remove-background", {
+        method: "POST",
+        body: formData,
+      });
+    } else {
+      res = await fetch("/api/ai/remove-background", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageUrl: productUrlTrimmed,
+          provider: "bria",
+          syncMode: false,
+        }),
+      });
+    }
+
+    return (await res.json()) as RemoveBackgroundResponse;
+  };
+
+  const handleExactProductCard = async () => {
     const productUrlTrimmed = productUrl.trim();
 
     if (!productFile && !productUrlTrimmed) {
       setError("Загрузите фото товара или вставьте ссылку.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setResults([]);
+
+    try {
+      const bgData = await removeBackgroundForProduct(productUrlTrimmed);
+
+      if (!bgData.ok) {
+        setError(friendlyAiError(bgData.errorCode, bgData.message));
+        return;
+      }
+
+      const cutoutUrl = bgData.image.url;
+      const background = scenePresetToExactBackground(
+        productShotSettings.scenePreset
+      );
+      const cardUrl = await composeExactProductCard(cutoutUrl, {
+        background,
+        shotSizePreset: productShotSettings.shotSizePreset,
+      });
+
+      setResults(
+        mapProductShotStudioResults(
+          [{ url: cardUrl }],
+          "exact-card",
+          {
+            cutoutPreviewUrl: cutoutUrl,
+            provider: bgData.provider,
+          }
+        )
+      );
+      setLastGenerationMode("product-shot");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Не удалось собрать точную карточку.";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreativeProductShot = async () => {
+    const productUrlTrimmed = productUrl.trim();
+
+    if (!productFile && !productUrlTrimmed) {
+      setError("Загрузите фото товара или вставьте ссылку.");
+      return;
+    }
+
+    if (isMarketplaceScenePreset(productShotSettings.scenePreset)) {
+      setError("Пресеты маркетплейса работают только в режиме «Точная карточка».");
       return;
     }
 
@@ -461,6 +559,7 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
         formData.append("manualPlacementSelection", "center_vertical");
         formData.append("shotSizePreset", productShotSettings.shotSizePreset);
         formData.append("syncMode", "false");
+        formData.append("fidelityMode", "creative-scene");
 
         res = await fetch("/api/ai/product-shot", {
           method: "POST",
@@ -481,6 +580,7 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
             manualPlacementSelection: "center_vertical",
             shotSizePreset: productShotSettings.shotSizePreset,
             syncMode: false,
+            fidelityMode: "creative-scene",
           }),
         });
       }
@@ -493,7 +593,9 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
       }
 
       setResults(
-        mapApiImagesToStudioResults(data.images, "Товарное фото", data.provider)
+        mapProductShotStudioResults(data.images, "creative-scene", {
+          provider: data.provider,
+        })
       );
       setLastGenerationMode("product-shot");
     } catch {
@@ -501,6 +603,14 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleProductShot = async () => {
+    if (usesExactProductCard()) {
+      await handleExactProductCard();
+      return;
+    }
+    await handleCreativeProductShot();
   };
 
   const handleBackgroundRemoveOnly = async () => {
@@ -546,6 +656,25 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
       setLoading(false);
     }
   };
+
+  const handleProductShotChecklistChange = useCallback(
+    (resultId: string, key: ProductShotChecklistKey, value: boolean) => {
+      setResults((prev) =>
+        prev.map((r) =>
+          r.id === resultId && r.productShotChecklist
+            ? {
+                ...r,
+                productShotChecklist: {
+                  ...r.productShotChecklist,
+                  [key]: value,
+                },
+              }
+            : r
+        )
+      );
+    },
+    []
+  );
 
   const handleAcceptResult = useCallback((resultId: string) => {
     setResults((prev) =>
@@ -942,6 +1071,8 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
                 loading={loading}
                 showRegenerate={!isBgOnlyMode && results.length > 0}
                 regenerateLoading={loading}
+                isProductShotMode={isProductShotMode}
+                onProductShotChecklistChange={handleProductShotChecklistChange}
                 onAccept={handleAcceptResult}
                 onReject={handleRejectResult}
                 onRegenerate={handleRegenerate}

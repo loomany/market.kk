@@ -1,4 +1,9 @@
 import type { ProductShotRequest } from "@/lib/ai/productShotSchemas";
+import {
+  CREATIVE_FIDELITY_SUFFIX,
+  CREATIVE_JEWELRY_SUFFIX,
+  isMarketplaceScenePreset,
+} from "@/lib/ai/productShotFidelity";
 
 const PRESET_SCENES: Record<
   Exclude<ProductShotRequest["scenePreset"], "custom">,
@@ -18,20 +23,26 @@ const PRESET_SCENES: Record<
     "professional flat lay ecommerce product photography on a clean neutral surface, balanced composition, soft natural shadows, no text, no watermark, no logo",
 };
 
-const QUALITY_SUFFIX =
-  "Keep the original product shape, color, material, texture, pattern, and details accurate. Do not change the product design.";
-
 export function buildProductShotSceneDescription(
   input: ProductShotRequest
 ): string {
+  if (isMarketplaceScenePreset(input.scenePreset)) {
+    throw new Error(
+      "Marketplace presets must use the exact-card pipeline, not creative product-shot."
+    );
+  }
+
   let scene: string;
 
   if (input.scenePreset === "custom") {
     const custom = input.customSceneDescription?.trim();
-    scene = custom || PRESET_SCENES["marketplace-clean"];
+    scene = custom || PRESET_SCENES["luxury-boutique"];
   } else {
     scene = PRESET_SCENES[input.scenePreset];
   }
 
-  return `${scene} ${QUALITY_SUFFIX}`;
+  const jewelrySuffix =
+    input.scenePreset === "jewelry-display" ? ` ${CREATIVE_JEWELRY_SUFFIX}` : "";
+
+  return `${scene} ${CREATIVE_FIDELITY_SUFFIX}${jewelrySuffix}`;
 }

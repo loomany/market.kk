@@ -10,9 +10,11 @@ import {
   ThumbsDown,
   ThumbsUp,
 } from "lucide-react";
+import type { ProductShotChecklistKey } from "@/lib/ai/productShotChecklist";
 import type { StudioResultImage } from "./types";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { ProductShotChecklist } from "./ProductShotChecklist";
 import { cn } from "@/lib/utils";
 
 type GenerationResultGridProps = {
@@ -20,6 +22,12 @@ type GenerationResultGridProps = {
   loading?: boolean;
   showRegenerate?: boolean;
   regenerateLoading?: boolean;
+  isProductShotMode?: boolean;
+  onProductShotChecklistChange?: (
+    resultId: string,
+    key: ProductShotChecklistKey,
+    value: boolean
+  ) => void;
   onAccept: (resultId: string) => void;
   onReject: (resultId: string) => void;
   onRegenerate?: () => void;
@@ -105,6 +113,8 @@ export function GenerationResultGrid({
   loading,
   showRegenerate = true,
   regenerateLoading,
+  isProductShotMode = false,
+  onProductShotChecklistChange,
   onAccept,
   onReject,
   onRegenerate,
@@ -171,7 +181,14 @@ export function GenerationResultGrid({
           const canAccept = result.reviewStatus !== "accepted";
           const canReject = result.reviewStatus !== "rejected";
           const canDownload = result.reviewStatus === "accepted";
-          const removedUrl = result.backgroundRemovedUrl;
+          const removedUrl =
+            result.cutoutPreviewUrl ?? result.backgroundRemovedUrl;
+          const fidelityBadge =
+            result.productShotFidelity === "exact-card"
+              ? "Точная карточка"
+              : result.productShotFidelity === "creative-scene"
+                ? "Креативная сцена — проверьте товар"
+                : null;
           const providerLabel =
             result.provider === "mock"
               ? "Превью"
@@ -200,6 +217,17 @@ export function GenerationResultGrid({
                   <Badge variant="outline">{label}</Badge>
                   {providerLabel && (
                     <Badge variant={providerVariant}>{providerLabel}</Badge>
+                  )}
+                  {fidelityBadge && (
+                    <Badge
+                      variant={
+                        result.productShotFidelity === "exact-card"
+                          ? "success"
+                          : "warning"
+                      }
+                    >
+                      {fidelityBadge}
+                    </Badge>
                   )}
                 </div>
                 <Badge variant={STATUS_VARIANTS[result.reviewStatus]}>
@@ -232,7 +260,7 @@ export function GenerationResultGrid({
                 {removedUrl && (
                   <div>
                     <p className="px-1 pb-2 text-xs font-semibold text-slate-500">
-                      PNG без фона
+                      {isProductShotMode ? "Вырезка без фона" : "PNG без фона"}
                     </p>
                     <div
                       className="rounded-[18px] bg-[length:12px_12px] bg-[position:0_0,6px_6px]"
@@ -256,6 +284,20 @@ export function GenerationResultGrid({
               </div>
 
               <div className="space-y-3 border-t border-border/70 p-4">
+                {isProductShotMode &&
+                  result.productShotChecklist &&
+                  onProductShotChecklistChange && (
+                    <ProductShotChecklist
+                      checklist={result.productShotChecklist}
+                      showCreativeWarning={
+                        result.productShotFidelity === "creative-scene"
+                      }
+                      onChange={(key, value) =>
+                        onProductShotChecklistChange(result.id, key, value)
+                      }
+                    />
+                  )}
+
                 <div className="grid gap-2 sm:grid-cols-2">
                   <Button
                     variant="primary"
@@ -295,7 +337,7 @@ export function GenerationResultGrid({
                   Скачать
                 </Button>
 
-                {!removedUrl && (
+                {!removedUrl && !isProductShotMode && (
                   <Button
                     variant="outline"
                     size="sm"

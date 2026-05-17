@@ -5,6 +5,7 @@ import {
   parseBooleanFormValue,
   parseNumberFormValue,
 } from "@/lib/ai/falSchemas";
+import { isMarketplaceScenePreset } from "@/lib/ai/productShotFidelity";
 
 export const productShotRequestSchema = z.object({
   productImageUrl: z.string().min(1).optional(),
@@ -43,6 +44,9 @@ export const productShotRequestSchema = z.object({
     .enum(["square", "portrait", "vertical", "wide"])
     .default("square"),
   syncMode: z.boolean().default(false),
+  fidelityMode: z
+    .enum(["exact-card", "creative-scene"])
+    .default("exact-card"),
 });
 
 export type ProductShotRequest = z.infer<typeof productShotRequestSchema>;
@@ -144,9 +148,20 @@ export function buildProductShotFormPayload(
     shotSizePreset:
       normalizeTryOnFormValue(formData.get("shotSizePreset")) ?? "square",
     syncMode: parseBooleanFormValue(formData.get("syncMode"), false),
+    fidelityMode:
+      normalizeTryOnFormValue(formData.get("fidelityMode")) ?? "exact-card",
   };
 
   const parsed = productShotRequestSchema.parse(raw);
+
+  if (
+    parsed.fidelityMode === "creative-scene" &&
+    isMarketplaceScenePreset(parsed.scenePreset)
+  ) {
+    throw new Error(
+      "Marketplace presets require exact-card mode. Use the exact-card pipeline instead of creative product-shot."
+    );
+  }
 
   return {
     ...parsed,
