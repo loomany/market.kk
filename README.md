@@ -1,36 +1,130 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Kaspi AI Product Photo Studio
 
-## Getting Started
+AI-студия для создания товарных фото для маркетплейсов:
 
-First, run the development server:
+- одежда на AI-модели (virtual try-on);
+- генерация AI-модели;
+- product shot для бижутерии и аксессуаров;
+- удаление фона;
+- QC checklist перед скачиванием.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Features
+
+- **Landing** — `/` с описанием продукта и CTA в студию
+- **Studio** — `/studio` с тремя режимами:
+  - **Clothing Try-On** — товар + AI-модель → FASHN try-on
+  - **Product Shot** — студийное фото товара без модели (Bria)
+  - **Background Remove Only** — удаление фона по URL
+- **AI model generation** — текстовая генерация студийной модели
+- **Local upload** — файлы на сервере загружаются в Fal Storage (real mode)
+- **QC flow** — checklist, Accept / Reject, Regenerate, Download
+- **Mock mode** — разработка без `FAL_KEY` и без списаний
+
+## Tech stack
+
+- Next.js 16 (App Router)
+- TypeScript
+- Tailwind CSS
+- [@fal-ai/client](https://www.npmjs.com/package/@fal-ai/client)
+- Zod
+
+## Environment variables
+
+Скопируйте `.env.example` в `.env.local`:
+
+```env
+AI_MOCK_MODE=1
+FAL_KEY=
+NEXT_PUBLIC_APP_NAME="Kaspi AI Product Studio"
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+| Variable | Description |
+|----------|-------------|
+| `AI_MOCK_MODE` | `1` (default) — mock, без вызовов Fal. `0` — real mode |
+| `FAL_KEY` | Ключ Fal AI (**только server-side**, не `NEXT_PUBLIC_*`) |
+| `NEXT_PUBLIC_APP_NAME` | Название приложения в UI |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Важно:**
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `AI_MOCK_MODE=1` — безопасный mock mode без списаний.
+- `AI_MOCK_MODE=0` + `FAL_KEY` — real mode через Fal AI, **платно**.
 
-## Learn More
+## How to run locally
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm install
+cp .env.example .env.local
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Откройте:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- http://localhost:3000 — landing
+- http://localhost:3000/studio — студия
 
-## Deploy on Vercel
+```bash
+npm run build
+npm run start
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Mock mode
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+При `AI_MOCK_MODE=1` (или если переменная не равна `0`):
+
+- все API routes возвращают демо-изображения;
+- `FAL_KEY` не обязателен;
+- загрузка локальных файлов валидируется, но в Fal Storage не отправляется.
+
+## Real Fal mode
+
+Только после явного approve и с ключом:
+
+```env
+AI_MOCK_MODE=0
+FAL_KEY=your_fal_key_here
+```
+
+Модели:
+
+| Endpoint | Fal model |
+|----------|-----------|
+| Try-on | `fal-ai/fashn/tryon/v1.6` |
+| Generate model | `fal-ai/nano-banana-2` |
+| Product shot | `fal-ai/bria/product-shot` |
+| Remove background | `fal-ai/bria/background/remove` |
+
+## API routes
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| POST | `/api/ai/tryon` | Clothing try-on (JSON or multipart) |
+| POST | `/api/ai/generate-model` | AI model image (JSON) |
+| POST | `/api/ai/product-shot` | Product shot (JSON or multipart) |
+| POST | `/api/ai/remove-background` | Background removal (JSON, `imageUrl`) |
+
+## Current MVP limitations
+
+- нет Auth;
+- нет Payments;
+- нет Supabase / Postgres;
+- нет истории генераций;
+- нет batch upload;
+- нет server-side export resize (1:1 / 4:5 presets только в UI product-shot);
+- Background Remove Only — только URL (без upload файла);
+- real paid Fal calls в этом MVP **не запускались** без отдельного approve.
+
+## Future Stage 8 (not implemented)
+
+Планируется отдельно, после approve:
+
+- Auth и user accounts
+- Credits / payments
+- Supabase (Postgres jobs, Storage)
+- Queue + webhooks для долгих генераций
+- Batch upload 10–100 товаров
+- Admin moderation
+- Тарифы
+
+## Repository
+
+https://github.com/loomany/market.kk
