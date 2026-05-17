@@ -1,10 +1,10 @@
 import { StudioShell } from "@/components/studio/StudioShell";
 
 export const metadata = {
-  title: "Студия | Kaspi AI Product Studio",
-  description: "Создайте AI-карточки товаров для маркетплейсов",
+  title: "Студия",
+  description: "Создавайте товарные фото для маркетплейсов, интернет-магазинов и каталогов",
 };
 
 export default function StudioPage() {
-  return <StudioShell />;
+  return <StudioShell mockMode={process.env.AI_MOCK_MODE !== "0"} />;
 }

@@ -1,51 +1,62 @@
-import { Camera, Download, UserRound } from "lucide-react";
+import {
+  CheckCircle2,
+  Download,
+  SlidersHorizontal,
+  UploadCloud,
+} from "lucide-react";
 import { Card, CardContent } from "@/components/ui/Card";
 
 const steps = [
   {
-    icon: Camera,
+    icon: UploadCloud,
     title: "Загрузите фото товара",
     description:
-      "Фото одежды на вешалке, flat-lay или на модели — мы подстроим обработку под тип снимка.",
+      "Подойдёт фото одежды, бижутерии, сумки, обуви или другого небольшого товара.",
   },
   {
-    icon: UserRound,
-    title: "Выберите AI-модель",
+    icon: SlidersHorizontal,
+    title: "Выберите режим",
     description:
-      "Готовый пресет студийной модели или своя референсная фотография для virtual try-on.",
+      "Одежда на модели, товарное фото без модели или быстрое удаление фона.",
+  },
+  {
+    icon: CheckCircle2,
+    title: "Получите AI-варианты",
+    description:
+      "Сервис создаст несколько аккуратных вариантов для карточки товара.",
   },
   {
     icon: Download,
-    title: "Получите карточки",
+    title: "Проверьте и скачайте",
     description:
-      "Несколько вариантов для Kaspi и соцсетей: чистый фон, before/after и скачивание.",
+      "Отметьте чеклист качества, примите хороший вариант и скачайте изображение.",
   },
 ];
 
 export function HowItWorks() {
   return (
-    <section className="px-4 py-20 sm:px-6 lg:px-8">
+    <section id="how" className="px-4 py-16 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+        <div className="max-w-2xl">
+          <h2 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
             Как работает
           </h2>
-          <p className="mt-3 text-slate-600">
-            Три шага от исходника до готовой карточки маркетплейса
+          <p className="mt-3 text-lg leading-7 text-slate-600">
+            Четыре простых шага от исходного фото до готовой карточки товара.
           </p>
         </div>
 
-        <div className="mt-12 grid gap-6 md:grid-cols-3">
+        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {steps.map((step, index) => (
-            <Card key={step.title} className="relative overflow-hidden">
+            <Card key={step.title} className="relative overflow-hidden shadow-lg">
               <CardContent className="pt-8">
-                <span className="absolute right-6 top-6 text-5xl font-bold text-slate-100">
+                <span className="absolute right-6 top-5 text-5xl font-bold text-slate-100">
                   {index + 1}
                 </span>
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-[18px] bg-teal-50 text-teal-700">
                   <step.icon className="h-6 w-6" />
                 </div>
-                <h3 className="text-lg font-semibold text-slate-900">
+                <h3 className="text-lg font-semibold text-slate-950">
                   {step.title}
                 </h3>
                 <p className="mt-2 text-sm leading-relaxed text-slate-600">

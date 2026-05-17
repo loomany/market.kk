@@ -6,35 +6,44 @@ import Link from "next/link";
 export default function HomePage() {
   return (
     <>
-      <header className="sticky top-0 z-50 border-b border-slate-200/60 bg-white/80 backdrop-blur-md">
+      <header className="sticky top-0 z-50 border-b border-border/70 bg-white/85 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-          <Link href="/" className="text-lg font-bold text-slate-900">
-            Kaspi <span className="text-violet-600">AI</span> Studio
+          <Link href="/" className="text-lg font-bold tracking-tight text-slate-950">
+            Vitrina <span className="text-teal-700">AI</span>
           </Link>
-          <nav className="flex items-center gap-6 text-sm">
-            <a href="#how" className="text-slate-600 hover:text-slate-900">
+          <nav className="hidden items-center gap-6 text-sm font-medium text-slate-600 md:flex">
+            <a href="#how" className="hover:text-slate-950">
               Как работает
             </a>
-            <Link
-              href="/studio"
-              className="rounded-lg bg-violet-600 px-4 py-2 font-medium text-white hover:bg-violet-700"
-            >
+            <a href="#features" className="hover:text-slate-950">
+              Возможности
+            </a>
+            <a href="#audiences" className="hover:text-slate-950">
+              Для кого
+            </a>
+            <Link href="/studio" className="hover:text-slate-950">
               Студия
             </Link>
           </nav>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/studio"
+              className="rounded-[16px] bg-primary px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-teal-900/15 transition-colors hover:bg-teal-800"
+            >
+              Открыть студию
+            </Link>
+          </div>
         </div>
       </header>
 
       <main>
         <Hero />
-        <div id="how">
-          <HowItWorks />
-        </div>
+        <HowItWorks />
         <UseCases />
       </main>
 
-      <footer className="border-t border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-500">
-        Kaspi AI Product Photo Studio · MVP Stage 1
+      <footer className="border-t border-border bg-white px-4 py-10 text-center text-sm text-muted">
+        Vitrina AI Studio · AI-студия товарных фото для маркетплейсов
       </footer>
     </>
   );

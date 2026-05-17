@@ -26,7 +26,7 @@ export const QUALITY_CHECKLIST_LABELS_RU: Record<
   handsAndEdgesOk:
     "Руки, края одежды и контуры без явных артефактов",
   backgroundClean: "Фон чистый",
-  noTextOrWatermark: "Нет текста, watermark или лишних логотипов",
+  noTextOrWatermark: "Нет лишнего текста, водяных знаков или логотипов",
   marketplaceReady: "Фото можно использовать для карточки товара",
 };
 

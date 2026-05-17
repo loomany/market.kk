@@ -38,20 +38,20 @@ export function QualityChecklist({
       </div>
 
       {!complete && (
-        <p className="text-xs text-amber-700">
-          Проверьте фото перед публикацией на маркетплейсе.
+        <p className="text-xs leading-5 text-amber-700">
+          Отметьте все пункты только если товар выглядит правильно.
         </p>
       )}
 
       <ul className="space-y-1.5">
         {QUALITY_CHECKLIST_KEYS.map((key) => (
           <li key={key}>
-            <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-700">
+            <label className="flex cursor-pointer items-start gap-2 text-xs leading-5 text-slate-700">
               <input
                 type="checkbox"
                 checked={checklist[key]}
                 onChange={(e) => onChange(key, e.target.checked)}
-                className="mt-0.5 accent-violet-600"
+                className="mt-1 h-4 w-4 rounded border-border accent-teal-700"
               />
               <span>{QUALITY_CHECKLIST_LABELS_RU[key]}</span>
             </label>

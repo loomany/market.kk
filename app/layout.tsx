@@ -12,8 +12,11 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const configuredAppName = process.env.NEXT_PUBLIC_APP_NAME;
 const appName =
-  process.env.NEXT_PUBLIC_APP_NAME ?? "Kaspi AI Product Studio";
+  configuredAppName && !configuredAppName.toLowerCase().includes("kaspi")
+    ? configuredAppName
+    : "Vitrina AI Studio";
 
 export const metadata: Metadata = {
   title: {
@@ -21,7 +24,7 @@ export const metadata: Metadata = {
     template: `%s | ${appName}`,
   },
   description:
-    "AI-фото товаров для маркетплейсов: virtual try-on, чистый фон, карточки для Kaspi и Instagram.",
+    "AI-студия товарных фото для маркетплейсов: одежда на AI-модели, product shot, чистый фон и проверка качества.",
 };
 
 export default function RootLayout({

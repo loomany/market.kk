@@ -1,5 +1,6 @@
 "use client";
 
+import { Eraser, Gem, Shirt } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { STUDIO_MODES, type StudioMode } from "./types";
 
@@ -8,32 +9,67 @@ type StudioModeSelectorProps = {
   onChange: (mode: StudioMode) => void;
 };
 
+const modeIcons = {
+  "clothing-tryon": Shirt,
+  "product-shot": Gem,
+  "background-remove-only": Eraser,
+} satisfies Record<StudioMode, typeof Shirt>;
+
 export function StudioModeSelector({
   value,
   onChange,
 }: StudioModeSelectorProps) {
   return (
-    <div className="space-y-2">
-      <label className="text-sm font-medium text-slate-900">Режим студии</label>
-      <div className="grid gap-2">
-        {STUDIO_MODES.map((mode) => (
-          <button
-            key={mode.id}
-            type="button"
-            onClick={() => onChange(mode.id)}
-            className={cn(
-              "rounded-xl border px-3 py-2.5 text-left text-sm transition-all",
-              value === mode.id
-                ? "border-violet-500 bg-violet-50 ring-1 ring-violet-500"
-                : "border-slate-200 bg-white hover:border-slate-300"
-            )}
-          >
-            <span className="font-medium text-slate-900">{mode.label}</span>
-            <span className="mt-0.5 block text-xs text-slate-500">
-              {mode.description}
-            </span>
-          </button>
-        ))}
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-xl font-semibold text-slate-950">Выберите режим</h2>
+        <p className="mt-1 text-sm leading-6 text-slate-600">
+          Каждый режим решает свою задачу. Если сомневаетесь, начните с
+          описания товара.
+        </p>
+      </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        {STUDIO_MODES.map((mode) => {
+          const Icon = modeIcons[mode.id];
+          const selected = value === mode.id;
+
+          return (
+            <button
+              key={mode.id}
+              type="button"
+              onClick={() => onChange(mode.id)}
+              className={cn(
+                "min-h-[150px] rounded-[24px] border p-4 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2",
+                selected
+                  ? "border-teal-500 bg-teal-50 shadow-xl shadow-teal-900/10"
+                  : "border-border bg-white shadow-md shadow-slate-200/60 hover:border-teal-200 hover:bg-teal-50/40"
+              )}
+              aria-pressed={selected}
+            >
+              <span className="flex items-start justify-between gap-3">
+                <span className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-white text-teal-700 shadow-sm">
+                  <Icon className="h-6 w-6" />
+                </span>
+                <span
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-xs font-semibold",
+                    selected
+                      ? "bg-teal-700 text-white"
+                      : "bg-slate-100 text-slate-600"
+                  )}
+                >
+                  {mode.recommendedFor}
+                </span>
+              </span>
+              <span className="mt-4 block text-base font-semibold text-slate-950">
+                {mode.label}
+              </span>
+              <span className="mt-2 block text-sm leading-6 text-slate-600">
+                {mode.description}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

@@ -2,7 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Camera, Eraser, Wand2 } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Camera,
+  Eraser,
+  ShieldCheck,
+  Sparkles,
+  Wand2,
+} from "lucide-react";
 import { MOCK_MODEL_IMAGE } from "@/lib/ai/mockResults";
 import type { GenerateModelResponse } from "@/lib/ai/modelGenerationSchemas";
 import type { RemoveBackgroundResponse } from "@/lib/ai/backgroundRemovalSchemas";
@@ -19,7 +27,13 @@ import {
 } from "@/lib/studio/resultUtils";
 import type { QualityChecklistKey } from "./types";
 import { Button } from "@/components/ui/Button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { ImageUploader } from "./ImageUploader";
 import { ModelPresetSelector } from "./ModelPresetSelector";
@@ -45,6 +59,30 @@ import {
 
 function isHttpUrl(value: string): boolean {
   return /^https?:\/\//i.test(value);
+}
+
+function friendlyAiError(errorCode?: string, message?: string): string {
+  if (errorCode === "FAL_KEY_MISSING") {
+    return "Для реального AI-режима нужен FAL_KEY на сервере. Включите демо-режим или добавьте ключ после отдельного approve.";
+  }
+
+  if (errorCode === "FAL_UPLOAD_FAILED") {
+    return "Не удалось временно отправить изображение в Fal. Попробуйте файл меньше 10MB в JPEG, PNG или WEBP.";
+  }
+
+  if (message?.includes("Product image file or URL is required")) {
+    return "Загрузите фото товара или вставьте ссылку.";
+  }
+
+  if (message?.includes("Product and model image sources are required")) {
+    return "Загрузите фото товара и модель или сгенерируйте AI-модель.";
+  }
+
+  if (message?.includes("Invalid")) {
+    return "Проверьте данные и попробуйте ещё раз.";
+  }
+
+  return message ?? "Не удалось создать изображение. Проверьте фото и попробуйте ещё раз.";
 }
 
 function useObjectUrlPreview() {
@@ -80,7 +118,7 @@ function useObjectUrlPreview() {
   return { setFromFile, setFromHttpUrl };
 }
 
-export function StudioShell() {
+export function StudioShell({ mockMode }: { mockMode: boolean }) {
   const productPreview = useObjectUrlPreview();
   const modelPreview = useObjectUrlPreview();
 
@@ -138,7 +176,6 @@ export function StudioShell() {
         return;
       }
       setError(null);
-      setProductUrl("");
       setProductFile(file);
       setProductPreviewUrl(productPreview.setFromFile(file));
     },
@@ -153,7 +190,6 @@ export function StudioShell() {
         return;
       }
       setError(null);
-      setModelUrl("");
       setGeneratedModelUrl(null);
       setModelGenerateError(null);
       setModelFile(file);
@@ -222,7 +258,7 @@ export function StudioShell() {
       const data = (await res.json()) as GenerateModelResponse;
 
       if (!data.ok) {
-        setModelGenerateError(data.message);
+        setModelGenerateError(friendlyAiError(data.errorCode, data.message));
         return;
       }
 
@@ -267,7 +303,7 @@ export function StudioShell() {
       !isHttpUrl(productUrlTrimmed)
     ) {
       setError(
-        "Для real AI mode локальные фото будут временно загружены в Fal Storage. Используйте ссылку https://… или загрузите файл."
+        "Вставьте ссылку, которая начинается с https://, или загрузите файл товара."
       );
       return;
     }
@@ -322,7 +358,7 @@ export function StudioShell() {
       const data = (await res.json()) as TryOnResponse;
 
       if (!data.ok) {
-        setError(data.message);
+        setError(friendlyAiError(data.errorCode, data.message));
         return;
       }
 
@@ -405,11 +441,11 @@ export function StudioShell() {
       const data = (await res.json()) as ProductShotResponse;
 
       if (!data.ok) {
-        setError(data.message);
+        setError(friendlyAiError(data.errorCode, data.message));
         return;
       }
 
-      setResults(mapApiImagesToStudioResults(data.images, "Product shot"));
+      setResults(mapApiImagesToStudioResults(data.images, "Товарное фото"));
       setLastGenerationMode("product-shot");
       setMeta({
         provider: data.provider,
@@ -418,20 +454,13 @@ export function StudioShell() {
         sceneDescription: data.sceneDescription,
       });
     } catch {
-      setError("Не удалось создать product shot. Попробуйте ещё раз.");
+      setError("Не удалось создать товарное фото. Проверьте фото и попробуйте ещё раз.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleBackgroundRemoveOnly = async () => {
-    if (productFile) {
-      setError(
-        "Для режима «Удалить фон» на этом этапе используйте URL картинки. Upload для этого режима добавим позже."
-      );
-      return;
-    }
-
     const imageUrl = productUrl.trim();
     if (!imageUrl || !isHttpUrl(imageUrl)) {
       setError("Вставьте ссылку на изображение (https://…).");
@@ -457,7 +486,7 @@ export function StudioShell() {
       const data = (await res.json()) as RemoveBackgroundResponse;
 
       if (!data.ok) {
-        setError(data.message);
+        setError(friendlyAiError(data.errorCode, data.message));
         return;
       }
 
@@ -548,7 +577,10 @@ export function StudioShell() {
               ? {
                   ...r,
                   backgroundRemoveLoading: false,
-                  backgroundRemoveError: data.message,
+                  backgroundRemoveError: friendlyAiError(
+                    data.errorCode,
+                    data.message
+                  ),
                 }
               : r
           )
@@ -607,71 +639,115 @@ export function StudioShell() {
   const isClothingMode = studioMode === "clothing-tryon";
   const isProductShotMode = studioMode === "product-shot";
   const isBgOnlyMode = studioMode === "background-remove-only";
+  const productUrlPreview =
+    productUrlTrimmed && isHttpUrl(productUrlTrimmed) ? productUrlTrimmed : null;
+  const effectiveProductPreviewUrl = isBgOnlyMode
+    ? productUrlPreview
+    : productPreviewUrl ?? productUrlPreview;
 
   const primaryButtonLabel = isClothingMode
-    ? "Создать фото"
+    ? "Создать фото на модели"
     : isProductShotMode
-      ? "Создать product shot"
+      ? "Создать Product Shot"
       : "Удалить фон";
 
-  const PrimaryIcon = isClothingMode ? Wand2 : isProductShotMode ? Camera : Eraser;
+  const PrimaryIcon = isClothingMode
+    ? Wand2
+    : isProductShotMode
+      ? Camera
+      : Eraser;
+  const modeBadgeLabel = mockMode ? "Демо-режим" : "Реальный AI-режим";
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      <header className="border-b border-slate-200/80 bg-white/80 backdrop-blur-md">
+    <div className="min-h-screen">
+      <header className="border-b border-border/70 bg-white/85 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900"
+            className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-950"
           >
             <ArrowLeft className="h-4 w-4" />
             На главную
           </Link>
-          <Badge variant="violet">Demo · Mock mode</Badge>
+          <div className="flex items-center gap-3">
+            <span className="hidden text-sm font-bold tracking-tight text-slate-950 sm:inline">
+              Vitrina <span className="text-teal-700">AI</span>
+            </span>
+            <Badge variant={mockMode ? "success" : "warning"}>
+              {modeBadgeLabel}
+            </Badge>
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-7xl gap-6 px-4 py-8 lg:grid-cols-[380px_1fr] lg:px-8">
-        <aside className="space-y-4">
-          <Card>
+      <main className="mx-auto max-w-7xl space-y-6 px-4 py-8 lg:px-8">
+        <section className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
+          <div>
+            <Badge variant="violet" className="mb-4">
+              <Sparkles className="h-3.5 w-3.5" />
+              Vitrina AI Studio
+            </Badge>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
+              Студия товарных фото
+            </h1>
+            <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600 sm:text-lg">
+              Создавайте фото для карточек товаров: одежда на модели, Product
+              Shot для аксессуаров и удаление фона. Перед скачиванием проверьте
+              результат по чеклисту.
+            </p>
+          </div>
+
+          <div className="rounded-[24px] border border-teal-100 bg-teal-50/70 p-4 text-sm leading-6 text-teal-950">
+            <div className="flex items-start gap-3">
+              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-teal-700" />
+              <p>
+                Ваши фото в MVP не сохраняются в нашей базе. В демо-режиме
+                генерация не списывает деньги. В реальном AI-режиме изображения
+                отправляются в Fal для обработки.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <StudioModeSelector value={studioMode} onChange={setStudioMode} />
+
+        <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
+          <aside className="space-y-4">
+            <Card>
             <CardHeader>
-              <CardTitle>Настройки</CardTitle>
+              <CardTitle>Рабочая область</CardTitle>
+              <CardDescription>
+                Загрузите фото, выберите понятные настройки и запустите
+                генерацию.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <StudioModeSelector
-                value={studioMode}
-                onChange={setStudioMode}
-              />
-
               {!isBgOnlyMode && (
-                <p className="text-xs text-slate-500">
-                  Для real AI mode локальные фото будут временно загружены в
-                  Fal Storage.
-                </p>
+                <div className="rounded-[18px] border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+                  В реальном AI-режиме обработка через Fal может стоить денег.
+                  В демо-режиме списаний нет.
+                </div>
               )}
 
               <ImageUploader
                 label={
                   isBgOnlyMode
-                    ? "Image URL / upload"
-                    : "Source product image"
+                    ? "Изображение для удаления фона"
+                    : "Загрузите фото товара"
                 }
                 hint={
                   isBgOnlyMode
-                    ? "Для удаления фона вставьте URL изображения"
-                    : "Фото одежды или товара"
+                    ? "В этом режиме используйте ссылку на готовое изображение."
+                    : "Лучше всего: товар хорошо виден, без сильного размытия и без лишних предметов."
                 }
                 previewUrl={
-                  productPreviewUrl ??
-                  (productUrlTrimmed && isHttpUrl(productUrlTrimmed)
-                    ? productUrlTrimmed
-                    : null)
+                  effectiveProductPreviewUrl
                 }
                 selectedFile={isBgOnlyMode ? null : productFile}
                 onFileSelect={isBgOnlyMode ? undefined : handleProductFile}
                 onClearFile={isBgOnlyMode ? undefined : clearProductFile}
                 onUrlChange={(url) => {
-                  if (productFile) return;
+                  if (productFile && !isBgOnlyMode) return;
                   setProductUrl(url);
                   setProductPreviewUrl(
                     url && isHttpUrl(url)
@@ -680,13 +756,14 @@ export function StudioShell() {
                   );
                 }}
                 urlValue={productUrl}
+                urlLabel="Или вставьте ссылку на изображение"
               />
 
               {isClothingMode && (
                 <>
                   <ImageUploader
-                    label="Target model image (optional)"
-                    hint="Или выберите пресет ниже"
+                    label="Загрузите фото модели или сгенерируйте AI-модель"
+                    hint="Для одежды лучше подходит фото в полный рост или по пояс, где одежду легко заменить."
                     previewUrl={
                       modelPreviewUrl ??
                       (modelUrlTrimmed && isHttpUrl(modelUrlTrimmed)
@@ -708,6 +785,7 @@ export function StudioShell() {
                       );
                     }}
                     urlValue={modelUrl}
+                    urlLabel="Или вставьте ссылку на изображение модели"
                   />
 
                   <ModelPresetSelector
@@ -755,62 +833,67 @@ export function StudioShell() {
                 {primaryButtonLabel}
               </Button>
             </CardContent>
-          </Card>
-        </aside>
+            </Card>
+          </aside>
 
-        <section className="space-y-6">
-          {isClothingMode ? (
-            <div className="grid gap-4 sm:grid-cols-2">
+          <section className="space-y-6">
+            {isClothingMode ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <PreviewCard
+                  title="Товар"
+                  url={
+                    effectiveProductPreviewUrl
+                  }
+                  empty="Загрузите фото товара"
+                />
+                <PreviewCard
+                  title="AI-модель"
+                  url={effectiveModelPreview}
+                  empty="Сгенерируйте или загрузите модель"
+                  badge={
+                    generatedModelUrl && !modelFile ? "AI-модель" : undefined
+                  }
+                />
+              </div>
+            ) : (
               <PreviewCard
-                title="Товар"
+                title={isBgOnlyMode ? "Исходник" : "Товар"}
                 url={
-                  productPreviewUrl ??
-                  (productUrlTrimmed && isHttpUrl(productUrlTrimmed)
-                    ? productUrlTrimmed
-                    : null)
+                  effectiveProductPreviewUrl
                 }
-                empty="Загрузите фото товара"
-              />
-              <PreviewCard
-                title="AI-модель"
-                url={effectiveModelPreview}
-                empty="Сгенерируйте или загрузите модель"
-                badge={
-                  generatedModelUrl && !modelFile ? "AI generated" : undefined
+                empty={
+                  isBgOnlyMode
+                    ? "Вставьте URL изображения"
+                    : "Загрузите фото товара"
                 }
               />
-            </div>
-          ) : (
-            <PreviewCard
-              title={isBgOnlyMode ? "Исходник" : "Товар"}
-              url={
-                productPreviewUrl ??
-                (productUrlTrimmed && isHttpUrl(productUrlTrimmed)
-                  ? productUrlTrimmed
-                  : null)
-              }
-              empty={
-                isBgOnlyMode
-                  ? "Вставьте URL изображения"
-                  : "Загрузите фото товара"
-              }
-            />
-          )}
+            )}
 
-          <Card>
+            <Card>
             <CardHeader>
               <CardTitle>Результаты</CardTitle>
+              <CardDescription>
+                Сначала проверьте качество. Скачать можно только принятый
+                вариант.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {error && (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                  {error}
+                <div
+                  role="alert"
+                  className="rounded-[18px] border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-800"
+                >
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>{error}</span>
+                  </div>
                 </div>
               )}
-              <p className="rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm leading-relaxed text-amber-900">
-                Перед публикацией на Kaspi/Instagram проверьте результат: AI
-                может изменить цвет, форму, узор или детали товара. Используйте
-                только фото, которые прошли ручную проверку.
+              <p className="rounded-[18px] border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm leading-6 text-amber-950">
+                Перед публикацией на маркетплейсе, в интернет-магазине или
+                каталоге проверьте результат: AI может изменить цвет, форму,
+                узор или детали товара. Используйте только фото, которые прошли
+                ручную проверку.
               </p>
               <GenerationResultGrid
                 results={results}
@@ -824,38 +907,42 @@ export function StudioShell() {
                 onRemoveBackground={handleRemoveBackground}
               />
               {meta && (
-                <div className="space-y-1 text-xs text-slate-400">
-                  <p>
-                    {meta.provider} · {meta.model} · {meta.requestId}
-                    {meta.seed !== undefined ? ` · seed ${meta.seed}` : ""}
-                  </p>
-                  {meta.inputSource && (
+                <details className="rounded-[16px] border border-border bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                  <summary className="cursor-pointer font-semibold text-slate-600">
+                    Техническая информация
+                  </summary>
+                  <div className="mt-2 space-y-1">
                     <p>
-                      Product: {meta.inputSource.product} · Model:{" "}
-                      {meta.inputSource.model}
+                      Провайдер: {meta.provider} · Модель: {meta.model} · ID:
+                      {meta.requestId}
+                      {meta.seed !== undefined ? ` · seed ${meta.seed}` : ""}
                     </p>
-                  )}
-                  {meta.sceneDescription && (
-                    <p className="line-clamp-2" title={meta.sceneDescription}>
-                      Scene: {meta.sceneDescription.slice(0, 120)}…
-                    </p>
-                  )}
-                </div>
+                    {meta.inputSource && (
+                      <p>
+                        Товар: {meta.inputSource.product} · Модель:{" "}
+                        {meta.inputSource.model}
+                      </p>
+                    )}
+                    {meta.sceneDescription && (
+                      <p className="line-clamp-2" title={meta.sceneDescription}>
+                        Сцена: {meta.sceneDescription.slice(0, 120)}…
+                      </p>
+                    )}
+                  </div>
+                </details>
               )}
               {isClothingMode && (
                 <BeforeAfterPreview
                   beforeUrl={
-                    productPreviewUrl ??
-                    (productUrlTrimmed && isHttpUrl(productUrlTrimmed)
-                      ? productUrlTrimmed
-                      : null)
+                    effectiveProductPreviewUrl
                   }
                   afterUrl={firstResultUrl}
                 />
               )}
             </CardContent>
-          </Card>
-        </section>
+            </Card>
+          </section>
+        </div>
       </main>
     </div>
   );
@@ -873,26 +960,22 @@ function PreviewCard({
   badge?: string;
 }) {
   return (
-    <Card>
+    <Card className="shadow-lg">
       <CardContent className="p-4">
         <div className="mb-2 flex items-center justify-between gap-2">
-          <p className="text-sm font-medium text-slate-900">{title}</p>
-          {badge && (
-            <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
-              {badge}
-            </span>
-          )}
+          <p className="text-sm font-semibold text-slate-950">{title}</p>
+          {badge && <Badge variant="violet">{badge}</Badge>}
         </div>
-        <div className="overflow-hidden rounded-xl border border-slate-100 bg-slate-50">
+        <div className="overflow-hidden rounded-[18px] border border-border bg-slate-50">
           {url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={url}
-              alt={title}
+              alt={`Предпросмотр: ${title}`}
               className="aspect-[3/4] w-full object-cover"
             />
           ) : (
-            <div className="flex aspect-[3/4] items-center justify-center p-4 text-center text-sm text-slate-400">
+            <div className="flex aspect-[3/4] items-center justify-center p-4 text-center text-sm leading-6 text-slate-500">
               {empty}
             </div>
           )}

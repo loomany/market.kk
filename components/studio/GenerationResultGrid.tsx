@@ -1,6 +1,12 @@
 "use client";
 
-import { Download, Eraser, RefreshCw, ThumbsDown, ThumbsUp } from "lucide-react";
+import {
+  Download,
+  Eraser,
+  RefreshCw,
+  ThumbsDown,
+  ThumbsUp,
+} from "lucide-react";
 import type { QualityChecklistKey, StudioResultImage } from "./types";
 import { isChecklistComplete } from "@/lib/ai/qualityChecklist";
 import { Button } from "@/components/ui/Button";
@@ -41,11 +47,11 @@ const STATUS_LABELS = {
   rejected: "Отклонено",
 } as const;
 
-const STATUS_STYLES = {
-  pending_review: "bg-amber-100 text-amber-800",
-  accepted: "bg-emerald-100 text-emerald-800",
-  rejected: "bg-red-100 text-red-800",
-};
+const STATUS_VARIANTS = {
+  pending_review: "warning",
+  accepted: "success",
+  rejected: "danger",
+} as const;
 
 export function GenerationResultGrid({
   results,
@@ -60,27 +66,46 @@ export function GenerationResultGrid({
 }: GenerationResultGridProps) {
   if (loading) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2">
-        {Array.from({ length: 2 }).map((_, i) => (
-          <div
-            key={i}
-            className="aspect-[3/4] animate-pulse rounded-2xl bg-slate-200"
-          />
-        ))}
+      <div className="space-y-4">
+        <div className="rounded-[22px] border border-teal-100 bg-teal-50/70 px-4 py-3 text-sm leading-6 text-teal-950">
+          Создаём изображение. В демо-режиме это быстро, в реальном AI-режиме
+          обработка может занять больше времени.
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {Array.from({ length: 2 }).map((_, index) => (
+            <div
+              key={index}
+              className="aspect-[3/4] animate-pulse rounded-[24px] bg-slate-200"
+            />
+          ))}
+        </div>
       </div>
     );
   }
 
   if (results.length === 0) {
     return (
-      <div className="flex aspect-[3/4] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-500">
-        Результаты появятся после генерации
+      <div className="flex min-h-[320px] items-center justify-center rounded-[24px] border border-dashed border-border bg-slate-50 p-6 text-center">
+        <div className="max-w-sm">
+          <p className="text-base font-semibold text-slate-950">
+            Здесь появятся готовые варианты
+          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Загрузите товар, выберите режим и нажмите кнопку генерации.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
+      <div className="rounded-[22px] border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm leading-6 text-amber-950">
+        Скачивание доступно после ручной проверки. Отметьте все пункты
+        чеклиста, если фото выглядит правильно. Если AI исказил товар —
+        нажмите “Отклонить” или “Сгенерировать ещё”.
+      </div>
+
       {showRegenerate && onRegenerate && (
         <Button
           variant="outline"
@@ -94,7 +119,7 @@ export function GenerationResultGrid({
         </Button>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-5 lg:grid-cols-2">
         {results.map((result, index) => {
           const label = result.label ?? `Вариант ${index + 1}`;
           const checklistDone = isChecklistComplete(result.checklist);
@@ -104,45 +129,42 @@ export function GenerationResultGrid({
           const removedUrl = result.backgroundRemovedUrl;
 
           return (
-            <div
+            <article
               key={result.id}
               className={cn(
-                "overflow-hidden rounded-2xl border bg-white shadow-md",
+                "overflow-hidden rounded-[24px] border bg-white shadow-xl shadow-slate-200/60",
                 result.reviewStatus === "rejected"
-                  ? "border-red-200 opacity-90"
-                  : "border-slate-200"
+                  ? "border-red-200"
+                  : "border-border"
               )}
             >
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2">
-                <Badge variant="violet">{label}</Badge>
-                <span
-                  className={cn(
-                    "rounded-full px-2 py-0.5 text-xs font-medium",
-                    STATUS_STYLES[result.reviewStatus]
-                  )}
-                >
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 px-4 py-3">
+                <Badge variant="outline">{label}</Badge>
+                <Badge variant={STATUS_VARIANTS[result.reviewStatus]}>
                   {STATUS_LABELS[result.reviewStatus]}
-                </span>
+                </Badge>
               </div>
 
-              <div className="space-y-2 p-2">
-                <p className="px-1 text-xs font-medium text-slate-500">
-                  Original
-                </p>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={result.url}
-                  alt={label}
-                  className="aspect-[3/4] w-full rounded-lg object-cover"
-                />
+              <div className="space-y-3 p-3">
+                <div>
+                  <p className="px-1 pb-2 text-xs font-semibold text-slate-500">
+                    Готовый вариант
+                  </p>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={result.url}
+                    alt={`${label}: готовый вариант`}
+                    className="aspect-[3/4] w-full rounded-[18px] object-cover"
+                  />
+                </div>
 
                 {removedUrl && (
-                  <>
-                    <p className="px-1 text-xs font-medium text-slate-500">
-                      Background removed
+                  <div>
+                    <p className="px-1 pb-2 text-xs font-semibold text-slate-500">
+                      PNG без фона
                     </p>
                     <div
-                      className="rounded-lg bg-[length:12px_12px] bg-[position:0_0,6px_6px]"
+                      className="rounded-[18px] bg-[length:12px_12px] bg-[position:0_0,6px_6px]"
                       style={{
                         backgroundImage:
                           "linear-gradient(45deg, #e2e8f0 25%, transparent 25%), linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e2e8f0 75%), linear-gradient(-45deg, transparent 75%, #e2e8f0 75%)",
@@ -152,15 +174,15 @@ export function GenerationResultGrid({
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={removedUrl}
-                        alt={`${label} без фона`}
-                        className="aspect-[3/4] w-full rounded-lg object-contain"
+                        alt={`${label}: изображение без фона`}
+                        className="aspect-[3/4] w-full rounded-[18px] object-contain"
                       />
                     </div>
-                  </>
+                  </div>
                 )}
               </div>
 
-              <div className="space-y-3 border-t border-slate-100 p-3">
+              <div className="space-y-3 border-t border-border/70 p-4">
                 <QualityChecklist
                   checklist={result.checklist}
                   onChange={(key, value) =>
@@ -169,14 +191,14 @@ export function GenerationResultGrid({
                   compact
                 />
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid gap-2 sm:grid-cols-2">
                   <Button
                     variant="primary"
                     size="sm"
                     disabled={!canAccept}
                     title={
                       !checklistDone
-                        ? "Сначала отметьте все проверки"
+                        ? "Сначала отметьте все пункты чеклиста"
                         : undefined
                     }
                     onClick={() => onAccept(result.id)}
@@ -228,7 +250,7 @@ export function GenerationResultGrid({
                 )}
 
                 {result.backgroundRemoveError && (
-                  <p className="text-xs text-red-600">
+                  <p className="rounded-[14px] border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700">
                     {result.backgroundRemoveError}
                   </p>
                 )}
@@ -238,8 +260,16 @@ export function GenerationResultGrid({
                     variant="outline"
                     size="sm"
                     className="w-full"
+                    disabled={!canDownload}
+                    title={
+                      !canDownload
+                        ? "Сначала примите результат после проверки"
+                        : undefined
+                    }
                     onClick={() =>
-                      downloadPng(removedUrl, `${result.id}-no-bg.png`)
+                      canDownload
+                        ? downloadPng(removedUrl, `${result.id}-no-bg.png`)
+                        : undefined
                     }
                   >
                     <Download className="h-4 w-4" />
@@ -247,7 +277,7 @@ export function GenerationResultGrid({
                   </Button>
                 )}
               </div>
-            </div>
+            </article>
           );
         })}
       </div>

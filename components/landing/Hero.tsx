@@ -1,65 +1,115 @@
 import Link from "next/link";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowRight, CheckCircle2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import {
+  MOCK_MODEL_IMAGE,
+  MOCK_PRODUCT_IMAGE,
+  MOCK_PRODUCT_SHOT_IMAGES,
+} from "@/lib/ai/mockResults";
+
+const benefitBadges = [
+  "Без сложной обработки",
+  "Для маркетплейсов и каталогов",
+  "Одежда, аксессуары, бижутерия",
+  "Ручная проверка качества",
+  "Демо-режим без списаний",
+];
+
+const demoSteps = [
+  {
+    title: "Исходное фото товара",
+    description: "Загрузите фото одежды или товара.",
+    src: MOCK_PRODUCT_IMAGE,
+  },
+  {
+    title: "AI-модель",
+    description: "Выберите модель или создайте новую.",
+    src: MOCK_MODEL_IMAGE,
+  },
+  {
+    title: "Готовая карточка",
+    description: "Проверьте результат и скачайте.",
+    src: MOCK_PRODUCT_SHOT_IMAGES[0].url,
+  },
+];
 
 export function Hero() {
   return (
-    <section className="relative overflow-hidden px-4 pb-20 pt-16 sm:px-6 lg:px-8 lg:pt-24">
-      <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute -left-32 top-0 h-72 w-72 rounded-full bg-violet-200/40 blur-3xl" />
-        <div className="absolute right-0 top-20 h-96 w-96 rounded-full bg-amber-100/50 blur-3xl" />
-      </div>
+    <section className="relative overflow-hidden px-4 pb-16 pt-12 sm:px-6 lg:px-8 lg:pb-20 lg:pt-18">
+      <div className="mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-[1.02fr_0.98fr]">
+        <div>
+          <Badge variant="violet" className="mb-5 px-3 py-1.5">
+            <Sparkles className="h-3.5 w-3.5" />
+            Vitrina AI Studio
+          </Badge>
 
-      <div className="mx-auto max-w-5xl text-center">
-        <Badge variant="violet" className="mb-6 gap-1 px-3 py-1">
-          <Sparkles className="h-3.5 w-3.5" />
-          AI Product Photo Studio
-        </Badge>
+          <h1 className="max-w-3xl text-4xl font-bold tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
+            AI-фото товаров для маркетплейсов
+          </h1>
 
-        <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
-          AI-фото товаров для{" "}
-          <span className="bg-gradient-to-r from-violet-600 to-fuchsia-500 bg-clip-text text-transparent">
-            маркетплейсов
-          </span>
-        </h1>
-
-        <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-600 sm:text-xl">
-          Загрузите фото одежды, белья или аксессуара — получите чистые карточки
-          на AI-модели для Kaspi, Instagram и каталога.
-        </p>
-
-        <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-          <Link href="/studio">
-            <Button size="lg" className="min-w-[200px]">
-              Открыть студию
-              <ArrowRight className="h-5 w-5" />
-            </Button>
-          </Link>
-          <p className="text-sm text-slate-500">
-            Демо-режим · без регистрации
+          <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600 sm:text-xl">
+            Загрузите фото одежды, бижутерии или аксессуара — получите
+            аккуратные карточки товара на AI-модели, с чистым фоном и проверкой
+            качества.
           </p>
+
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Link href="/studio">
+              <Button size="lg" className="min-w-[200px]">
+                Открыть студию
+                <ArrowRight className="h-5 w-5" />
+              </Button>
+            </Link>
+            <a href="#how">
+              <Button variant="outline" size="lg" className="min-w-[200px]">
+                Посмотреть как работает
+                <ArrowDown className="h-5 w-5" />
+              </Button>
+            </a>
+          </div>
+
+          <div className="mt-8 flex flex-wrap gap-2.5">
+            {benefitBadges.map((benefit) => (
+              <span
+                key={benefit}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm"
+              >
+                <CheckCircle2 className="h-4 w-4 text-teal-700" />
+                {benefit}
+              </span>
+            ))}
+          </div>
         </div>
 
-        <div className="mx-auto mt-16 grid max-w-4xl gap-4 sm:grid-cols-3">
-          {[
-            { src: "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=400&h=500&fit=crop", label: "Исходник" },
-            { src: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=500&fit=crop", label: "AI-модель" },
-            { src: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400&h=500&fit=crop", label: "Карточка" },
-          ].map((item) => (
-            <div
-              key={item.label}
-              className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xl shadow-slate-200/60"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={item.src}
-                alt={item.label}
-                className="aspect-[4/5] w-full object-cover"
-              />
-              <p className="py-2 text-sm font-medium text-slate-600">{item.label}</p>
-            </div>
-          ))}
+        <div className="rounded-[28px] border border-border/80 bg-white p-3 shadow-2xl shadow-slate-200/70">
+          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+            {demoSteps.map((step, index) => (
+              <div key={step.title} className="relative">
+                <div className="overflow-hidden rounded-[22px] border border-slate-100 bg-slate-50">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={step.src}
+                    alt={step.title}
+                    className="aspect-[4/5] w-full object-cover"
+                  />
+                </div>
+                <div className="mt-3 px-1">
+                  <p className="text-sm font-semibold text-slate-950">
+                    {step.title}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-muted">
+                    {step.description}
+                  </p>
+                </div>
+                {index < demoSteps.length - 1 && (
+                  <div className="absolute -right-5 top-[42%] z-10 hidden h-10 w-10 items-center justify-center rounded-full border border-border bg-white text-teal-700 shadow-lg sm:flex lg:hidden xl:flex">
+                    <ArrowRight className="h-5 w-5" />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </section>

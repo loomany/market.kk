@@ -1,6 +1,7 @@
 "use client";
 
-import { Upload, X } from "lucide-react";
+import { useState } from "react";
+import { ImagePlus, LinkIcon, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatFileSize } from "@/lib/ai/clientImageValidation";
 
@@ -13,6 +14,7 @@ type ImageUploaderProps = {
   onClearFile?: () => void;
   onUrlChange?: (url: string) => void;
   urlValue?: string;
+  urlLabel?: string;
   className?: string;
 };
 
@@ -25,55 +27,97 @@ export function ImageUploader({
   onClearFile,
   onUrlChange,
   urlValue = "",
+  urlLabel = "Или вставьте ссылку на изображение",
   className,
 }: ImageUploaderProps) {
-  const showUrlInput = onUrlChange && !selectedFile;
+  const [dragActive, setDragActive] = useState(false);
+  const canUploadFile = Boolean(onFileSelect);
+  const showUrlInput = Boolean(onUrlChange);
+  const urlDisabled = Boolean(selectedFile);
+
+  const selectFile = (file: File | undefined) => {
+    if (!file || !onFileSelect) return;
+    onFileSelect(file);
+  };
 
   return (
     <div className={cn("space-y-3", className)}>
-      <label className="text-sm font-medium text-slate-900">{label}</label>
-      {hint && <p className="text-xs text-slate-500">{hint}</p>}
-      <p className="text-xs text-slate-400">
-        Для MVP фото не сохраняются в нашей базе. В real mode файл отправляется
-        в Fal только для генерации.
-      </p>
+      <div>
+        <label className="text-sm font-semibold text-slate-950">{label}</label>
+        {hint && <p className="mt-1 text-xs leading-5 text-slate-600">{hint}</p>}
+      </div>
 
-      <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 px-4 py-6 transition-colors hover:border-violet-300 hover:bg-violet-50/30">
-        <Upload className="mb-2 h-6 w-6 text-slate-400" />
-        <span className="text-sm font-medium text-slate-700">
-          Выберите файл
-        </span>
-        <span className="mt-1 text-xs text-slate-500">
-          JPEG, PNG, WebP · до 10 MB
-        </span>
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) onFileSelect?.(file);
-            e.target.value = "";
+      <div className="rounded-[18px] border border-teal-100 bg-teal-50/60 px-3 py-2 text-xs leading-5 text-teal-950">
+        JPEG, PNG или WEBP до 10MB. Фото не сохраняются в нашей базе в MVP.
+        В реальном AI-режиме файл временно отправляется в Fal для обработки.
+      </div>
+
+      {canUploadFile && (
+        <label
+          onDragEnter={(event) => {
+            event.preventDefault();
+            setDragActive(true);
           }}
-        />
-      </label>
+          onDragOver={(event) => {
+            event.preventDefault();
+            setDragActive(true);
+          }}
+          onDragLeave={(event) => {
+            event.preventDefault();
+            setDragActive(false);
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            setDragActive(false);
+            selectFile(event.dataTransfer.files?.[0]);
+          }}
+          className={cn(
+            "flex min-h-[148px] cursor-pointer flex-col items-center justify-center rounded-[22px] border-2 border-dashed px-4 py-6 text-center transition-colors",
+            dragActive
+              ? "border-teal-500 bg-teal-50"
+              : "border-border bg-slate-50/80 hover:border-teal-300 hover:bg-teal-50/60"
+          )}
+        >
+          <Upload className="mb-3 h-7 w-7 text-teal-700" />
+          <span className="text-sm font-semibold text-slate-800">
+            Выберите файл или перетащите его сюда
+          </span>
+          <span className="mt-1 text-xs leading-5 text-slate-500">
+            Если выбран файл и ссылка одновременно, используем файл.
+          </span>
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(event) => {
+              selectFile(event.target.files?.[0]);
+              event.target.value = "";
+            }}
+          />
+        </label>
+      )}
 
       {selectedFile && (
-        <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-medium text-slate-800">
-              {selectedFile.name}
-            </p>
-            <p className="text-xs text-slate-500">
-              {formatFileSize(selectedFile.size)}
-            </p>
+        <div className="flex items-center justify-between gap-3 rounded-[16px] border border-border bg-white px-3 py-2 text-sm shadow-sm">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] bg-teal-50 text-teal-700">
+              <ImagePlus className="h-4 w-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-semibold text-slate-800">
+                {selectedFile.name}
+              </p>
+              <p className="text-xs text-slate-500">
+                {formatFileSize(selectedFile.size)}
+              </p>
+            </div>
           </div>
           {onClearFile && (
             <button
               type="button"
               onClick={onClearFile}
-              className="shrink-0 rounded-lg p-1 text-slate-500 hover:bg-slate-200 hover:text-slate-800"
-              aria-label="Удалить файл"
+              className="shrink-0 rounded-[12px] p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+              aria-label="Очистить выбранный файл"
             >
               <X className="h-4 w-4" />
             </button>
@@ -82,24 +126,34 @@ export function ImageUploader({
       )}
 
       {showUrlInput && (
-        <div>
-          <label className="text-xs font-medium text-slate-600">или URL</label>
+        <div className="space-y-1.5">
+          <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+            <LinkIcon className="h-3.5 w-3.5" />
+            {urlLabel}
+          </label>
           <input
             type="url"
             value={urlValue}
-            onChange={(e) => onUrlChange(e.target.value)}
-            placeholder="https://..."
-            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+            onChange={(event) => onUrlChange?.(event.target.value)}
+            disabled={urlDisabled}
+            placeholder="https://example.com/image.png"
+            className="w-full rounded-[16px] border border-border bg-white px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100 disabled:bg-slate-50 disabled:text-slate-400"
           />
+          {urlDisabled && (
+            <p className="text-xs leading-5 text-slate-500">
+              Сейчас выбран файл. Очистите файл, если хотите использовать
+              ссылку.
+            </p>
+          )}
         </div>
       )}
 
       {previewUrl && (
-        <div className="overflow-hidden rounded-xl border border-slate-200">
+        <div className="overflow-hidden rounded-[22px] border border-border bg-slate-50">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={previewUrl}
-            alt="Preview"
+            alt={`Предпросмотр: ${label}`}
             className="aspect-square w-full object-cover"
           />
         </div>

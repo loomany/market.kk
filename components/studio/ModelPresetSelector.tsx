@@ -1,6 +1,6 @@
 "use client";
 
-import { UserRound } from "lucide-react";
+import { CheckCircle2, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import {
@@ -38,12 +38,12 @@ function SelectField<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <div className="space-y-1">
-      <label className="text-xs font-medium text-slate-600">{label}</label>
+    <div className="space-y-1.5">
+      <label className="text-xs font-semibold text-slate-700">{label}</label>
       <select
         value={value}
-        onChange={(e) => onChange(e.target.value as T)}
-        className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+        onChange={(event) => onChange(event.target.value as T)}
+        className="w-full rounded-[14px] border border-border bg-white px-3 py-2 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
       >
         {options.map((opt) => (
           <option key={opt.id} value={opt.id}>
@@ -56,37 +56,37 @@ function SelectField<T extends string>({
 }
 
 const GENDER_OPTIONS: { id: ModelGender; label: string }[] = [
-  { id: "female", label: "Female" },
-  { id: "male", label: "Male" },
+  { id: "female", label: "Женская" },
+  { id: "male", label: "Мужская" },
 ];
 
 const BODY_OPTIONS: { id: ModelBodyType; label: string }[] = [
-  { id: "standard", label: "Standard" },
+  { id: "standard", label: "Стандартная" },
   { id: "plus-size", label: "Plus-size" },
-  { id: "slim", label: "Slim" },
+  { id: "slim", label: "Стройная" },
 ];
 
 const POSE_OPTIONS: { id: ModelPose; label: string }[] = [
-  { id: "front", label: "Front" },
-  { id: "slight-angle", label: "Slight angle" },
+  { id: "front", label: "Прямо к камере" },
+  { id: "slight-angle", label: "Лёгкий поворот" },
 ];
 
 const CROP_OPTIONS: { id: ModelCrop; label: string }[] = [
-  { id: "full-body", label: "Full body" },
-  { id: "upper-body", label: "Upper body" },
+  { id: "full-body", label: "В полный рост" },
+  { id: "upper-body", label: "По пояс" },
 ];
 
 const BACKGROUND_OPTIONS: { id: ModelBackground; label: string }[] = [
-  { id: "white", label: "White" },
-  { id: "light-gray", label: "Light gray" },
-  { id: "studio", label: "Studio" },
+  { id: "white", label: "Белый" },
+  { id: "light-gray", label: "Светло-серый" },
+  { id: "studio", label: "Студийный" },
 ];
 
 const CONTEXT_OPTIONS: { id: ModelCategoryContext; label: string }[] = [
-  { id: "clothing", label: "Clothing" },
-  { id: "lingerie", label: "Lingerie" },
-  { id: "jewelry", label: "Jewelry" },
-  { id: "general", label: "General" },
+  { id: "clothing", label: "Одежда" },
+  { id: "lingerie", label: "Бельё / купальники" },
+  { id: "jewelry", label: "Украшения" },
+  { id: "general", label: "Универсально" },
 ];
 
 export function ModelPresetSelector({
@@ -103,69 +103,81 @@ export function ModelPresetSelector({
     onSettingsChange({ ...settings, ...partial });
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-slate-900">Model preset</label>
-        <div className="grid gap-2">
-          {MODEL_PRESETS.map((preset) => (
-            <button
-              key={preset.id}
-              type="button"
-              onClick={() => onChange(preset.id)}
-              className={cn(
-                "rounded-xl border px-3 py-2.5 text-left text-sm transition-all",
-                value === preset.id
-                  ? "border-violet-500 bg-violet-50 ring-1 ring-violet-500"
-                  : "border-slate-200 bg-white hover:border-slate-300"
-              )}
-            >
-              <span className="font-medium text-slate-900">{preset.label}</span>
-              <span className="mt-0.5 block text-xs text-slate-500">
-                {preset.description}
-              </span>
-            </button>
-          ))}
-        </div>
+    <div className="space-y-4 rounded-[22px] border border-border bg-white p-4 shadow-sm">
+      <div>
+        <h3 className="text-sm font-semibold text-slate-950">
+          AI-модель для одежды
+        </h3>
+        <p className="mt-1 text-xs leading-5 text-slate-600">
+          Модель нужна для режима “Одежда на модели”. Используйте взрослую
+          модель, нейтральную позу и минимум сложных аксессуаров.
+        </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-2">
+        {MODEL_PRESETS.map((preset) => (
+          <button
+            key={preset.id}
+            type="button"
+            onClick={() => onChange(preset.id)}
+            className={cn(
+              "rounded-[16px] border px-3 py-2.5 text-left text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500",
+              value === preset.id
+                ? "border-teal-500 bg-teal-50"
+                : "border-border bg-white hover:border-teal-200 hover:bg-teal-50/50"
+            )}
+          >
+            <span className="font-semibold text-slate-950">{preset.label}</span>
+            <span className="mt-0.5 block text-xs leading-5 text-slate-600">
+              {preset.description}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <SelectField
-          label="Gender"
+          label="Пол модели"
           value={settings.gender}
           options={GENDER_OPTIONS}
           onChange={(gender) => patch({ gender })}
         />
         <SelectField
-          label="Body type"
+          label="Тип фигуры"
           value={settings.bodyType}
           options={BODY_OPTIONS}
           onChange={(bodyType) => patch({ bodyType })}
         />
         <SelectField
-          label="Pose"
+          label="Поза"
           value={settings.pose}
           options={POSE_OPTIONS}
           onChange={(pose) => patch({ pose })}
         />
         <SelectField
-          label="Crop"
+          label="Кадр"
           value={settings.crop}
           options={CROP_OPTIONS}
           onChange={(crop) => patch({ crop })}
         />
         <SelectField
-          label="Background"
+          label="Фон"
           value={settings.background}
           options={BACKGROUND_OPTIONS}
           onChange={(background) => patch({ background })}
         />
         <SelectField
-          label="Category"
+          label="Сценарий"
           value={settings.categoryContext}
           options={CONTEXT_OPTIONS}
           onChange={(categoryContext) => patch({ categoryContext })}
         />
       </div>
+
+      <p className="rounded-[16px] bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+        В реальном AI-режиме генерация модели может стоить денег. В
+        демо-режиме списаний нет.
+      </p>
 
       <Button
         type="button"
@@ -175,23 +187,28 @@ export function ModelPresetSelector({
         onClick={onGenerate}
       >
         <UserRound className="h-4 w-4" />
-        {generating ? "Генерируем модель…" : "Сгенерировать AI-модель"}
+        {generating
+          ? "Генерируем модель для примерки…"
+          : "Сгенерировать AI-модель"}
       </Button>
 
       {generateError && (
-        <p className="text-sm text-red-600">{generateError}</p>
+        <p className="rounded-[16px] border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {generateError}
+        </p>
       )}
 
       {generatedPreviewUrl && !generating && (
         <div className="space-y-2">
-          <p className="text-xs font-medium text-emerald-700">
-            AI-модель сгенерирована
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+            <CheckCircle2 className="h-4 w-4" />
+            AI-модель готова. Теперь можно создать фото товара на модели.
           </p>
-          <div className="overflow-hidden rounded-xl border border-emerald-200">
+          <div className="overflow-hidden rounded-[18px] border border-emerald-200">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={generatedPreviewUrl}
-              alt="Generated model"
+              alt="Готовая AI-модель"
               className="aspect-[3/4] w-full object-cover"
             />
           </div>

@@ -22,44 +22,44 @@ export const MODEL_PRESETS: {
 }[] = [
   {
     id: "female-studio",
-    label: "Female studio model",
-    description: "Женская студийная модель, фронтальная поза",
+    label: "Женская студийная модель",
+    description: "Нейтральная поза, подходит для платьев, топов и комплектов.",
   },
   {
     id: "male-studio",
-    label: "Male studio model",
-    description: "Мужская студийная модель",
+    label: "Мужская студийная модель",
+    description: "Спокойная поза для футболок, рубашек, костюмов и верхней одежды.",
   },
   {
     id: "plus-size-female",
-    label: "Plus-size female model",
-    description: "Plus-size женская модель",
+    label: "Женская plus-size модель",
+    description: "Взрослая модель plus-size для каталожной съёмки.",
   },
   {
     id: "neutral-mannequin",
-    label: "Neutral mannequin",
-    description: "Нейтральный манекен без лица",
+    label: "Нейтральный манекен",
+    description: "Когда нужна карточка без узнаваемого лица модели.",
   },
 ];
 
 export const PRODUCT_CATEGORIES: { id: ProductCategory; label: string }[] = [
-  { id: "auto", label: "Auto" },
-  { id: "tops", label: "Tops" },
-  { id: "bottoms", label: "Bottoms" },
-  { id: "one-pieces", label: "One-pieces" },
-  { id: "accessory", label: "Accessory" },
+  { id: "auto", label: "Авто" },
+  { id: "tops", label: "Верх" },
+  { id: "bottoms", label: "Низ" },
+  { id: "one-pieces", label: "Платье / комплект" },
+  { id: "accessory", label: "Аксессуар" },
 ];
 
 export const GARMENT_PHOTO_TYPES: { id: GarmentPhotoType; label: string }[] = [
-  { id: "auto", label: "Auto" },
-  { id: "model", label: "Model" },
-  { id: "flat-lay", label: "Flat-lay" },
+  { id: "auto", label: "Авто" },
+  { id: "model", label: "Одежда на человеке" },
+  { id: "flat-lay", label: "Одежда отдельно" },
 ];
 
 export const QUALITY_MODES: { id: QualityMode; label: string }[] = [
-  { id: "performance", label: "Performance" },
-  { id: "balanced", label: "Balanced" },
-  { id: "quality", label: "Quality" },
+  { id: "performance", label: "Быстро" },
+  { id: "balanced", label: "Баланс" },
+  { id: "quality", label: "Максимальное качество" },
 ];
 
 export type ModelGender = "female" | "male";
@@ -100,21 +100,27 @@ export const STUDIO_MODES: {
   id: StudioMode;
   label: string;
   description: string;
+  recommendedFor: string;
 }[] = [
   {
     id: "clothing-tryon",
     label: "Одежда на модели",
-    description: "Virtual try-on на AI-модель",
+    description:
+      "Для платьев, футболок, белья, костюмов и другой одежды.",
+    recommendedFor: "Рекомендуем для одежды",
   },
   {
     id: "product-shot",
     label: "Product Shot",
-    description: "Студийное фото товара без модели",
+    description:
+      "Товарное фото без модели для бижутерии, сумок, обуви, аксессуаров и небольших товаров.",
+    recommendedFor: "Рекомендуем для аксессуаров",
   },
   {
     id: "background-remove-only",
     label: "Удалить фон",
-    description: "Только удаление фона по URL",
+    description: "Быстро убрать фон у готового изображения по ссылке.",
+    recommendedFor: "Рекомендуем для готовых фото",
   },
 ];
 

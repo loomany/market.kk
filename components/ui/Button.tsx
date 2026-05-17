@@ -6,18 +6,18 @@ type ButtonSize = "sm" | "md" | "lg";
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    "bg-violet-600 text-white hover:bg-violet-700 shadow-md shadow-violet-600/20",
+    "bg-primary text-primary-foreground shadow-lg shadow-teal-900/15 hover:bg-teal-800",
   secondary:
-    "bg-slate-900 text-white hover:bg-slate-800 shadow-md shadow-slate-900/10",
+    "bg-slate-950 text-white shadow-lg shadow-slate-900/15 hover:bg-slate-800",
   outline:
-    "border border-slate-200 bg-white text-slate-900 hover:bg-slate-50",
-  ghost: "text-slate-700 hover:bg-slate-100",
+    "border border-border bg-white text-slate-900 shadow-sm hover:border-teal-200 hover:bg-teal-50/70",
+  ghost: "text-slate-700 hover:bg-slate-100/80",
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
-  sm: "h-9 px-3 text-sm",
-  md: "h-11 px-5 text-sm",
-  lg: "h-12 px-6 text-base",
+  sm: "min-h-10 px-3.5 text-sm",
+  md: "min-h-11 px-5 text-sm",
+  lg: "min-h-12 px-6 text-base",
 };
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -43,7 +43,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       ref={ref}
       disabled={disabled || loading}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-xl font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex items-center justify-center gap-2 rounded-[18px] font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 active:scale-[0.99] disabled:pointer-events-none disabled:translate-y-0 disabled:opacity-55",
         variantStyles[variant],
         sizeStyles[size],
         className
