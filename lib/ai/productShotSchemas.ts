@@ -12,6 +12,7 @@ export const SHOT_SIZE_PRESET_VALUES = [
   "vertical_4_5",
   "vertical_3_4",
   "horizontal_4_3",
+  "reels_9_16",
 ] as const;
 
 export type ShotSizePreset = (typeof SHOT_SIZE_PRESET_VALUES)[number];
@@ -32,7 +33,7 @@ export const PRODUCT_SHOT_SIZE_OPTIONS: {
   pixels: string;
   subtitle?: string;
 }[] = [
-  { id: "square", ratio: "1:1", pixels: "1000×1000" },
+  { id: "square", ratio: "1:1", pixels: "1000×1000", subtitle: "Квадрат" },
   {
     id: "vertical_4_5",
     ratio: "4:5",
@@ -46,6 +47,12 @@ export const PRODUCT_SHOT_SIZE_OPTIONS: {
     pixels: "1200×900",
     subtitle: "Горизонтально",
   },
+  {
+    id: "reels_9_16",
+    ratio: "9:16",
+    pixels: "1080×1920",
+    subtitle: "Reels / Stories",
+  },
 ];
 
 export function shotSizePresetToDimensions(
@@ -58,6 +65,8 @@ export function shotSizePresetToDimensions(
       return [900, 1200];
     case "horizontal_4_3":
       return [1200, 900];
+    case "reels_9_16":
+      return [1080, 1920];
     case "square":
     default:
       return [1000, 1000];
@@ -100,7 +109,13 @@ export const productShotRequestSchema = z.object({
   shotSizePreset: z.preprocess(
     (value) =>
       typeof value === "string" ? normalizeShotSizePreset(value) : value,
-    z.enum(["square", "vertical_4_5", "vertical_3_4", "horizontal_4_3"])
+    z.enum([
+      "square",
+      "vertical_4_5",
+      "vertical_3_4",
+      "horizontal_4_3",
+      "reels_9_16",
+    ])
   ).default("square"),
   syncMode: z.boolean().default(false),
   fidelityMode: z

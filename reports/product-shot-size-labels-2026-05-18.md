@@ -21,10 +21,21 @@ Users did not see output pixel dimensions.
 | `vertical_4_5` | 4:5 | 1000×1250 | Вертикально |
 | `vertical_3_4` | 3:4 | 900×1200 | Каталог |
 | `horizontal_4_3` | 4:3 | 1200×900 | Горизонтально |
+| `reels_9_16` | 9:16 | 1080×1920 | Reels / Stories |
 
 Helper under formats:
 
-> Размер используется для финальной карточки. Для маркетплейсов чаще всего подходит 1:1 или 4:5.
+> Для маркетплейсов чаще всего подходит 1:1 или 4:5. Для Reels, Stories и TikTok используйте 9:16.
+
+### Update: 9:16 for Reels / Stories
+
+- **Key:** `reels_9_16`
+- **Size:** 1080×1920 (~2.07M px; standard vertical social export)
+- **Use:** Instagram Reels, Stories, TikTok vertical video covers / stills
+- **Exact-card canvas:** same `[1080, 1920]` via `shotSizePresetToDimensions`
+- **Bria creative `shot_size`:** same `[1080, 1920]`
+- **UI:** fifth format card spans full width on 2-column mobile grid (`col-span-2`)
+- **Creative mode UX:** `ProductShotCreativeReview` warning + 3 self-check prompts before Accept (does not block accept)
 
 Legacy form/API values `portrait`, `vertical`, `wide` are normalized to the new keys.
 
@@ -36,6 +47,7 @@ Legacy form/API values `portrait`, `vertical`, `wide` are normalized to the new 
 | `vertical_4_5` | [1000, 1250] | 1.25M |
 | `vertical_3_4` | [900, 1200] | 1.08M |
 | `horizontal_4_3` | [1200, 900] | 1.08M |
+| `reels_9_16` | [1080, 1920] | 2.07M |
 
 ## Exact-card canvas
 
@@ -45,6 +57,8 @@ Same dimensions via `shotSizePresetToDimensions()` in `lib/studio/exactProductCa
 
 - `lib/ai/productShotSchemas.ts` — keys, labels, mapping, legacy normalize
 - `components/studio/ProductShotSettingsPanel.tsx` — UI cards + helper
+- `components/studio/ProductShotCreativeReview.tsx` — creative-mode review prompts
+- `components/studio/GenerationResultGrid.tsx` — shows review block for creative product shot
 - `components/studio/types.ts` — re-export `ShotSizePreset`
 
 ## Real Fal calls

@@ -210,6 +210,7 @@ export function ProductShotSettingsPanel({
               onClick={() => patch({ shotSizePreset: preset.id })}
               className={cn(
                 "min-w-0 rounded-[16px] border px-3 py-2 text-left text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500",
+                preset.id === "reels_9_16" && "col-span-2",
                 settings.shotSizePreset === preset.id
                   ? "border-teal-500 bg-teal-50 text-teal-950"
                   : "border-border bg-white text-slate-600 hover:border-teal-200"
@@ -228,8 +229,8 @@ export function ProductShotSettingsPanel({
           ))}
         </div>
         <p className="text-xs leading-5 text-slate-500">
-          Размер используется для финальной карточки. Для маркетплейсов чаще
-          всего подходит 1:1 или 4:5.
+          Для маркетплейсов чаще всего подходит 1:1 или 4:5. Для Reels, Stories
+          и TikTok используйте 9:16.
         </p>
       </div>
     </div>

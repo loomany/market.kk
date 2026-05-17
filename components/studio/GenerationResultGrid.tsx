@@ -13,6 +13,7 @@ import {
 import type { StudioResultImage } from "./types";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { ProductShotCreativeReview } from "./ProductShotCreativeReview";
 import { cn } from "@/lib/utils";
 
 type GenerationResultGridProps = {
@@ -276,6 +277,11 @@ export function GenerationResultGrid({
               </div>
 
               <div className="space-y-3 border-t border-border/70 p-4">
+                {isProductShotMode &&
+                  result.productShotFidelity === "creative-scene" && (
+                    <ProductShotCreativeReview />
+                  )}
+
                 <div className="grid gap-2 sm:grid-cols-2">
                   <Button
                     variant="primary"
