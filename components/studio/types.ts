@@ -172,6 +172,7 @@ export type StudioResultImage = {
   width?: number;
   height?: number;
   label?: string;
+  provider?: string;
   reviewStatus: ResultReviewStatus;
   checklist: QualityChecklistState;
   backgroundRemovedUrl?: string;

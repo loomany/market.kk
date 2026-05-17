@@ -1,6 +1,5 @@
 import {
   CheckCircle2,
-  Download,
   SlidersHorizontal,
   UploadCloud,
 } from "lucide-react";
@@ -9,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/Card";
 const steps = [
   {
     icon: UploadCloud,
-    title: "Загрузите фото товара",
+    title: "Загрузите товар",
     description:
       "Подойдёт фото одежды, бижутерии, сумки, обуви или другого небольшого товара.",
   },
@@ -21,15 +20,9 @@ const steps = [
   },
   {
     icon: CheckCircle2,
-    title: "Получите AI-варианты",
-    description:
-      "Сервис создаст несколько аккуратных вариантов для карточки товара.",
-  },
-  {
-    icon: Download,
     title: "Проверьте и скачайте",
     description:
-      "Отметьте чеклист качества, примите хороший вариант и скачайте изображение.",
+      "Сравните результат с исходником, примите хороший вариант и скачайте изображение.",
   },
 ];
 
@@ -42,11 +35,11 @@ export function HowItWorks() {
             Как работает
           </h2>
           <p className="mt-3 text-lg leading-7 text-slate-600">
-            Четыре простых шага от исходного фото до готовой карточки товара.
+            Три простых шага от исходного фото до готовой карточки товара.
           </p>
         </div>
 
-        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-10 grid gap-4 md:grid-cols-3">
           {steps.map((step, index) => (
             <Card key={step.title} className="relative overflow-hidden shadow-lg">
               <CardContent className="pt-8">

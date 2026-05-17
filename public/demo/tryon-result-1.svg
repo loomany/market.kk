@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1200" viewBox="0 0 900 1200" role="img" aria-label="Demo try-on result">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#ecfeff"/>
+    </linearGradient>
+    <pattern id="lace" width="28" height="28" patternUnits="userSpaceOnUse">
+      <path d="M0 14 C7 2 21 2 28 14 C21 26 7 26 0 14Z" fill="none" stroke="#34d399" stroke-width="2.5"/>
+      <circle cx="14" cy="14" r="3" fill="#10b981"/>
+    </pattern>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="28" stdDeviation="25" flood-color="#0f172a" flood-opacity=".16"/>
+    </filter>
+  </defs>
+  <rect width="900" height="1200" rx="64" fill="url(#bg)"/>
+  <rect x="108" y="86" width="684" height="1038" rx="54" fill="#fff" stroke="#dbeafe" stroke-width="4"/>
+  <g filter="url(#shadow)">
+    <ellipse cx="450" cy="204" rx="76" ry="88" fill="#e8b997"/>
+    <path d="M346 316 C394 356 506 356 554 316 C602 404 618 520 594 646 C568 780 550 900 574 1036 L506 1036 C480 884 474 752 500 642 L400 642 C426 752 420 884 394 1036 L326 1036 C350 900 332 780 306 646 C282 520 298 404 346 316Z" fill="#f1c7a6"/>
+    <path d="M336 324 C384 292 516 292 564 324 L594 502 C530 548 370 548 306 502Z" fill="#020617"/>
+    <path d="M346 324 C388 302 512 302 554 324 L578 424 C524 398 376 398 322 424Z" fill="url(#lace)" opacity=".95"/>
+    <path d="M318 506 C370 548 412 536 450 500 C488 536 530 548 582 506" fill="none" stroke="#10b981" stroke-width="13" stroke-linecap="round"/>
+    <path d="M384 626 C430 602 470 602 516 626 L552 790 C506 828 394 828 348 790Z" fill="#020617"/>
+    <path d="M386 626 C430 604 470 604 514 626 L534 708 C484 688 416 688 366 708Z" fill="url(#lace)" opacity=".9"/>
+    <path d="M356 790 C408 824 492 824 544 790" fill="none" stroke="#10b981" stroke-width="13" stroke-linecap="round"/>
+    <path d="M306 440 C258 540 252 654 288 780" fill="none" stroke="#e8b997" stroke-width="42" stroke-linecap="round"/>
+    <path d="M594 440 C642 540 648 654 612 780" fill="none" stroke="#e8b997" stroke-width="42" stroke-linecap="round"/>
+    <path d="M326 1036 L402 1036" stroke="#0f172a" stroke-width="26" stroke-linecap="round"/>
+    <path d="M498 1036 L574 1036" stroke="#0f172a" stroke-width="26" stroke-linecap="round"/>
+  </g>
+</svg>

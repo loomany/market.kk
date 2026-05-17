@@ -18,6 +18,7 @@ type GarmentSettingsPanelProps = {
   onQualityModeChange: (v: QualityMode) => void;
   numSamples: number;
   onNumSamplesChange: (v: number) => void;
+  lingerieMode?: boolean;
 };
 
 function SelectField<T extends string>({
@@ -65,16 +66,32 @@ export function GarmentSettingsPanel(props: GarmentSettingsPanelProps) {
         </p>
       </div>
 
+      {props.lingerieMode && (
+        <div className="rounded-[16px] border border-teal-100 bg-teal-50 px-3 py-2 text-xs leading-5 text-teal-950">
+          Для белья на человеке используется тип исходного фото “Одежда на
+          человеке”, режим “Максимальное качество” и разрешение для
+          коммерческого белья/купальников.
+        </div>
+      )}
+
       <SelectField
         label="Тип товара"
-        helper="Помогает AI понять, какую часть одежды переносить на модель."
+        helper={
+          props.lingerieMode
+            ? "Для комплекта белья начните с “Авто”. Если низ или верх теряется, попробуйте “Платье / комплект”."
+            : "Помогает AI понять, какую часть одежды переносить на модель."
+        }
         value={props.productCategory}
         options={PRODUCT_CATEGORIES}
         onChange={props.onProductCategoryChange}
       />
       <SelectField
         label="Тип исходного фото"
-        helper="Укажите, сфотографирована одежда отдельно или уже на человеке."
+        helper={
+          props.lingerieMode
+            ? "Для исходника, где бельё уже надето на модели, выберите “Одежда на человеке”."
+            : "Укажите, сфотографирована одежда отдельно или уже на человеке."
+        }
         value={props.garmentPhotoType}
         options={GARMENT_PHOTO_TYPES}
         onChange={props.onGarmentPhotoTypeChange}

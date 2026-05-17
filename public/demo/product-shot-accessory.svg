@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000" role="img" aria-label="Demo accessory product shot">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#f5f3ff"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="34" stdDeviation="30" flood-color="#312e81" flood-opacity=".15"/>
+    </filter>
+  </defs>
+  <rect width="1000" height="1000" rx="70" fill="url(#bg)"/>
+  <ellipse cx="500" cy="730" rx="310" ry="64" fill="#c7d2fe" opacity=".35"/>
+  <g filter="url(#shadow)">
+    <path d="M270 440 C270 348 344 274 436 274 H564 C656 274 730 348 730 440 V630 C730 696 676 750 610 750 H390 C324 750 270 696 270 630Z" fill="#0f172a"/>
+    <path d="M380 314 C390 236 610 236 620 314" fill="none" stroke="#64748b" stroke-width="34" stroke-linecap="round"/>
+    <path d="M310 472 H690" stroke="#14b8a6" stroke-width="18" stroke-linecap="round"/>
+    <circle cx="430" cy="522" r="18" fill="#f8fafc"/>
+    <circle cx="570" cy="522" r="18" fill="#f8fafc"/>
+  </g>
+</svg>

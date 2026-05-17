@@ -52,7 +52,10 @@ async function resolveImageUrls(
           "Product image"
         );
       } catch (uploadError) {
-        console.error("[fal tryon] product upload failed:", uploadError);
+        console.error(
+          "[fal tryon] product upload failed:",
+          uploadError instanceof Error ? uploadError.message : "Unknown error"
+        );
         throw new Error("Fal storage upload failed for product image");
       }
     }
@@ -68,7 +71,10 @@ async function resolveImageUrls(
           "Model image"
         );
       } catch (uploadError) {
-        console.error("[fal tryon] model upload failed:", uploadError);
+        console.error(
+          "[fal tryon] model upload failed:",
+          uploadError instanceof Error ? uploadError.message : "Unknown error"
+        );
         throw new Error("Fal storage upload failed for model image");
       }
     }
@@ -171,7 +177,7 @@ function handleTryOnError(error: unknown) {
     message.includes("Upload") ||
     message.includes("storage")
   ) {
-    console.error("[fal tryon] upload failed:", error);
+    console.error("[fal tryon] upload failed:", message);
     return NextResponse.json(
       {
         ok: false,
@@ -183,7 +189,7 @@ function handleTryOnError(error: unknown) {
     );
   }
 
-  console.error("[fal tryon] failed:", error);
+  console.error("[fal tryon] failed:", message);
   return NextResponse.json(
     {
       ok: false,

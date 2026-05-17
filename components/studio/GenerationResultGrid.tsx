@@ -1,8 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import {
   Download,
   Eraser,
+  ExternalLink,
+  ImageOff,
   RefreshCw,
   ThumbsDown,
   ThumbsUp,
@@ -53,6 +56,57 @@ const STATUS_VARIANTS = {
   rejected: "danger",
 } as const;
 
+function ResultImage({
+  imageKey,
+  url,
+  alt,
+  className,
+  failed,
+  onFail,
+}: {
+  imageKey: string;
+  url: string;
+  alt: string;
+  className: string;
+  failed: boolean;
+  onFail: (imageKey: string) => void;
+}) {
+  if (failed) {
+    return (
+      <div className="flex aspect-[3/4] w-full flex-col items-center justify-center gap-3 rounded-[18px] border border-dashed border-slate-300 bg-slate-50 p-5 text-center">
+        <ImageOff className="h-8 w-8 text-slate-400" />
+        <div>
+          <p className="text-sm font-semibold text-slate-900">
+            Изображение не загрузилось
+          </p>
+          <p className="mt-1 text-xs leading-5 text-slate-500">
+            Ссылка есть, но браузер не смог показать файл.
+          </p>
+        </div>
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[14px] border border-border bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-teal-200 hover:bg-teal-50"
+        >
+          <ExternalLink className="h-4 w-4" />
+          Открыть в новой вкладке
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={url}
+      alt={alt}
+      className={className}
+      onError={() => onFail(imageKey)}
+    />
+  );
+}
+
 export function GenerationResultGrid({
   results,
   loading,
@@ -64,6 +118,12 @@ export function GenerationResultGrid({
   onRegenerate,
   onRemoveBackground,
 }: GenerationResultGridProps) {
+  const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
+
+  const markImageFailed = (imageKey: string) => {
+    setFailedImages((prev) => ({ ...prev, [imageKey]: true }));
+  };
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -127,6 +187,18 @@ export function GenerationResultGrid({
             result.reviewStatus !== "accepted" && checklistDone;
           const canDownload = result.reviewStatus === "accepted";
           const removedUrl = result.backgroundRemovedUrl;
+          const providerLabel =
+            result.provider === "mock"
+              ? "Демо-результат"
+              : result.provider === "fal"
+                ? "Fal AI"
+                : result.provider;
+          const providerVariant =
+            result.provider === "mock"
+              ? "violet"
+              : result.provider === "fal"
+                ? "success"
+                : "outline";
 
           return (
             <article
@@ -139,22 +211,35 @@ export function GenerationResultGrid({
               )}
             >
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 px-4 py-3">
-                <Badge variant="outline">{label}</Badge>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">{label}</Badge>
+                  {providerLabel && (
+                    <Badge variant={providerVariant}>{providerLabel}</Badge>
+                  )}
+                </div>
                 <Badge variant={STATUS_VARIANTS[result.reviewStatus]}>
                   {STATUS_LABELS[result.reviewStatus]}
                 </Badge>
               </div>
+
+              {result.provider === "mock" && (
+                <div className="border-b border-violet-100 bg-violet-50 px-4 py-3 text-xs leading-5 text-violet-800">
+                  Это демо-картинка, она не проверяет качество переноса товара.
+                </div>
+              )}
 
               <div className="space-y-3 p-3">
                 <div>
                   <p className="px-1 pb-2 text-xs font-semibold text-slate-500">
                     Готовый вариант
                   </p>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={result.url}
+                  <ResultImage
+                    imageKey={`${result.id}:main`}
+                    url={result.url}
                     alt={`${label}: готовый вариант`}
-                    className="aspect-[3/4] w-full rounded-[18px] object-cover"
+                    className="max-h-[560px] min-h-[260px] w-full rounded-[18px] bg-slate-50 object-contain"
+                    failed={Boolean(failedImages[`${result.id}:main`])}
+                    onFail={markImageFailed}
                   />
                 </div>
 
@@ -171,11 +256,13 @@ export function GenerationResultGrid({
                         backgroundColor: "#f8fafc",
                       }}
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={removedUrl}
+                      <ResultImage
+                        imageKey={`${result.id}:removed`}
+                        url={removedUrl}
                         alt={`${label}: изображение без фона`}
-                        className="aspect-[3/4] w-full rounded-[18px] object-contain"
+                        className="max-h-[560px] min-h-[260px] w-full rounded-[18px] object-contain"
+                        failed={Boolean(failedImages[`${result.id}:removed`])}
+                        onFail={markImageFailed}
                       />
                     </div>
                   </div>

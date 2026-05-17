@@ -6,6 +6,7 @@ import {
   ImageIcon,
   RefreshCw,
   Scissors,
+  ShieldCheck,
   Shirt,
   Sparkles,
 } from "lucide-react";
@@ -30,7 +31,7 @@ const features = [
   },
   {
     icon: Sparkles,
-    title: "Product Shot",
+    title: "Product Shot / товарное фото",
     description:
       "Товарное фото без модели на белом, светлом или более красивом фоне.",
     badge: "Без модели",
@@ -141,6 +142,25 @@ export function UseCases() {
                 {audience}
               </span>
             ))}
+          </div>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="rounded-[28px] border border-teal-100 bg-teal-50/80 p-6 text-teal-950 shadow-lg shadow-teal-100/50">
+            <ShieldCheck className="h-7 w-7 text-teal-700" />
+            <h2 className="mt-4 text-xl font-semibold">Демо-режим</h2>
+            <p className="mt-2 text-sm leading-6">
+              Безопасно и без списаний. Показывает интерфейс и порядок работы,
+              но не проверяет качество переноса товара.
+            </p>
+          </div>
+          <div className="rounded-[28px] border border-amber-200 bg-amber-50/80 p-6 text-amber-950 shadow-lg shadow-amber-100/60">
+            <Sparkles className="h-7 w-7 text-amber-700" />
+            <h2 className="mt-4 text-xl font-semibold">Реальный AI-режим</h2>
+            <p className="mt-2 text-sm leading-6">
+              Использует Fal для генерации и может списывать деньги. Перед
+              скачиванием всё равно нужна ручная проверка результата.
+            </p>
           </div>
         </div>
 

@@ -135,6 +135,7 @@ export function ImageUploader({
             type="url"
             value={urlValue}
             onChange={(event) => onUrlChange?.(event.target.value)}
+            onInput={(event) => onUrlChange?.(event.currentTarget.value)}
             disabled={urlDisabled}
             placeholder="https://example.com/image.png"
             className="w-full rounded-[16px] border border-border bg-white px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100 disabled:bg-slate-50 disabled:text-slate-400"
@@ -154,7 +155,7 @@ export function ImageUploader({
           <img
             src={previewUrl}
             alt={`Предпросмотр: ${label}`}
-            className="aspect-square w-full object-cover"
+            className="max-h-[320px] min-h-[180px] w-full object-contain"
           />
         </div>
       )}

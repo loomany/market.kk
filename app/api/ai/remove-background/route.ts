@@ -109,7 +109,7 @@ export async function POST(request: Request) {
       );
     }
 
-    console.error("[fal remove-background] failed:", error);
+    console.error("[fal remove-background] failed:", message);
     return NextResponse.json(
       {
         ok: false,

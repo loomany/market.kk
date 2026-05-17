@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1200" viewBox="0 0 900 1200" role="img" aria-label="Demo transparent background result">
+  <defs>
+    <pattern id="checker" width="48" height="48" patternUnits="userSpaceOnUse">
+      <rect width="24" height="24" fill="#f8fafc"/>
+      <rect x="24" y="24" width="24" height="24" fill="#f8fafc"/>
+      <rect x="24" width="24" height="24" fill="#e2e8f0"/>
+      <rect y="24" width="24" height="24" fill="#e2e8f0"/>
+    </pattern>
+  </defs>
+  <rect width="900" height="1200" rx="64" fill="url(#checker)"/>
+  <path d="M318 270 C360 224 432 220 450 310 C468 220 540 224 582 270 L616 482 C560 526 500 518 450 466 C400 518 340 526 284 482Z" fill="#020617"/>
+  <path d="M318 270 C360 224 432 220 450 310 C468 220 540 224 582 270 L602 396 C548 368 506 376 450 420 C394 376 352 368 298 396Z" fill="#10b981" opacity=".78"/>
+  <path d="M340 652 C386 616 514 616 560 652 L606 836 C558 880 486 884 450 838 C414 884 342 880 294 836Z" fill="#020617"/>
+  <path d="M340 652 C386 616 514 616 560 652 L584 744 C526 720 374 720 316 744Z" fill="#10b981" opacity=".78"/>
+</svg>

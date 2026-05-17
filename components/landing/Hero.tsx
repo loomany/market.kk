@@ -18,8 +18,8 @@ const benefitBadges = [
 
 const demoSteps = [
   {
-    title: "Исходное фото товара",
-    description: "Загрузите фото одежды или товара.",
+    title: "Исходник",
+    description: "Фото одежды, белья или товара.",
     src: MOCK_PRODUCT_IMAGE,
   },
   {
@@ -49,9 +49,9 @@ export function Hero() {
           </h1>
 
           <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600 sm:text-xl">
-            Загрузите фото одежды, бижутерии или аксессуара — получите
-            аккуратные карточки товара на AI-модели, с чистым фоном и проверкой
-            качества.
+            Загрузите фото одежды, белья, бижутерии или аксессуара — получите
+            аккуратные карточки товара на AI-модели, с чистым фоном и ручной
+            проверкой качества.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -63,7 +63,7 @@ export function Hero() {
             </Link>
             <a href="#how">
               <Button variant="outline" size="lg" className="min-w-[200px]">
-                Посмотреть как работает
+                Посмотреть пример
                 <ArrowDown className="h-5 w-5" />
               </Button>
             </a>

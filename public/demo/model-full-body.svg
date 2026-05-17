@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1200" viewBox="0 0 900 1200" role="img" aria-label="Demo full body model">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#f0fdfa"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="30" stdDeviation="28" flood-color="#0f172a" flood-opacity=".14"/>
+    </filter>
+  </defs>
+  <rect width="900" height="1200" rx="64" fill="url(#bg)"/>
+  <rect x="106" y="86" width="688" height="1038" rx="54" fill="#fff" stroke="#ccfbf1" stroke-width="4"/>
+  <g filter="url(#shadow)">
+    <ellipse cx="450" cy="214" rx="82" ry="94" fill="#f1c7a6"/>
+    <path d="M360 308 C410 344 490 344 540 308 C592 384 616 500 594 620 C568 764 552 890 576 1034 L506 1034 C478 884 474 752 500 636 L400 636 C426 752 422 884 394 1034 L324 1034 C348 890 332 764 306 620 C284 500 308 384 360 308Z" fill="#dbeafe"/>
+    <path d="M360 308 C398 340 502 340 540 308 L578 492 C514 522 386 522 322 492Z" fill="#14b8a6" opacity=".18"/>
+    <path d="M314 410 C264 508 252 644 288 778" fill="none" stroke="#f1c7a6" stroke-width="42" stroke-linecap="round"/>
+    <path d="M586 410 C636 508 648 644 612 778" fill="none" stroke="#f1c7a6" stroke-width="42" stroke-linecap="round"/>
+    <path d="M400 636 L500 636" stroke="#94a3b8" stroke-width="7" stroke-linecap="round"/>
+    <path d="M326 1034 L402 1034" stroke="#0f172a" stroke-width="26" stroke-linecap="round"/>
+    <path d="M498 1034 L574 1034" stroke="#0f172a" stroke-width="26" stroke-linecap="round"/>
+  </g>
+  <circle cx="420" cy="214" r="7" fill="#334155"/>
+  <circle cx="480" cy="214" r="7" fill="#334155"/>
+  <path d="M424 252 C440 264 462 264 476 252" fill="none" stroke="#334155" stroke-width="6" stroke-linecap="round"/>
+</svg>

@@ -10,7 +10,8 @@ export function newResultId(): string {
 
 export function mapApiImagesToStudioResults(
   images: { url: string; width?: number; height?: number }[],
-  labelPrefix: string
+  labelPrefix: string,
+  provider?: string
 ): StudioResultImage[] {
   return images.map((img, i) => ({
     id: newResultId(),
@@ -18,6 +19,7 @@ export function mapApiImagesToStudioResults(
     width: img.width,
     height: img.height,
     label: `${labelPrefix} ${i + 1}`,
+    provider,
     reviewStatus: "pending_review",
     checklist: createDefaultChecklist(),
   }));

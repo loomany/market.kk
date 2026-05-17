@@ -57,6 +57,54 @@ import {
   type LastGenerationMode,
 } from "./types";
 
+const MODE_STEPS: Record<
+  StudioMode,
+  { title: string; description: string }[]
+> = {
+  "clothing-tryon": [
+    {
+      title: "Загрузите товар",
+      description: "Фото одежды или белья. Если товар на человеке, выберите это в настройках.",
+    },
+    {
+      title: "Выберите модель",
+      description: "Загрузите фото модели или сгенерируйте взрослую AI-модель.",
+    },
+    {
+      title: "Проверьте результат",
+      description: "Сравните цвет, форму, узор, посадку и детали изделия.",
+    },
+  ],
+  "product-shot": [
+    {
+      title: "Загрузите товар",
+      description: "Фото бижутерии, сумки, обуви, аксессуара или небольшого товара.",
+    },
+    {
+      title: "Выберите стиль сцены",
+      description: "Белый фон для маркетплейса или более красивый фон для витрины.",
+    },
+    {
+      title: "Проверьте и скачайте",
+      description: "Примите только тот вариант, где товар не искажён.",
+    },
+  ],
+  "background-remove-only": [
+    {
+      title: "Вставьте ссылку",
+      description: "Нужна ссылка на готовое изображение.",
+    },
+    {
+      title: "Удалите фон",
+      description: "Сервис создаст вариант без фона.",
+    },
+    {
+      title: "Скачайте PNG",
+      description: "Сначала проверьте края товара и прозрачность.",
+    },
+  ],
+};
+
 function isHttpUrl(value: string): boolean {
   return /^https?:\/\//i.test(value);
 }
@@ -213,14 +261,14 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
     if (generatedModelUrl) return generatedModelUrl;
     const trimmed = modelUrl.trim();
     if (trimmed && isHttpUrl(trimmed)) return trimmed;
-    return MOCK_MODEL_IMAGE;
-  }, [modelFile, generatedModelUrl, modelUrl]);
+    return mockMode ? MOCK_MODEL_IMAGE : null;
+  }, [modelFile, generatedModelUrl, modelUrl, mockMode]);
 
   const effectiveModelPreview =
     modelPreviewUrl ??
     (generatedModelUrl && !modelFile ? generatedModelUrl : null) ??
     (modelUrl && isHttpUrl(modelUrl) ? modelUrl : null) ??
-    MOCK_MODEL_IMAGE;
+    (mockMode ? MOCK_MODEL_IMAGE : null);
 
   const handlePresetChange = useCallback((preset: ModelPreset) => {
     setModelPreset(preset);
@@ -229,6 +277,17 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
       ...presetToModelSettings(preset),
     }));
   }, []);
+
+  const handleModelSettingsChange = useCallback(
+    (settings: ModelGenerationSettings) => {
+      setModelSettings(settings);
+      if (settings.categoryContext === "lingerie") {
+        setGarmentPhotoType("model");
+        setQualityMode("quality");
+      }
+    },
+    []
+  );
 
   const handleGenerateModel = async (seedOverride?: number) => {
     const useSeed = seedOverride ?? modelGenerationSeed;
@@ -291,9 +350,19 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
       return;
     }
 
-    const resolvedModelUrl = modelFile
-      ? null
-      : resolveModelImageUrl() ?? MOCK_MODEL_IMAGE;
+    if (!modelFile && modelUrlTrimmed && !isHttpUrl(modelUrlTrimmed)) {
+      setError(
+        "Вставьте ссылку на модель, которая начинается с https://, или загрузите файл модели."
+      );
+      return;
+    }
+
+    const resolvedModelUrl = modelFile ? null : resolveModelImageUrl();
+
+    if (!modelFile && !resolvedModelUrl) {
+      setError("Загрузите фото модели или сгенерируйте AI-модель.");
+      return;
+    }
 
     const useMultipart = Boolean(productFile || modelFile);
 
@@ -342,7 +411,7 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             productImageUrl: productUrlTrimmed,
-            modelImageUrl: resolvedModelUrl ?? MOCK_MODEL_IMAGE,
+            modelImageUrl: resolvedModelUrl,
             category: mapCategoryForTryOn(productCategory),
             garmentPhotoType,
             mode: qualityMode,
@@ -362,7 +431,7 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
         return;
       }
 
-      setResults(mapApiImagesToStudioResults(data.images, "Вариант"));
+      setResults(mapApiImagesToStudioResults(data.images, "Вариант", data.provider));
       setLastGenerationMode("clothing-tryon");
       setMeta({
         provider: data.provider,
@@ -445,7 +514,9 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
         return;
       }
 
-      setResults(mapApiImagesToStudioResults(data.images, "Товарное фото"));
+      setResults(
+        mapApiImagesToStudioResults(data.images, "Товарное фото", data.provider)
+      );
       setLastGenerationMode("product-shot");
       setMeta({
         provider: data.provider,
@@ -493,7 +564,8 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
       setResults(
         mapApiImagesToStudioResults(
           [{ url: data.image.url }],
-          "Без фона"
+          "Без фона",
+          data.provider
         )
       );
       setLastGenerationMode("background-remove-only");
@@ -644,6 +716,43 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
   const effectiveProductPreviewUrl = isBgOnlyMode
     ? productUrlPreview
     : productPreviewUrl ?? productUrlPreview;
+  const productUrlIsValid = Boolean(productUrlPreview);
+  const modelUrlIsValid = Boolean(modelUrlTrimmed && isHttpUrl(modelUrlTrimmed));
+  const hasProductInput = isBgOnlyMode
+    ? productUrlIsValid
+    : Boolean(productFile || productUrlIsValid);
+  const hasModelInput = Boolean(
+    modelFile || generatedModelUrl || modelUrlIsValid || mockMode
+  );
+  const primaryBlocker = (() => {
+    if (isBgOnlyMode) {
+      if (!productUrlTrimmed) return "Сначала вставьте ссылку на изображение.";
+      if (!productUrlIsValid) return "Ссылка должна начинаться с https:// или http://.";
+      return null;
+    }
+
+    if (!productFile && productUrlTrimmed && !productUrlIsValid) {
+      return "Ссылка на товар должна начинаться с https:// или http://.";
+    }
+
+    if (!hasProductInput) return "Сначала загрузите фото товара.";
+
+    if (isClothingMode && !modelFile && modelUrlTrimmed && !modelUrlIsValid) {
+      return "Ссылка на модель должна начинаться с https:// или http://.";
+    }
+
+    if (isClothingMode && !hasModelInput) {
+      return "Загрузите фото модели или сгенерируйте AI-модель.";
+    }
+
+    return null;
+  })();
+  const canRunPrimary = !loading && primaryBlocker === null;
+  const primaryHelper =
+    primaryBlocker ??
+    (mockMode
+      ? "Сейчас включён демо-режим: списаний нет, результат не проверяет качество переноса товара."
+      : "Сейчас включён реальный AI-режим: Fal может списывать деньги за генерацию.");
 
   const primaryButtonLabel = isClothingMode
     ? "Создать фото на модели"
@@ -710,6 +819,7 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
         </section>
 
         <StudioModeSelector value={studioMode} onChange={setStudioMode} />
+        <ModeStepper mode={studioMode} />
 
         <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
           <aside className="space-y-4">
@@ -792,7 +902,7 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
                     value={modelPreset}
                     onChange={handlePresetChange}
                     settings={modelSettings}
-                    onSettingsChange={setModelSettings}
+                    onSettingsChange={handleModelSettingsChange}
                     onGenerate={() => void handleGenerateModel()}
                     generating={modelGenerating}
                     generateError={modelGenerateError}
@@ -812,6 +922,7 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
                     onQualityModeChange={setQualityMode}
                     numSamples={numSamples}
                     onNumSamplesChange={setNumSamples}
+                    lingerieMode={modelSettings.categoryContext === "lingerie"}
                   />
                 </>
               )}
@@ -827,11 +938,20 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
                 className="w-full"
                 size="lg"
                 loading={loading}
+                disabled={!canRunPrimary}
+                title={primaryBlocker ?? undefined}
                 onClick={handlePrimaryAction}
               >
                 <PrimaryIcon className="h-5 w-5" />
                 {primaryButtonLabel}
               </Button>
+              <p
+                className={`text-xs leading-5 ${
+                  primaryBlocker ? "text-amber-800" : "text-slate-500"
+                }`}
+              >
+                {primaryHelper}
+              </p>
             </CardContent>
             </Card>
           </aside>
@@ -948,6 +1068,33 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
   );
 }
 
+function ModeStepper({ mode }: { mode: StudioMode }) {
+  const steps = MODE_STEPS[mode];
+
+  return (
+    <section className="grid gap-2 sm:grid-cols-3" aria-label="Порядок работы">
+      {steps.map((step, index) => (
+        <div
+          key={step.title}
+          className="flex min-h-[112px] gap-3 rounded-[20px] border border-border bg-white p-4 shadow-sm"
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-700 text-sm font-bold text-white">
+            {index + 1}
+          </span>
+          <div>
+            <h2 className="text-sm font-semibold text-slate-950">
+              {step.title}
+            </h2>
+            <p className="mt-1 text-xs leading-5 text-slate-600">
+              {step.description}
+            </p>
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 function PreviewCard({
   title,
   url,
@@ -972,10 +1119,10 @@ function PreviewCard({
             <img
               src={url}
               alt={`Предпросмотр: ${title}`}
-              className="aspect-[3/4] w-full object-cover"
+              className="max-h-[460px] min-h-[220px] w-full object-contain"
             />
           ) : (
-            <div className="flex aspect-[3/4] items-center justify-center p-4 text-center text-sm leading-6 text-slate-500">
+            <div className="flex min-h-[260px] items-center justify-center p-4 text-center text-sm leading-6 text-slate-500">
               {empty}
             </div>
           )}

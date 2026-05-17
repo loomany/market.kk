@@ -28,11 +28,13 @@ type ModelPresetSelectorProps = {
 
 function SelectField<T extends string>({
   label,
+  helper,
   value,
   options,
   onChange,
 }: {
   label: string;
+  helper?: string;
   value: T;
   options: { id: T; label: string }[];
   onChange: (value: T) => void;
@@ -40,6 +42,7 @@ function SelectField<T extends string>({
   return (
     <div className="space-y-1.5">
       <label className="text-xs font-semibold text-slate-700">{label}</label>
+      {helper && <p className="text-xs leading-5 text-slate-500">{helper}</p>}
       <select
         value={value}
         onChange={(event) => onChange(event.target.value as T)}
@@ -101,6 +104,7 @@ export function ModelPresetSelector({
 }: ModelPresetSelectorProps) {
   const patch = (partial: Partial<ModelGenerationSettings>) =>
     onSettingsChange({ ...settings, ...partial });
+  const isLingerieScenario = settings.categoryContext === "lingerie";
 
   return (
     <div className="space-y-4 rounded-[22px] border border-border bg-white p-4 shadow-sm">
@@ -155,7 +159,12 @@ export function ModelPresetSelector({
           onChange={(pose) => patch({ pose })}
         />
         <SelectField
-          label="Кадр"
+          label="Кадр для примерки"
+          helper={
+            isLingerieScenario
+              ? "Для белья и купальников нужен полный рост или кадр по пояс с видимыми бёдрами. Портрет не подходит."
+              : "Для одежды лучше подходит полный рост или кадр по пояс."
+          }
           value={settings.crop}
           options={CROP_OPTIONS}
           onChange={(crop) => patch({ crop })}
@@ -170,13 +179,19 @@ export function ModelPresetSelector({
           label="Сценарий"
           value={settings.categoryContext}
           options={CONTEXT_OPTIONS}
-          onChange={(categoryContext) => patch({ categoryContext })}
+          onChange={(categoryContext) =>
+            patch({
+              categoryContext,
+              ...(categoryContext === "lingerie" ? { crop: "full-body" } : {}),
+            })
+          }
         />
       </div>
 
       <p className="rounded-[16px] bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
-        В реальном AI-режиме генерация модели может стоить денег. В
-        демо-режиме списаний нет.
+        {isLingerieScenario
+          ? "Для белья используйте взрослую модель, нейтральную позу, чистый фон и руки, которые не закрывают грудь, талию и бёдра."
+          : "В реальном AI-режиме генерация модели может стоить денег. В демо-режиме списаний нет."}
       </p>
 
       <Button
@@ -209,7 +224,7 @@ export function ModelPresetSelector({
             <img
               src={generatedPreviewUrl}
               alt="Готовая AI-модель"
-              className="aspect-[3/4] w-full object-cover"
+              className="max-h-[460px] min-h-[260px] w-full object-contain"
             />
           </div>
         </div>

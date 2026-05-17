@@ -36,7 +36,10 @@ async function resolveProductImageUrl(
           "Product image"
         );
       } catch (uploadError) {
-        console.error("[fal product-shot] upload failed:", uploadError);
+        console.error(
+          "[fal product-shot] upload failed:",
+          uploadError instanceof Error ? uploadError.message : "Unknown error"
+        );
         throw new Error("Fal storage upload failed for product image");
       }
     }
@@ -155,7 +158,7 @@ function handleProductShotError(error: unknown) {
   }
 
   if (message.includes("upload") || message.includes("storage")) {
-    console.error("[fal product-shot] upload failed:", error);
+    console.error("[fal product-shot] upload failed:", message);
     return NextResponse.json(
       {
         ok: false,
@@ -167,7 +170,7 @@ function handleProductShotError(error: unknown) {
     );
   }
 
-  console.error("[fal product-shot] failed:", error);
+  console.error("[fal product-shot] failed:", message);
   return NextResponse.json(
     {
       ok: false,

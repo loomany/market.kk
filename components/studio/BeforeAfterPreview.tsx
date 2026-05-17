@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight } from "lucide-react";
+import { ArrowDown, ArrowRight } from "lucide-react";
 
 type BeforeAfterPreviewProps = {
   beforeUrl?: string | null;
@@ -18,9 +18,10 @@ export function BeforeAfterPreview({
   return (
     <div className="space-y-3">
       <h3 className="text-sm font-semibold text-slate-950">До / После</h3>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <PreviewSlot label="До" url={beforeUrl} />
-        <ArrowRight className="h-5 w-5 shrink-0 text-slate-400" />
+        <ArrowDown className="mx-auto h-5 w-5 shrink-0 text-slate-400 sm:hidden" />
+        <ArrowRight className="hidden h-5 w-5 shrink-0 text-slate-400 sm:block" />
         <PreviewSlot label="После" url={afterUrl} />
       </div>
     </div>
@@ -40,9 +41,13 @@ function PreviewSlot({
       <div className="overflow-hidden rounded-[18px] border border-border bg-slate-50">
         {url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={url} alt={label} className="aspect-[3/4] w-full object-cover" />
+          <img
+            src={url}
+            alt={label}
+            className="max-h-[420px] min-h-[220px] w-full object-contain"
+          />
         ) : (
-          <div className="flex aspect-[3/4] items-center justify-center text-xs text-slate-400">
+          <div className="flex min-h-[220px] items-center justify-center text-xs text-slate-400">
             —
           </div>
         )}

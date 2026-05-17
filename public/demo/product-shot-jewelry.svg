@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000" role="img" aria-label="Demo jewelry product shot">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="36%" r="70%">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f1f5f9"/>
+    </radialGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="30" stdDeviation="30" flood-color="#0f172a" flood-opacity=".18"/>
+    </filter>
+  </defs>
+  <rect width="1000" height="1000" rx="70" fill="url(#bg)"/>
+  <ellipse cx="500" cy="720" rx="280" ry="62" fill="#cbd5e1" opacity=".35"/>
+  <g filter="url(#shadow)">
+    <path d="M314 354 C376 258 624 258 686 354 C734 430 690 548 500 704 C310 548 266 430 314 354Z" fill="#fef3c7" stroke="#c08b2c" stroke-width="28" stroke-linejoin="round"/>
+    <path d="M398 382 C432 330 568 330 602 382 C630 426 602 492 500 580 C398 492 370 426 398 382Z" fill="#fff7ed" stroke="#f59e0b" stroke-width="18"/>
+    <circle cx="500" cy="442" r="56" fill="#ecfeff" stroke="#0891b2" stroke-width="12"/>
+  </g>
+</svg>

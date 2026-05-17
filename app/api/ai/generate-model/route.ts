@@ -113,7 +113,7 @@ export async function POST(request: Request) {
       );
     }
 
-    console.error("[fal generate-model] failed:", error);
+    console.error("[fal generate-model] failed:", message);
     return NextResponse.json(
       {
         ok: false,
