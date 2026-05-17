@@ -15,17 +15,12 @@ import { MOCK_MODEL_IMAGE } from "@/lib/ai/mockResults";
 import type { GenerateModelResponse } from "@/lib/ai/modelGenerationSchemas";
 import type { RemoveBackgroundResponse } from "@/lib/ai/backgroundRemovalSchemas";
 import type { ProductShotResponse } from "@/lib/ai/productShotSchemas";
-import {
-  mapCategoryForTryOn,
-  type TryOnInputSource,
-  type TryOnResponse,
-} from "@/lib/ai/falSchemas";
+import { mapCategoryForTryOn, type TryOnResponse } from "@/lib/ai/falSchemas";
 import { validateImageFileClient } from "@/lib/ai/clientImageValidation";
 import {
   mapApiImagesToStudioResults,
   nextGenerationSeed,
 } from "@/lib/studio/resultUtils";
-import type { QualityChecklistKey } from "./types";
 import { Button } from "@/components/ui/Button";
 import {
   Card,
@@ -111,7 +106,7 @@ function isHttpUrl(value: string): boolean {
 
 function friendlyAiError(errorCode?: string, message?: string): string {
   if (errorCode === "FAL_KEY_MISSING") {
-    return "Для реального AI-режима нужен FAL_KEY на сервере. Включите демо-режим или добавьте ключ после отдельного approve.";
+    return "AI-сервис не настроен на сервере. Обратитесь к администратору.";
   }
 
   if (errorCode === "FAL_UPLOAD_FAILED") {
@@ -203,14 +198,6 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<StudioResultImage[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [meta, setMeta] = useState<{
-    provider: string;
-    model: string;
-    requestId: string;
-    seed?: number;
-    inputSource?: TryOnInputSource;
-    sceneDescription?: string;
-  } | null>(null);
   const [generationSeed, setGenerationSeed] = useState(42);
   const [modelGenerationSeed, setModelGenerationSeed] = useState(42);
   const [lastGenerationMode, setLastGenerationMode] =
@@ -380,7 +367,6 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
     setLoading(true);
     setError(null);
     setResults([]);
-    setMeta(null);
 
     try {
       let res: Response;
@@ -433,13 +419,6 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
 
       setResults(mapApiImagesToStudioResults(data.images, "Вариант", data.provider));
       setLastGenerationMode("clothing-tryon");
-      setMeta({
-        provider: data.provider,
-        model: data.model,
-        requestId: data.requestId,
-        seed: useSeed,
-        inputSource: data.inputSource,
-      });
       setGenerationSeed(nextGenerationSeed());
     } catch {
       setError("Не удалось связаться с сервером. Попробуйте ещё раз.");
@@ -459,7 +438,6 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
     setLoading(true);
     setError(null);
     setResults([]);
-    setMeta(null);
 
     try {
       let res: Response;
@@ -518,12 +496,6 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
         mapApiImagesToStudioResults(data.images, "Товарное фото", data.provider)
       );
       setLastGenerationMode("product-shot");
-      setMeta({
-        provider: data.provider,
-        model: data.model,
-        requestId: data.requestId ?? "product-shot",
-        sceneDescription: data.sceneDescription,
-      });
     } catch {
       setError("Не удалось создать товарное фото. Проверьте фото и попробуйте ещё раз.");
     } finally {
@@ -541,7 +513,6 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
     setLoading(true);
     setError(null);
     setResults([]);
-    setMeta(null);
 
     try {
       const res = await fetch("/api/ai/remove-background", {
@@ -569,30 +540,12 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
         )
       );
       setLastGenerationMode("background-remove-only");
-      setMeta({
-        provider: data.provider,
-        model: data.model,
-        requestId: data.requestId ?? "bg-only",
-      });
     } catch {
       setError("Не удалось удалить фон. Попробуйте ещё раз.");
     } finally {
       setLoading(false);
     }
   };
-
-  const handleChecklistChange = useCallback(
-    (resultId: string, key: QualityChecklistKey, value: boolean) => {
-      setResults((prev) =>
-        prev.map((r) =>
-          r.id === resultId
-            ? { ...r, checklist: { ...r.checklist, [key]: value } }
-            : r
-        )
-      );
-    },
-    []
-  );
 
   const handleAcceptResult = useCallback((resultId: string) => {
     setResults((prev) =>
@@ -748,11 +701,7 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
     return null;
   })();
   const canRunPrimary = !loading && primaryBlocker === null;
-  const primaryHelper =
-    primaryBlocker ??
-    (mockMode
-      ? "Сейчас включён демо-режим: списаний нет, результат не проверяет качество переноса товара."
-      : "Сейчас включён реальный AI-режим: Fal может списывать деньги за генерацию.");
+  const primaryHelper = primaryBlocker;
 
   const primaryButtonLabel = isClothingMode
     ? "Создать фото на модели"
@@ -765,8 +714,6 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
     : isProductShotMode
       ? Camera
       : Eraser;
-  const modeBadgeLabel = mockMode ? "Демо-режим" : "Реальный AI-режим";
-
   return (
     <div className="min-h-screen">
       <header className="border-b border-border/70 bg-white/85 backdrop-blur-xl">
@@ -778,14 +725,9 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
             <ArrowLeft className="h-4 w-4" />
             На главную
           </Link>
-          <div className="flex items-center gap-3">
-            <span className="hidden text-sm font-bold tracking-tight text-slate-950 sm:inline">
-              Vitrina <span className="text-teal-700">AI</span>
-            </span>
-            <Badge variant={mockMode ? "success" : "warning"}>
-              {modeBadgeLabel}
-            </Badge>
-          </div>
+          <span className="hidden text-sm font-bold tracking-tight text-slate-950 sm:inline">
+            Vitrina <span className="text-teal-700">AI</span>
+          </span>
         </div>
       </header>
 
@@ -810,9 +752,8 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
             <div className="flex items-start gap-3">
               <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-teal-700" />
               <p>
-                Ваши фото в MVP не сохраняются в нашей базе. В демо-режиме
-                генерация не списывает деньги. В реальном AI-режиме изображения
-                отправляются в Fal для обработки.
+                Фото не сохраняются в нашей базе. Для генерации изображения
+                временно обрабатываются в защищённом облачном AI-сервисе.
               </p>
             </div>
           </div>
@@ -832,13 +773,6 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {!isBgOnlyMode && (
-                <div className="rounded-[18px] border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
-                  В реальном AI-режиме обработка через Fal может стоить денег.
-                  В демо-режиме списаний нет.
-                </div>
-              )}
-
               <ImageUploader
                 label={
                   isBgOnlyMode
@@ -945,13 +879,11 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
                 <PrimaryIcon className="h-5 w-5" />
                 {primaryButtonLabel}
               </Button>
-              <p
-                className={`text-xs leading-5 ${
-                  primaryBlocker ? "text-amber-800" : "text-slate-500"
-                }`}
-              >
-                {primaryHelper}
-              </p>
+              {primaryHelper ? (
+                <p className="text-xs leading-5 text-amber-800">
+                  {primaryHelper}
+                </p>
+              ) : null}
             </CardContent>
             </Card>
           </aside>
@@ -992,10 +924,6 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
             <Card>
             <CardHeader>
               <CardTitle>Результаты</CardTitle>
-              <CardDescription>
-                Сначала проверьте качество. Скачать можно только принятый
-                вариант.
-              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {error && (
@@ -1009,48 +937,16 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
                   </div>
                 </div>
               )}
-              <p className="rounded-[18px] border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm leading-6 text-amber-950">
-                Перед публикацией на маркетплейсе, в интернет-магазине или
-                каталоге проверьте результат: AI может изменить цвет, форму,
-                узор или детали товара. Используйте только фото, которые прошли
-                ручную проверку.
-              </p>
               <GenerationResultGrid
                 results={results}
                 loading={loading}
                 showRegenerate={!isBgOnlyMode && results.length > 0}
                 regenerateLoading={loading}
-                onChecklistChange={handleChecklistChange}
                 onAccept={handleAcceptResult}
                 onReject={handleRejectResult}
                 onRegenerate={handleRegenerate}
                 onRemoveBackground={handleRemoveBackground}
               />
-              {meta && (
-                <details className="rounded-[16px] border border-border bg-slate-50 px-3 py-2 text-xs text-slate-500">
-                  <summary className="cursor-pointer font-semibold text-slate-600">
-                    Техническая информация
-                  </summary>
-                  <div className="mt-2 space-y-1">
-                    <p>
-                      Провайдер: {meta.provider} · Модель: {meta.model} · ID:
-                      {meta.requestId}
-                      {meta.seed !== undefined ? ` · seed ${meta.seed}` : ""}
-                    </p>
-                    {meta.inputSource && (
-                      <p>
-                        Товар: {meta.inputSource.product} · Модель:{" "}
-                        {meta.inputSource.model}
-                      </p>
-                    )}
-                    {meta.sceneDescription && (
-                      <p className="line-clamp-2" title={meta.sceneDescription}>
-                        Сцена: {meta.sceneDescription.slice(0, 120)}…
-                      </p>
-                    )}
-                  </div>
-                </details>
-              )}
               {isClothingMode && (
                 <BeforeAfterPreview
                   beforeUrl={

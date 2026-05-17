@@ -148,18 +148,18 @@ export function UseCases() {
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-[28px] border border-teal-100 bg-teal-50/80 p-6 text-teal-950 shadow-lg shadow-teal-100/50">
             <ShieldCheck className="h-7 w-7 text-teal-700" />
-            <h2 className="mt-4 text-xl font-semibold">Демо-режим</h2>
+            <h2 className="mt-4 text-xl font-semibold">Облачная генерация</h2>
             <p className="mt-2 text-sm leading-6">
-              Безопасно и без списаний. Показывает интерфейс и порядок работы,
-              но не проверяет качество переноса товара.
+              Загрузите фото — AI создаст варианты для карточки. Обычно на один
+              запуск уходит от нескольких секунд до минуты.
             </p>
           </div>
           <div className="rounded-[28px] border border-amber-200 bg-amber-50/80 p-6 text-amber-950 shadow-lg shadow-amber-100/60">
             <Sparkles className="h-7 w-7 text-amber-700" />
-            <h2 className="mt-4 text-xl font-semibold">Реальный AI-режим</h2>
+            <h2 className="mt-4 text-xl font-semibold">Проверка перед скачиванием</h2>
             <p className="mt-2 text-sm leading-6">
-              Использует Fal для генерации и может списывать деньги. Перед
-              скачиванием всё равно нужна ручная проверка результата.
+              Перед выгрузкой пройдите чеклист качества — так вы отсеете
+              варианты, где AI исказил товар.
             </p>
           </div>
         </div>
@@ -187,8 +187,8 @@ export function UseCases() {
               Попробовать в студии
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-300">
-              Откройте демо-режим, загрузите фото товара и пройдите весь
-              сценарий без списаний.
+              Загрузите фото товара, получите варианты и проверьте их перед
+              скачиванием.
             </p>
             <Link href="/studio" className="mt-5 inline-block">
               <Button variant="primary" size="lg">

@@ -188,11 +188,12 @@ export function ModelPresetSelector({
         />
       </div>
 
-      <p className="rounded-[16px] bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
-        {isLingerieScenario
-          ? "Для белья используйте взрослую модель, нейтральную позу, чистый фон и руки, которые не закрывают грудь, талию и бёдра."
-          : "В реальном AI-режиме генерация модели может стоить денег. В демо-режиме списаний нет."}
-      </p>
+      {isLingerieScenario ? (
+        <p className="rounded-[16px] bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+          Для белья используйте взрослую модель, нейтральную позу, чистый фон и
+          руки, которые не закрывают грудь, талию и бёдра.
+        </p>
+      ) : null}
 
       <Button
         type="button"

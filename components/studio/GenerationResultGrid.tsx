@@ -10,11 +10,9 @@ import {
   ThumbsDown,
   ThumbsUp,
 } from "lucide-react";
-import type { QualityChecklistKey, StudioResultImage } from "./types";
-import { isChecklistComplete } from "@/lib/ai/qualityChecklist";
+import type { StudioResultImage } from "./types";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { QualityChecklist } from "./QualityChecklist";
 import { cn } from "@/lib/utils";
 
 type GenerationResultGridProps = {
@@ -22,11 +20,6 @@ type GenerationResultGridProps = {
   loading?: boolean;
   showRegenerate?: boolean;
   regenerateLoading?: boolean;
-  onChecklistChange: (
-    resultId: string,
-    key: QualityChecklistKey,
-    value: boolean
-  ) => void;
   onAccept: (resultId: string) => void;
   onReject: (resultId: string) => void;
   onRegenerate?: () => void;
@@ -112,7 +105,6 @@ export function GenerationResultGrid({
   loading,
   showRegenerate = true,
   regenerateLoading,
-  onChecklistChange,
   onAccept,
   onReject,
   onRegenerate,
@@ -128,8 +120,8 @@ export function GenerationResultGrid({
     return (
       <div className="space-y-4">
         <div className="rounded-[22px] border border-teal-100 bg-teal-50/70 px-4 py-3 text-sm leading-6 text-teal-950">
-          Создаём изображение. В демо-режиме это быстро, в реальном AI-режиме
-          обработка может занять больше времени.
+          Создаём изображение. Обычно это занимает от нескольких секунд до
+          минуты — не закрывайте страницу, пока идёт обработка.
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           {Array.from({ length: 2 }).map((_, index) => (
@@ -160,12 +152,6 @@ export function GenerationResultGrid({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-[22px] border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm leading-6 text-amber-950">
-        Скачивание доступно после ручной проверки. Отметьте все пункты
-        чеклиста, если фото выглядит правильно. Если AI исказил товар —
-        нажмите “Отклонить” или “Сгенерировать ещё”.
-      </div>
-
       {showRegenerate && onRegenerate && (
         <Button
           variant="outline"
@@ -182,16 +168,15 @@ export function GenerationResultGrid({
       <div className="grid gap-5 lg:grid-cols-2">
         {results.map((result, index) => {
           const label = result.label ?? `Вариант ${index + 1}`;
-          const checklistDone = isChecklistComplete(result.checklist);
-          const canAccept =
-            result.reviewStatus !== "accepted" && checklistDone;
+          const canAccept = result.reviewStatus !== "accepted";
+          const canReject = result.reviewStatus !== "rejected";
           const canDownload = result.reviewStatus === "accepted";
           const removedUrl = result.backgroundRemovedUrl;
           const providerLabel =
             result.provider === "mock"
-              ? "Демо-результат"
+              ? "Превью"
               : result.provider === "fal"
-                ? "Fal AI"
+                ? "AI"
                 : result.provider;
           const providerVariant =
             result.provider === "mock"
@@ -224,7 +209,8 @@ export function GenerationResultGrid({
 
               {result.provider === "mock" && (
                 <div className="border-b border-violet-100 bg-violet-50 px-4 py-3 text-xs leading-5 text-violet-800">
-                  Это демо-картинка, она не проверяет качество переноса товара.
+                  Показан тестовый пример. Для финального результата запустите
+                  генерацию в студии.
                 </div>
               )}
 
@@ -270,24 +256,11 @@ export function GenerationResultGrid({
               </div>
 
               <div className="space-y-3 border-t border-border/70 p-4">
-                <QualityChecklist
-                  checklist={result.checklist}
-                  onChange={(key, value) =>
-                    onChecklistChange(result.id, key, value)
-                  }
-                  compact
-                />
-
                 <div className="grid gap-2 sm:grid-cols-2">
                   <Button
                     variant="primary"
                     size="sm"
                     disabled={!canAccept}
-                    title={
-                      !checklistDone
-                        ? "Сначала отметьте все пункты чеклиста"
-                        : undefined
-                    }
                     onClick={() => onAccept(result.id)}
                   >
                     <ThumbsUp className="h-4 w-4" />
@@ -296,6 +269,7 @@ export function GenerationResultGrid({
                   <Button
                     variant="outline"
                     size="sm"
+                    disabled={!canReject}
                     onClick={() => onReject(result.id)}
                   >
                     <ThumbsDown className="h-4 w-4" />
@@ -309,9 +283,7 @@ export function GenerationResultGrid({
                   className="w-full"
                   disabled={!canDownload}
                   title={
-                    !canDownload
-                      ? "Сначала примите результат после проверки"
-                      : undefined
+                    !canDownload ? "Сначала нажмите «Принять»" : undefined
                   }
                   onClick={() =>
                     canDownload

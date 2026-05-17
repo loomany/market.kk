@@ -98,9 +98,9 @@ export function GarmentSettingsPanel(props: GarmentSettingsPanelProps) {
       />
       <SelectField
         label="Качество"
-        helper="Быстрый режим быстрее, максимальное качество может ждать дольше."
+        helper="Максимальное качество может ждать дольше."
         value={props.qualityMode}
-        options={QUALITY_MODES}
+        options={QUALITY_MODES.filter((mode) => mode.id !== "performance")}
         onChange={props.onQualityModeChange}
       />
 
@@ -123,8 +123,7 @@ export function GarmentSettingsPanel(props: GarmentSettingsPanelProps) {
           aria-label="Количество вариантов"
         />
         <p className="text-xs leading-5 text-slate-500">
-          В реальном AI-режиме больше вариантов обычно означает больше
-          обработки.
+          Больше вариантов — дольше генерация, но проще выбрать лучший кадр.
         </p>
       </div>
     </div>

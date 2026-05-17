@@ -48,8 +48,8 @@ export function ImageUploader({
       </div>
 
       <div className="rounded-[18px] border border-teal-100 bg-teal-50/60 px-3 py-2 text-xs leading-5 text-teal-950">
-        JPEG, PNG или WEBP до 10MB. Фото не сохраняются в нашей базе в MVP.
-        В реальном AI-режиме файл временно отправляется в Fal для обработки.
+        JPEG, PNG или WEBP до 10MB. Файл не сохраняется у нас и временно
+        передаётся в облачный AI-сервис только для обработки.
       </div>
 
       {canUploadFile && (
