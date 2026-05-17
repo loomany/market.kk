@@ -182,6 +182,10 @@ export function GenerationResultGrid({
               : result.productShotFidelity === "creative-scene"
                 ? "Креативная сцена — проверьте товар"
                 : null;
+          const manualMaskBadge = result.manualMaskUsed
+            ? "Товар выделен вручную"
+            : null;
+          const selectedPreview = result.selectedProductPreviewUrl;
           const providerLabel =
             result.provider === "mock"
               ? "Превью"
@@ -222,6 +226,9 @@ export function GenerationResultGrid({
                       {fidelityBadge}
                     </Badge>
                   )}
+                  {manualMaskBadge && (
+                    <Badge variant="violet">{manualMaskBadge}</Badge>
+                  )}
                 </div>
                 <Badge variant={STATUS_VARIANTS[result.reviewStatus]}>
                   {STATUS_LABELS[result.reviewStatus]}
@@ -235,10 +242,71 @@ export function GenerationResultGrid({
                 </div>
               )}
 
+              {result.exactCardWithoutMask &&
+                result.productShotFidelity === "exact-card" && (
+                  <div className="border-b border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900">
+                    Карточка создана без ручного выделения. Проверьте, не попали
+                    ли лишние предметы.
+                  </div>
+                )}
+
               <div className="space-y-3 p-3">
+                {selectedPreview && (
+                  <div>
+                    <p className="px-1 pb-2 text-xs font-semibold text-slate-500">
+                      Выделенный товар
+                    </p>
+                    <div
+                      className="rounded-[18px] bg-[length:12px_12px] bg-[position:0_0,6px_6px]"
+                      style={{
+                        backgroundImage:
+                          "linear-gradient(45deg, #e2e8f0 25%, transparent 25%), linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e2e8f0 75%), linear-gradient(-45deg, transparent 75%, #e2e8f0 75%)",
+                        backgroundColor: "#f8fafc",
+                      }}
+                    >
+                      <ResultImage
+                        imageKey={`${result.id}:selected`}
+                        url={selectedPreview}
+                        alt={`${label}: выделенный товар`}
+                        className="max-h-[360px] min-h-[180px] w-full rounded-[18px] object-contain"
+                        failed={Boolean(failedImages[`${result.id}:selected`])}
+                        onFail={markImageFailed}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {removedUrl && isProductShotMode && (
+                  <div>
+                    <p className="px-1 pb-2 text-xs font-semibold text-slate-500">
+                      Вырезка без фона
+                    </p>
+                    <div
+                      className="rounded-[18px] bg-[length:12px_12px] bg-[position:0_0,6px_6px]"
+                      style={{
+                        backgroundImage:
+                          "linear-gradient(45deg, #e2e8f0 25%, transparent 25%), linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e2e8f0 75%), linear-gradient(-45deg, transparent 75%, #e2e8f0 75%)",
+                        backgroundColor: "#f8fafc",
+                      }}
+                    >
+                      <ResultImage
+                        imageKey={`${result.id}:removed`}
+                        url={removedUrl}
+                        alt={`${label}: вырезка без фона`}
+                        className="max-h-[360px] min-h-[180px] w-full rounded-[18px] object-contain"
+                        failed={Boolean(failedImages[`${result.id}:removed`])}
+                        onFail={markImageFailed}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <p className="px-1 pb-2 text-xs font-semibold text-slate-500">
-                    Готовый вариант
+                    {isProductShotMode &&
+                    result.productShotFidelity === "exact-card"
+                      ? "Готовая карточка"
+                      : "Готовый вариант"}
                   </p>
                   <ResultImage
                     imageKey={`${result.id}:main`}
@@ -250,10 +318,10 @@ export function GenerationResultGrid({
                   />
                 </div>
 
-                {removedUrl && (
+                {removedUrl && !isProductShotMode && (
                   <div>
                     <p className="px-1 pb-2 text-xs font-semibold text-slate-500">
-                      {isProductShotMode ? "Вырезка без фона" : "PNG без фона"}
+                      PNG без фона
                     </p>
                     <div
                       className="rounded-[18px] bg-[length:12px_12px] bg-[position:0_0,6px_6px]"

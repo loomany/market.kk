@@ -5,6 +5,7 @@ export type ProductShotChecklistKey =
   | "materialTextureSimilar"
   | "noExtraDetails"
   | "noNewColorsGemsChains"
+  | "noExtraObjectsInCard"
   | "backgroundClean"
   | "marketplaceReady";
 
@@ -20,6 +21,7 @@ export const DEFAULT_PRODUCT_SHOT_CHECKLIST: ProductShotChecklistState = {
   materialTextureSimilar: false,
   noExtraDetails: false,
   noNewColorsGemsChains: false,
+  noExtraObjectsInCard: false,
   backgroundClean: false,
   marketplaceReady: false,
 };
@@ -34,6 +36,7 @@ export const PRODUCT_SHOT_CHECKLIST_LABELS_RU: Record<
   materialTextureSimilar: "Материал и текстура похожи",
   noExtraDetails: "Нет лишних деталей",
   noNewColorsGemsChains: "Нет новых цветов, камней или цепочек",
+  noExtraObjectsInCard: "Лишние предметы не попали в карточку",
   backgroundClean: "Фон чистый",
   marketplaceReady: "Фото подходит для карточки товара",
 };

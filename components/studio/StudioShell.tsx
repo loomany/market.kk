@@ -44,6 +44,10 @@ import { StudioModeSelector } from "./StudioModeSelector";
 import { GenerationResultGrid } from "./GenerationResultGrid";
 import { BeforeAfterPreview } from "./BeforeAfterPreview";
 import {
+  ProductMaskEditor,
+  type ProductMaskApplyResult,
+} from "./ProductMaskEditor";
+import {
   DEFAULT_MODEL_GENERATION_SETTINGS,
   DEFAULT_PRODUCT_SHOT_SETTINGS,
   presetToModelSettings,
@@ -82,12 +86,13 @@ const MODE_STEPS: Record<
       description: "Фото бижутерии, сумки, обуви, аксессуара или небольшого товара.",
     },
     {
-      title: "Выберите стиль сцены",
-      description: "Белый фон для маркетплейса или более красивый фон для витрины.",
+      title: "Выделите товар",
+      description:
+        "Если рядом есть ветки, руки или декор — закрасьте только товар кистью.",
     },
     {
-      title: "Проверьте и скачайте",
-      description: "Примите только тот вариант, где товар не искажён.",
+      title: "Создайте карточку",
+      description: "Проверьте результат и примите только точный вариант.",
     },
   ],
   "background-remove-only": [
@@ -209,6 +214,26 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
   const [lastGenerationMode, setLastGenerationMode] =
     useState<LastGenerationMode>("clothing-tryon");
 
+  const [maskEditorOpen, setMaskEditorOpen] = useState(false);
+  const [selectedProductFile, setSelectedProductFile] = useState<File | null>(
+    null
+  );
+  const [selectedProductPreviewUrl, setSelectedProductPreviewUrl] = useState<
+    string | null
+  >(null);
+  const selectedProductPreviewRef = useRef<string | null>(null);
+  const [useSelectedForCreative, setUseSelectedForCreative] = useState(false);
+
+  const clearSelectedProduct = useCallback(() => {
+    if (selectedProductPreviewRef.current) {
+      URL.revokeObjectURL(selectedProductPreviewRef.current);
+      selectedProductPreviewRef.current = null;
+    }
+    setSelectedProductFile(null);
+    setSelectedProductPreviewUrl(null);
+    setMaskEditorOpen(false);
+  }, []);
+
   const handleProductFile = useCallback(
     (file: File) => {
       const validationError = validateImageFileClient(file);
@@ -219,8 +244,9 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
       setError(null);
       setProductFile(file);
       setProductPreviewUrl(productPreview.setFromFile(file));
+      clearSelectedProduct();
     },
-    [productPreview]
+    [productPreview, clearSelectedProduct]
   );
 
   const handleModelFile = useCallback(
@@ -242,7 +268,27 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
   const clearProductFile = useCallback(() => {
     setProductFile(null);
     setProductPreviewUrl(productPreview.setFromFile(null));
-  }, [productPreview]);
+    clearSelectedProduct();
+  }, [productPreview, clearSelectedProduct]);
+
+  useEffect(() => {
+    return () => {
+      if (selectedProductPreviewRef.current) {
+        URL.revokeObjectURL(selectedProductPreviewRef.current);
+      }
+    };
+  }, []);
+
+  const handleMaskApply = useCallback((result: ProductMaskApplyResult) => {
+    if (selectedProductPreviewRef.current) {
+      URL.revokeObjectURL(selectedProductPreviewRef.current);
+    }
+    selectedProductPreviewRef.current = result.previewUrl;
+    setSelectedProductFile(result.file);
+    setSelectedProductPreviewUrl(result.previewUrl);
+    setMaskEditorOpen(false);
+    setError(null);
+  }, []);
 
   const clearModelFile = useCallback(() => {
     setModelFile(null);
@@ -438,14 +484,16 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
     isMarketplaceScenePreset(productShotSettings.scenePreset);
 
   const removeBackgroundForProduct = async (
-    productUrlTrimmed: string
+    productUrlTrimmed: string,
+    imageFileOverride?: File | null
   ): Promise<RemoveBackgroundResponse> => {
     let res: Response;
+    const fileForBg = imageFileOverride ?? productFile;
 
-    if (productFile) {
+    if (fileForBg) {
       const formData = new FormData();
-      formData.append("imageFile", productFile);
-      if (productUrlTrimmed) {
+      formData.append("imageFile", fileForBg);
+      if (productUrlTrimmed && !imageFileOverride) {
         formData.append("imageUrl", productUrlTrimmed);
       }
       formData.append("syncMode", "false");
@@ -481,7 +529,12 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
     setResults([]);
 
     try {
-      const bgData = await removeBackgroundForProduct(productUrlTrimmed);
+      const maskUsed = Boolean(selectedProductFile);
+      const bgSourceFile = selectedProductFile ?? productFile;
+      const bgData = await removeBackgroundForProduct(
+        productUrlTrimmed,
+        bgSourceFile
+      );
 
       if (!bgData.ok) {
         setError(friendlyAiError(bgData.errorCode, bgData.message));
@@ -503,6 +556,9 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
           "exact-card",
           {
             cutoutPreviewUrl: cutoutUrl,
+            selectedProductPreviewUrl: selectedProductPreviewUrl ?? undefined,
+            manualMaskUsed: maskUsed,
+            exactCardWithoutMask: !maskUsed,
             provider: bgData.provider,
           }
         )
@@ -538,10 +594,14 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
 
     try {
       let res: Response;
+      const creativeProductFile =
+        useSelectedForCreative && selectedProductFile
+          ? selectedProductFile
+          : productFile;
 
-      if (productFile) {
+      if (creativeProductFile) {
         const formData = new FormData();
-        formData.append("productImageFile", productFile);
+        formData.append("productImageFile", creativeProductFile);
         if (productUrlTrimmed) {
           formData.append("productImageUrl", productUrlTrimmed);
         }
@@ -902,6 +962,7 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
                 onUrlChange={(url) => {
                   if (productFile && !isBgOnlyMode) return;
                   setProductUrl(url);
+                  clearSelectedProduct();
                   setProductPreviewUrl(
                     url && isHttpUrl(url)
                       ? productPreview.setFromHttpUrl(url)
@@ -974,6 +1035,76 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
                 <ProductShotSettingsPanel
                   settings={productShotSettings}
                   onChange={setProductShotSettings}
+                  hasSelectedProduct={Boolean(selectedProductFile)}
+                  useSelectedForCreative={useSelectedForCreative}
+                  onUseSelectedForCreativeChange={setUseSelectedForCreative}
+                />
+              )}
+
+              {isProductShotMode &&
+                usesExactProductCard() &&
+                hasProductInput &&
+                effectiveProductPreviewUrl &&
+                !maskEditorOpen && (
+                  <div className="space-y-3 rounded-[22px] border border-teal-100 bg-teal-50/50 p-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      size="lg"
+                      onClick={() => setMaskEditorOpen(true)}
+                    >
+                      Выделить товар
+                    </Button>
+                    <p className="text-xs leading-5 text-slate-600">
+                      Если на фото есть ветки, руки, декор или лишние предметы
+                      — выделите только товар. Так карточка получится точнее.
+                    </p>
+                    {!selectedProductFile && (
+                      <p className="text-xs leading-5 text-amber-800">
+                        Без выделения AI может оставить лишние объекты рядом с
+                        товаром.
+                      </p>
+                    )}
+                    {selectedProductPreviewUrl && (
+                      <div>
+                        <p className="mb-2 text-xs font-semibold text-slate-700">
+                          Выбранный товар
+                        </p>
+                        <div className="overflow-hidden rounded-[16px] border border-border bg-[length:12px_12px] bg-[position:0_0,6px_6px]"
+                          style={{
+                            backgroundImage:
+                              "linear-gradient(45deg, #e2e8f0 25%, transparent 25%), linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e2e8f0 75%), linear-gradient(-45deg, transparent 75%, #e2e8f0 75%)",
+                            backgroundColor: "#f8fafc",
+                          }}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={selectedProductPreviewUrl}
+                            alt="Выбранный товар"
+                            className="max-h-48 w-full object-contain"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="mt-2 w-full"
+                          onClick={() => setMaskEditorOpen(true)}
+                        >
+                          Изменить выделение
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+              {isProductShotMode && maskEditorOpen && effectiveProductPreviewUrl && (
+                <ProductMaskEditor
+                  key={effectiveProductPreviewUrl}
+                  imageUrl={effectiveProductPreviewUrl}
+                  onApply={handleMaskApply}
+                  onCancel={() => setMaskEditorOpen(false)}
                 />
               )}
 

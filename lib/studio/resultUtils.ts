@@ -36,7 +36,13 @@ export function nextGenerationSeed(): number {
 export function mapProductShotStudioResults(
   images: { url: string; width?: number; height?: number }[],
   fidelityMode: ProductShotFidelityMode,
-  options?: { cutoutPreviewUrl?: string; provider?: string }
+  options?: {
+    cutoutPreviewUrl?: string;
+    selectedProductPreviewUrl?: string;
+    manualMaskUsed?: boolean;
+    exactCardWithoutMask?: boolean;
+    provider?: string;
+  }
 ): StudioResultImage[] {
   return images.map((img, i) => ({
     id: newResultId(),
@@ -51,5 +57,8 @@ export function mapProductShotStudioResults(
     productShotChecklist: createDefaultProductShotChecklist(),
     cutoutPreviewUrl: options?.cutoutPreviewUrl,
     backgroundRemovedUrl: options?.cutoutPreviewUrl,
+    selectedProductPreviewUrl: options?.selectedProductPreviewUrl,
+    manualMaskUsed: options?.manualMaskUsed,
+    exactCardWithoutMask: options?.exactCardWithoutMask,
   }));
 }

@@ -189,6 +189,9 @@ export type StudioResultImage = {
   productShotChecklist?: ProductShotChecklistState;
   cutoutPreviewUrl?: string;
   backgroundRemovedUrl?: string;
+  selectedProductPreviewUrl?: string;
+  manualMaskUsed?: boolean;
+  exactCardWithoutMask?: boolean;
   backgroundRemoveError?: string;
   backgroundRemoveLoading?: boolean;
 };

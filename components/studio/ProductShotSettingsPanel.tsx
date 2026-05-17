@@ -53,11 +53,17 @@ const SCENE_PRESETS: {
 type ProductShotSettingsPanelProps = {
   settings: ProductShotSettings;
   onChange: (settings: ProductShotSettings) => void;
+  hasSelectedProduct?: boolean;
+  useSelectedForCreative?: boolean;
+  onUseSelectedForCreativeChange?: (value: boolean) => void;
 };
 
 export function ProductShotSettingsPanel({
   settings,
   onChange,
+  hasSelectedProduct = false,
+  useSelectedForCreative = false,
+  onUseSelectedForCreativeChange,
 }: ProductShotSettingsPanelProps) {
   const patch = (partial: Partial<ProductShotSettings>) =>
     onChange({ ...settings, ...partial });
@@ -111,7 +117,8 @@ export function ProductShotSettingsPanel({
         {settings.fidelityMode === "exact-card" ? (
           <p className="rounded-[14px] bg-teal-50 px-3 py-2 text-xs leading-5 text-teal-900">
             Лучший выбор для маркетплейсов. Сначала удаляем фон и собираем
-            чистую карточку, чтобы не менять сам товар.
+            чистую карточку, чтобы не менять сам товар. Если в карточку попала
+            ветка, рука или декор — вернитесь и выделите товар вручную.
           </p>
         ) : (
           <p className="rounded-[14px] bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
@@ -172,6 +179,22 @@ export function ProductShotSettingsPanel({
               className="w-full rounded-[16px] border border-border px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
             />
           </div>
+        )}
+
+      {settings.fidelityMode === "creative-scene" &&
+        hasSelectedProduct &&
+        onUseSelectedForCreativeChange && (
+          <label className="flex cursor-pointer items-start gap-2 rounded-[14px] border border-border bg-slate-50 px-3 py-2.5 text-xs leading-5 text-slate-700">
+            <input
+              type="checkbox"
+              checked={useSelectedForCreative}
+              onChange={(e) => onUseSelectedForCreativeChange(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-border accent-teal-700"
+            />
+            <span>
+              Использовать выделенный товар для креативной сцены
+            </span>
+          </label>
         )}
 
       {settings.fidelityMode === "creative-scene" && (
