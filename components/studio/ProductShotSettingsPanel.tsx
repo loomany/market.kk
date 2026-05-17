@@ -16,7 +16,7 @@ const SCENE_PRESETS: {
   {
     id: "marketplace-clean",
     label: "Маркетплейс",
-    hint: "Светлый фон и аккуратная тень.",
+    hint: "Чистый фон без изменения товара.",
   },
   {
     id: "white-studio",

@@ -28,12 +28,16 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
+export type ComposeExactProductCardOptions = {
+  background: ExactCardBackground;
+  shotSizePreset: ShotSizePreset;
+  /** Off by default — marketplace cards use a flat background without drop shadow. */
+  showShadow?: boolean;
+};
+
 export async function composeExactProductCard(
   cutoutUrl: string,
-  options: {
-    background: ExactCardBackground;
-    shotSizePreset: ShotSizePreset;
-  }
+  options: ComposeExactProductCardOptions
 ): Promise<string> {
   const [width, height] = shotSizePresetToDimensions(options.shotSizePreset);
   const img = await loadImage(cutoutUrl);
@@ -57,23 +61,25 @@ export async function composeExactProductCard(
   const x = (width - drawW) / 2;
   const y = (height - drawH) / 2;
 
-  ctx.save();
-  ctx.fillStyle = "rgba(15, 23, 42, 0.12)";
-  ctx.filter = "blur(18px)";
-  const shadowW = drawW * 0.72;
-  const shadowH = Math.max(12, drawH * 0.08);
-  ctx.beginPath();
-  ctx.ellipse(
-    width / 2,
-    y + drawH - shadowH * 0.2,
-    shadowW / 2,
-    shadowH,
-    0,
-    0,
-    Math.PI * 2
-  );
-  ctx.fill();
-  ctx.restore();
+  if (options.showShadow) {
+    ctx.save();
+    ctx.fillStyle = "rgba(15, 23, 42, 0.12)";
+    ctx.filter = "blur(18px)";
+    const shadowW = drawW * 0.72;
+    const shadowH = Math.max(12, drawH * 0.08);
+    ctx.beginPath();
+    ctx.ellipse(
+      width / 2,
+      y + drawH - shadowH * 0.2,
+      shadowW / 2,
+      shadowH,
+      0,
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+    ctx.restore();
+  }
 
   ctx.drawImage(img, x, y, drawW, drawH);
 
