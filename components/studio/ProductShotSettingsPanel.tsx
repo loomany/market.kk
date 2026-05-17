@@ -1,15 +1,12 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { PRODUCT_SHOT_SIZE_OPTIONS } from "@/lib/ai/productShotSchemas";
 import {
   isMarketplaceScenePreset,
   PRODUCT_SHOT_FIDELITY_MODES,
 } from "@/lib/ai/productShotFidelity";
-import type {
-  ProductShotScenePreset,
-  ProductShotSettings,
-  ShotSizePreset,
-} from "./types";
+import type { ProductShotScenePreset, ProductShotSettings } from "./types";
 
 const SCENE_PRESETS: {
   id: ProductShotScenePreset;
@@ -52,14 +49,6 @@ const SCENE_PRESETS: {
     hint: "Только для креативной сцены.",
   },
 ];
-
-const SHOT_SIZE_PRESETS: { id: ShotSizePreset; label: string; hint: string }[] =
-  [
-    { id: "square", label: "1:1", hint: "Квадрат" },
-    { id: "portrait", label: "4:5", hint: "Вертикально" },
-    { id: "vertical", label: "3:4", hint: "Каталог" },
-    { id: "wide", label: "Wide", hint: "Шире" },
-  ];
 
 type ProductShotSettingsPanelProps = {
   settings: ProductShotSettings;
@@ -213,26 +202,35 @@ export function ProductShotSettingsPanel({
         <label className="text-sm font-semibold text-slate-950">
           Формат изображения
         </label>
-        <div className="grid grid-cols-2 gap-2">
-          {SHOT_SIZE_PRESETS.map((preset) => (
+        <div className="grid min-w-0 grid-cols-2 gap-2">
+          {PRODUCT_SHOT_SIZE_OPTIONS.map((preset) => (
             <button
               key={preset.id}
               type="button"
               onClick={() => patch({ shotSizePreset: preset.id })}
               className={cn(
-                "rounded-[16px] border px-3 py-2 text-left text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500",
+                "min-w-0 rounded-[16px] border px-3 py-2 text-left text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500",
                 settings.shotSizePreset === preset.id
                   ? "border-teal-500 bg-teal-50 text-teal-950"
                   : "border-border bg-white text-slate-600 hover:border-teal-200"
               )}
             >
-              {preset.label}
+              <span className="block">{preset.ratio}</span>
               <span className="mt-0.5 block font-normal text-slate-500">
-                {preset.hint}
+                {preset.pixels}
               </span>
+              {preset.subtitle ? (
+                <span className="mt-0.5 block text-[11px] font-normal text-slate-400">
+                  {preset.subtitle}
+                </span>
+              ) : null}
             </button>
           ))}
         </div>
+        <p className="text-xs leading-5 text-slate-500">
+          Размер используется для финальной карточки. Для маркетплейсов чаще
+          всего подходит 1:1 или 4:5.
+        </p>
       </div>
     </div>
   );

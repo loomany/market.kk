@@ -7,6 +7,63 @@ import {
 } from "@/lib/ai/falSchemas";
 import { isMarketplaceScenePreset } from "@/lib/ai/productShotFidelity";
 
+export const SHOT_SIZE_PRESET_VALUES = [
+  "square",
+  "vertical_4_5",
+  "vertical_3_4",
+  "horizontal_4_3",
+] as const;
+
+export type ShotSizePreset = (typeof SHOT_SIZE_PRESET_VALUES)[number];
+
+const LEGACY_SHOT_SIZE_PRESET_MAP: Record<string, ShotSizePreset> = {
+  portrait: "vertical_4_5",
+  vertical: "vertical_3_4",
+  wide: "horizontal_4_3",
+};
+
+export function normalizeShotSizePreset(value: string): ShotSizePreset {
+  return LEGACY_SHOT_SIZE_PRESET_MAP[value] ?? (value as ShotSizePreset);
+}
+
+export const PRODUCT_SHOT_SIZE_OPTIONS: {
+  id: ShotSizePreset;
+  ratio: string;
+  pixels: string;
+  subtitle?: string;
+}[] = [
+  { id: "square", ratio: "1:1", pixels: "1000×1000" },
+  {
+    id: "vertical_4_5",
+    ratio: "4:5",
+    pixels: "1000×1250",
+    subtitle: "Вертикально",
+  },
+  { id: "vertical_3_4", ratio: "3:4", pixels: "900×1200", subtitle: "Каталог" },
+  {
+    id: "horizontal_4_3",
+    ratio: "4:3",
+    pixels: "1200×900",
+    subtitle: "Горизонтально",
+  },
+];
+
+export function shotSizePresetToDimensions(
+  preset: ShotSizePreset
+): [number, number] {
+  switch (preset) {
+    case "vertical_4_5":
+      return [1000, 1250];
+    case "vertical_3_4":
+      return [900, 1200];
+    case "horizontal_4_3":
+      return [1200, 900];
+    case "square":
+    default:
+      return [1000, 1000];
+  }
+}
+
 export const productShotRequestSchema = z.object({
   productImageUrl: z.string().min(1).optional(),
   scenePreset: z
@@ -40,9 +97,11 @@ export const productShotRequestSchema = z.object({
       "center_horizontal",
     ])
     .default("center_vertical"),
-  shotSizePreset: z
-    .enum(["square", "portrait", "vertical", "wide"])
-    .default("square"),
+  shotSizePreset: z.preprocess(
+    (value) =>
+      typeof value === "string" ? normalizeShotSizePreset(value) : value,
+    z.enum(["square", "vertical_4_5", "vertical_3_4", "horizontal_4_3"])
+  ).default("square"),
   syncMode: z.boolean().default(false),
   fidelityMode: z
     .enum(["exact-card", "creative-scene"])
@@ -50,7 +109,6 @@ export const productShotRequestSchema = z.object({
 });
 
 export type ProductShotRequest = z.infer<typeof productShotRequestSchema>;
-export type ShotSizePreset = ProductShotRequest["shotSizePreset"];
 
 export type ProductShotImage = {
   url: string;
@@ -80,22 +138,6 @@ export type ProductShotErrorResponse = {
 export type ProductShotResponse =
   | ProductShotSuccessResponse
   | ProductShotErrorResponse;
-
-export function shotSizePresetToDimensions(
-  preset: ShotSizePreset
-): [number, number] {
-  switch (preset) {
-    case "portrait":
-      return [1000, 1250];
-    case "vertical":
-      return [900, 1200];
-    case "wide":
-      return [1200, 900];
-    case "square":
-    default:
-      return [1000, 1000];
-  }
-}
 
 function getFileFromFormData(
   formData: FormData,
@@ -145,8 +187,9 @@ export function buildProductShotFormPayload(
     manualPlacementSelection:
       normalizeTryOnFormValue(formData.get("manualPlacementSelection")) ??
       "center_vertical",
-    shotSizePreset:
-      normalizeTryOnFormValue(formData.get("shotSizePreset")) ?? "square",
+    shotSizePreset: normalizeShotSizePreset(
+      normalizeTryOnFormValue(formData.get("shotSizePreset")) ?? "square"
+    ),
     syncMode: parseBooleanFormValue(formData.get("syncMode"), false),
     fidelityMode:
       normalizeTryOnFormValue(formData.get("fidelityMode")) ?? "exact-card",

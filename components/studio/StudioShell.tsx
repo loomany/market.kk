@@ -18,7 +18,6 @@ import type { ProductShotResponse } from "@/lib/ai/productShotSchemas";
 import { mapCategoryForTryOn, type TryOnResponse } from "@/lib/ai/falSchemas";
 import { validateImageFileClient } from "@/lib/ai/clientImageValidation";
 import { isMarketplaceScenePreset } from "@/lib/ai/productShotFidelity";
-import type { ProductShotChecklistKey } from "@/lib/ai/productShotChecklist";
 import {
   composeExactProductCard,
   scenePresetToExactBackground,
@@ -657,25 +656,6 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
     }
   };
 
-  const handleProductShotChecklistChange = useCallback(
-    (resultId: string, key: ProductShotChecklistKey, value: boolean) => {
-      setResults((prev) =>
-        prev.map((r) =>
-          r.id === resultId && r.productShotChecklist
-            ? {
-                ...r,
-                productShotChecklist: {
-                  ...r.productShotChecklist,
-                  [key]: value,
-                },
-              }
-            : r
-        )
-      );
-    },
-    []
-  );
-
   const handleAcceptResult = useCallback((resultId: string) => {
     setResults((prev) =>
       prev.map((r) =>
@@ -1072,7 +1052,6 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
                 showRegenerate={!isBgOnlyMode && results.length > 0}
                 regenerateLoading={loading}
                 isProductShotMode={isProductShotMode}
-                onProductShotChecklistChange={handleProductShotChecklistChange}
                 onAccept={handleAcceptResult}
                 onReject={handleRejectResult}
                 onRegenerate={handleRegenerate}

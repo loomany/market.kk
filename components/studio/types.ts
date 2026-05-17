@@ -135,7 +135,9 @@ export type ProductShotScenePreset =
   | "flat-lay"
   | "custom";
 
-export type ShotSizePreset = "square" | "portrait" | "vertical" | "wide";
+import type { ShotSizePreset } from "@/lib/ai/productShotSchemas";
+
+export type { ShotSizePreset };
 
 export type ProductShotFidelityMode = "exact-card" | "creative-scene";
 

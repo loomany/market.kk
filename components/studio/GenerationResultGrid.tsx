@@ -10,11 +10,9 @@ import {
   ThumbsDown,
   ThumbsUp,
 } from "lucide-react";
-import type { ProductShotChecklistKey } from "@/lib/ai/productShotChecklist";
 import type { StudioResultImage } from "./types";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { ProductShotChecklist } from "./ProductShotChecklist";
 import { cn } from "@/lib/utils";
 
 type GenerationResultGridProps = {
@@ -23,11 +21,6 @@ type GenerationResultGridProps = {
   showRegenerate?: boolean;
   regenerateLoading?: boolean;
   isProductShotMode?: boolean;
-  onProductShotChecklistChange?: (
-    resultId: string,
-    key: ProductShotChecklistKey,
-    value: boolean
-  ) => void;
   onAccept: (resultId: string) => void;
   onReject: (resultId: string) => void;
   onRegenerate?: () => void;
@@ -114,7 +107,6 @@ export function GenerationResultGrid({
   showRegenerate = true,
   regenerateLoading,
   isProductShotMode = false,
-  onProductShotChecklistChange,
   onAccept,
   onReject,
   onRegenerate,
@@ -284,20 +276,6 @@ export function GenerationResultGrid({
               </div>
 
               <div className="space-y-3 border-t border-border/70 p-4">
-                {isProductShotMode &&
-                  result.productShotChecklist &&
-                  onProductShotChecklistChange && (
-                    <ProductShotChecklist
-                      checklist={result.productShotChecklist}
-                      showCreativeWarning={
-                        result.productShotFidelity === "creative-scene"
-                      }
-                      onChange={(key, value) =>
-                        onProductShotChecklistChange(result.id, key, value)
-                      }
-                    />
-                  )}
-
                 <div className="grid gap-2 sm:grid-cols-2">
                   <Button
                     variant="primary"
