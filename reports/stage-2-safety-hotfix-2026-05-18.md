@@ -209,3 +209,57 @@ Before any future real run:
 4. Run one explicit route at a time.
 5. Record endpoint, estimated cost, request ID, and visual pass/fail.
 6. Disable `ALLOW_PAID_AI_RUNS` immediately after the test.
+
+## 16. Finalization check — 2026-05-18
+
+Git before final report commit:
+
+- `git status --short`: current working tree contains unrelated uncommitted Studio/Auth WIP files. They were not staged for this safety finalization.
+- `git diff --stat`: current WIP diff is outside the original safety hotfix and includes Studio UI/model workflow changes.
+
+Build / lint:
+
+- `npm run build`: passed on the current working tree.
+- `npm run lint`: failed on current uncommitted WIP files:
+  - `components/auth/PhoneCountryInput.tsx`
+  - `components/auth/WhatsAppLoginModal.tsx`
+  - `components/studio/ModelPromptComposer.tsx`
+  - `components/ui/Select.tsx`
+  - plus several unused-variable warnings.
+
+Safety smoke:
+
+- First `npm run smoke:ai:mock` attempt failed safe because another Next dev server was already running on `localhost:3010`.
+- `GET http://localhost:3010/api/system/ai-mode` returned only boolean fields and no keys:
+  - `mockMode: false`
+  - `paidAiRunsAllowed: true`
+  - `openAiConfigured: true`
+  - `falConfigured: true`
+  - `greenApiConfigured: true`
+- Because that existing server was real-enabled and paid-enabled, it was stopped before running smoke.
+- Second `npm run smoke:ai:mock`: passed.
+
+Smoke result:
+
+- `forced mock routes`: ok.
+- `real mode disabled guard`: ok.
+- `budget guard`: ok.
+- `AI mock and paid guard checks passed`.
+
+Security grep:
+
+- Checked `FAL_KEY`, `OPENAI_API_KEY`, `GREEN_API_TOKEN`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`, `APP_SESSION_SECRET`.
+- No real secret values were printed.
+- Occurrences are expected in `.env.example`, README/reports, server-side code, and smoke dummy placeholders.
+- `SUPABASE_SERVICE_ROLE_KEY` is not used in client components.
+- `.env.local` is ignored by `.gitignore` and not tracked by git.
+
+Real paid calls after hotfix:
+
+- None.
+
+Final remaining risks:
+
+- A real-enabled dev server can still be left running by a developer; the smoke script fails safe instead of using it.
+- Current uncommitted WIP has lint errors unrelated to the safety guard.
+- Node prints `MODULE_TYPELESS_PACKAGE_JSON` for the TypeScript smoke script; this is noisy but does not affect guard behavior.
