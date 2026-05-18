@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920" viewBox="0 0 1080 1920" role="img" aria-label="Demo video placeholder">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="1" stop-color="#134e4a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="35%" r="50%">
+      <stop offset="0" stop-color="#5eead4" stop-opacity=".5"/>
+      <stop offset="1" stop-color="#5eead4" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1080" height="1920" fill="url(#bg)"/>
+  <rect width="1080" height="1920" fill="url(#glow)"/>
+  <rect x="128" y="260" width="824" height="1120" rx="72" fill="#ffffff" opacity=".96"/>
+  <path d="M445 770 L445 870 L540 820 Z" fill="#0f766e"/>
+  <circle cx="540" cy="820" r="132" fill="none" stroke="#0f766e" stroke-width="18"/>
+  <text x="540" y="1040" text-anchor="middle" font-family="Arial, sans-serif" font-size="52" font-weight="700" fill="#0f172a">Демо-видео</text>
+  <text x="540" y="1118" text-anchor="middle" font-family="Arial, sans-serif" font-size="32" fill="#475569">Mock preview без списаний</text>
+  <rect x="188" y="1470" width="704" height="24" rx="12" fill="#5eead4" opacity=".9"/>
+  <rect x="188" y="1526" width="420" height="18" rx="9" fill="#99f6e4" opacity=".7"/>
+</svg>
