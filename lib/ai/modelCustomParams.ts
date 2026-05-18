@@ -10,3 +10,6 @@ export const MODEL_CUSTOM_SELECT_OPTION = {
 } as const;
 
 export const MODEL_CUSTOM_TEXT_MAX = 300;
+
+/** Preset angle prompts (server-side); longer than user custom fields */
+export const MODEL_CAMERA_ANGLE_PROMPT_MAX = 512;

@@ -2,44 +2,70 @@
 
 import { Check, Download, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import {
+  PreviewImageCarousel,
+  type PreviewCarouselItem,
+} from "@/components/studio/PreviewImageCarousel";
+import { downloadImageFile, previewImageFilename } from "@/lib/studio/downloadImages";
+
 type ModelReadyCardProps = {
-  imageUrl: string;
+  previewItems: PreviewCarouselItem[];
   isSaved: boolean;
   onSave: () => void;
-  onDownload: () => void;
   onStartOver: () => void;
 };
 
 export function downloadModelImage(url: string, filename = "ai-model.png") {
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.target = "_blank";
-  link.rel = "noopener noreferrer";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  void downloadImageFile(url, filename);
 }
 
 export function ModelReadyCard({
-  imageUrl,
+  previewItems,
   isSaved,
   onSave,
-  onDownload,
   onStartOver,
 }: ModelReadyCardProps) {
+  const hasMultiple = previewItems.length > 1;
+  const singleItem = previewItems[0];
+
   return (
     <div className="overflow-hidden rounded-[16px] border border-slate-200/90 bg-white shadow-sm">
       <p className="px-3 pb-2 pt-3 text-xs font-semibold text-slate-500">
-        Готовый вариант
+        {hasMultiple
+          ? `Готовые ракурсы (${previewItems.length})`
+          : "Готовый вариант"}
       </p>
-      <div className="border-t border-border bg-slate-50 px-2 pb-2 pt-2">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={imageUrl}
-          alt="Сгенерированная AI-модель"
-          className="max-h-[460px] min-h-[200px] w-full rounded-[12px] object-contain"
-        />
+      <div className="flex min-h-[220px] flex-col border-t border-border bg-slate-50">
+        {hasMultiple ? (
+          <PreviewImageCarousel
+            items={previewItems}
+            className="min-h-[220px]"
+          />
+        ) : singleItem ? (
+          <div className="space-y-2 px-2 pb-2 pt-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={singleItem.url}
+              alt="Сгенерированная AI-модель"
+              className="max-h-[460px] min-h-[200px] w-full rounded-[12px] object-contain"
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="w-full"
+              onClick={() =>
+                void downloadImageFile(
+                  singleItem.url,
+                  previewImageFilename("vitrina-ai-model", singleItem.label, 0)
+                )
+              }
+            >
+              <Download className="h-4 w-4" />
+              Скачать
+            </Button>
+          </div>
+        ) : null}
       </div>
       <div className="space-y-2 border-t border-border/70 p-3">
         <Button
@@ -58,16 +84,6 @@ export function ModelReadyCard({
           ) : (
             "Сохранить модель"
           )}
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="w-full"
-          onClick={onDownload}
-        >
-          <Download className="h-4 w-4" />
-          Скачать
         </Button>
         <Button
           type="button"

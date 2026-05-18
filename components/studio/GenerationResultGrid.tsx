@@ -9,6 +9,10 @@ import {
 } from "lucide-react";
 import type { StudioResultImage } from "./types";
 import {
+  PreviewImageCarousel,
+  type PreviewCarouselItem,
+} from "./PreviewImageCarousel";
+import {
   PreviewCard,
   ResultCompareSkeleton,
 } from "./PreviewCard";
@@ -23,6 +27,7 @@ type GenerationResultGridProps = {
   /** Side-by-side compare cards in studio (no extra outer frame) */
   embedded?: boolean;
   productPreviewUrl?: string | null;
+  productPreviewItems?: PreviewCarouselItem[];
   onStartOver: () => void;
 };
 
@@ -34,14 +39,38 @@ function ResultCompareGrid({ children }: { children: ReactNode }) {
 
 function ProductCompareColumn({
   productPreviewUrl,
+  productPreviewItems = [],
 }: {
   productPreviewUrl: string | null | undefined;
+  productPreviewItems?: PreviewCarouselItem[];
 }) {
+  const items =
+    productPreviewItems.length > 0
+      ? productPreviewItems
+      : productPreviewUrl
+        ? [
+            {
+              id: "product-single",
+              url: productPreviewUrl,
+              label: "Товар",
+            },
+          ]
+        : [];
+
   return (
     <PreviewCard
       title="Товар"
-      url={productPreviewUrl ?? null}
+      url={items.length === 1 ? (items[0]?.url ?? null) : null}
       empty="Загрузите фото товара"
+      content={
+        items.length > 1 ? (
+          <PreviewImageCarousel
+            items={items}
+            downloadFilenamePrefix="vitrina-product"
+            className="min-h-[260px]"
+          />
+        ) : undefined
+      }
     />
   );
 }
@@ -247,6 +276,7 @@ export function GenerationResultGrid({
   isProductShotMode = false,
   embedded = false,
   productPreviewUrl = null,
+  productPreviewItems = [],
   onStartOver,
 }: GenerationResultGridProps) {
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
@@ -273,7 +303,10 @@ export function GenerationResultGrid({
         <div>
           {loadingBanner}
           <ResultCompareGrid>
-            <ProductCompareColumn productPreviewUrl={productPreviewUrl} />
+            <ProductCompareColumn
+              productPreviewUrl={productPreviewUrl}
+              productPreviewItems={productPreviewItems}
+            />
             <ResultCompareSkeleton />
           </ResultCompareGrid>
         </div>
@@ -294,7 +327,10 @@ export function GenerationResultGrid({
     if (embedded) {
       return (
         <ResultCompareGrid>
-          <ProductCompareColumn productPreviewUrl={productPreviewUrl} />
+          <ProductCompareColumn
+              productPreviewUrl={productPreviewUrl}
+              productPreviewItems={productPreviewItems}
+            />
           <PreviewCard
             title="Результат"
             url={null}
@@ -359,7 +395,10 @@ export function GenerationResultGrid({
             <div key={result.id} className="space-y-4">
               <ResultAlerts result={result} />
               <ResultCompareGrid>
-                <ProductCompareColumn productPreviewUrl={productPreviewUrl} />
+                <ProductCompareColumn
+              productPreviewUrl={productPreviewUrl}
+              productPreviewItems={productPreviewItems}
+            />
                 <PreviewCard
                   title="Готовая карточка"
                   url={null}
@@ -428,7 +467,10 @@ export function GenerationResultGrid({
             <div key={result.id} className="space-y-4">
               <ResultAlerts result={result} />
               <ResultCompareGrid>
-                <ProductCompareColumn productPreviewUrl={productPreviewUrl} />
+                <ProductCompareColumn
+              productPreviewUrl={productPreviewUrl}
+              productPreviewItems={productPreviewItems}
+            />
                 <PreviewCard
                   title={resultTitle}
                   url={null}

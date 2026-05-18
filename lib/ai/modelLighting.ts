@@ -21,6 +21,9 @@ export function lightingPromptPhrase(
       return "bright natural sunny outdoor daylight, clear shadows";
     case "studio":
     default:
-      return "even studio softbox lighting, clean catalog look, minimal harsh shadows";
+      return (
+        "professional studio key light with soft fill, gentle natural shadow behind the model on the backdrop, " +
+        "subtle floor contact shadow, dimensional commercial catalog lighting — not flat shadowless overlit, not harsh dark shadows"
+      );
   }
 }

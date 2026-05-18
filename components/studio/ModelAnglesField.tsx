@@ -16,6 +16,7 @@ import {
   normalizeAnglePresetSelection,
   type ModelAnglePresetId,
   type ModelCustomAngle,
+  type ResolvedModelAngle,
 } from "@/lib/ai/modelAngles";
 
 function CustomAngleRow({
@@ -112,6 +113,12 @@ type ModelAnglesFieldProps = {
   anglePresets: ModelAnglePresetId[];
   customAngles: ModelCustomAngle[];
   disabled?: boolean;
+  productPhotoCount?: number;
+  useProductSampleAngles?: boolean;
+  productSampleAngles?: ResolvedModelAngle[] | null;
+  analyzingProductAngles?: boolean;
+  onApplyAnglesFromProducts?: () => void;
+  onClearProductSampleAngles?: () => void;
   onPresetsChange: (presets: ModelAnglePresetId[]) => void;
   onCustomAnglesChange: (angles: ModelCustomAngle[]) => void;
 };
@@ -120,6 +127,12 @@ export function ModelAnglesField({
   anglePresets,
   customAngles,
   disabled,
+  productPhotoCount = 0,
+  useProductSampleAngles = false,
+  productSampleAngles = null,
+  analyzingProductAngles = false,
+  onApplyAnglesFromProducts,
+  onClearProductSampleAngles,
   onPresetsChange,
   onCustomAnglesChange,
 }: ModelAnglesFieldProps) {
@@ -137,7 +150,9 @@ export function ModelAnglesField({
   );
   const atLimit = selectedCount >= MAX_MODEL_ANGLES;
 
-  const presetOptions = MODEL_ANGLE_PRESETS.map((preset) => ({
+  const presetOptions = MODEL_ANGLE_PRESETS.filter(
+    (preset) => !preset.isBundle
+  ).map((preset) => ({
     value: preset.id,
     label: preset.label,
     description: preset.hint,
@@ -210,12 +225,57 @@ export function ModelAnglesField({
     }
   };
 
+  const presetAnglesDisabled = disabled || useProductSampleAngles;
+
   return (
     <div className="space-y-3">
+      {productPhotoCount > 0 && onApplyAnglesFromProducts ? (
+        <div className="space-y-2 rounded-[14px] border border-teal-100 bg-teal-50/50 p-3">
+          <p className="text-xs leading-5 text-teal-950">
+            AI прочитает позу и кадр с загруженного фото товара — для генерации
+            модели в том же ракурсе (плюс ваши настройки: возраст, свет, фигура).
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="w-full"
+            loading={analyzingProductAngles}
+            disabled={disabled || analyzingProductAngles}
+            onClick={onApplyAnglesFromProducts}
+          >
+            Взять ракурс с фото товара
+          </Button>
+        </div>
+      ) : null}
+
+      {useProductSampleAngles &&
+      productSampleAngles &&
+      productSampleAngles.length > 0 ? (
+        <div className="space-y-2 rounded-[14px] border border-emerald-200 bg-emerald-50/60 p-3">
+          <p className="text-xs font-semibold text-emerald-900">
+            Ракурс с фото товара
+          </p>
+          <p className="text-xs text-emerald-950">
+            {productSampleAngles[0]?.label ?? "—"}
+          </p>
+          {onClearProductSampleAngles ? (
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={onClearProductSampleAngles}
+              className="text-xs font-medium text-emerald-800 underline-offset-2 hover:underline"
+            >
+              Выбрать ракурсы вручную
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       <MultiSelect
         values={anglePresets}
         options={presetOptions}
-        disabled={disabled}
+        disabled={presetAnglesDisabled}
         placeholder="Выберите ракурсы"
         triggerClassName="rounded-[12px] font-medium"
         menuMatchTriggerWidth
@@ -224,7 +284,7 @@ export function ModelAnglesField({
         menuHeader={
           <button
             type="button"
-            disabled={disabled}
+            disabled={presetAnglesDisabled}
             onClick={toggleCustomPanel}
             className={cn(
               "flex w-full items-center justify-between gap-2 rounded-[12px] px-3 py-2 text-left text-sm transition-colors",
@@ -250,12 +310,12 @@ export function ModelAnglesField({
         }
       />
 
-      {customPanelOpen ? (
+      {customPanelOpen && !useProductSampleAngles ? (
         <div className="space-y-2 rounded-[14px] border border-border bg-slate-50/60 p-3">
           {customAngles.length === 0 ? (
             <CustomAngleRow
               value={createEmptyCustomAngle()}
-              disabled={disabled || atLimit}
+              disabled={presetAnglesDisabled || atLimit}
               canRemove={false}
               onChange={(next) => {
                 if (next.saved && next.text.trim()) {
@@ -269,7 +329,7 @@ export function ModelAnglesField({
               <CustomAngleRow
                 key={item.id}
                 value={item}
-                disabled={disabled}
+                disabled={presetAnglesDisabled}
                 canRemove={customAngles.length > 1 || item.text.length > 0}
                 onChange={(next) => updateCustom(index, next)}
                 onRemove={() => removeCustom(index)}
@@ -280,7 +340,7 @@ export function ModelAnglesField({
             type="button"
             variant="outline"
             size="sm"
-            disabled={disabled || atLimit}
+            disabled={presetAnglesDisabled || atLimit}
             className="w-full"
             onClick={addCustomRow}
           >
@@ -291,8 +351,9 @@ export function ModelAnglesField({
       ) : null}
 
       <p className="px-0.5 text-xs text-slate-500">
-        Выбрано: {selectedCount} из {MAX_MODEL_ANGLES}. Для каждого ракурса —
-        отдельная модель и примерка.
+        {useProductSampleAngles && productSampleAngles
+          ? `Будет ${productSampleAngles.length} AI-моделей под ракурсы образцов. Первый задаёт лицо и образ.`
+          : "Один ракурс за запуск: 1 товар, 1 модель, 1 примерка."}
       </p>
     </div>
   );

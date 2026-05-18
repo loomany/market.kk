@@ -11,9 +11,17 @@ export function buildGenerateModelRequestBody(input: {
   promptLocale: PromptLocale;
   seed: number;
   angle?: ResolvedModelAngle;
+  referenceImageUrl?: string | null;
 }): GenerateModelRequest {
-  const { settings, outputSize, modelDescription, promptLocale, seed, angle } =
-    input;
+  const {
+    settings,
+    outputSize,
+    modelDescription,
+    promptLocale,
+    seed,
+    angle,
+    referenceImageUrl,
+  } = input;
 
   return {
     gender: settings.gender,
@@ -36,6 +44,7 @@ export function buildGenerateModelRequestBody(input: {
     seed,
     customDescription: modelDescription?.trim() || undefined,
     cameraAnglePrompt: angle?.prompt,
+    referenceImageUrl: referenceImageUrl ?? undefined,
     promptLocale,
   };
 }

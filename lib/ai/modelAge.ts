@@ -21,15 +21,82 @@ export function isAdultModelAge(age: number): boolean {
 export function modelAgePromptPhrase(age: number): string {
   const years = clampModelAge(age);
   if (years < 4) {
-    return `child model, approximately ${years} years old, toddler proportions`;
+    return `child model, exactly ${years} years old, toddler proportions`;
   }
   if (years < 13) {
-    return `child model, approximately ${years} years old, age-appropriate child proportions`;
+    return `child model, exactly ${years} years old, age-appropriate child proportions`;
   }
   if (years < MODEL_AGE_ADULT) {
-    return `teenage model, approximately ${years} years old, adolescent proportions, fully clothed catalog style`;
+    return `teenage model, exactly ${years} years old, adolescent proportions, fully clothed catalog style`;
   }
-  return `adult model, approximately ${years} years old`;
+  if (years <= 23) {
+    return `young adult model, exactly ${years} years old`;
+  }
+  return `adult model, exactly ${years} years old`;
+}
+
+export function modelAgeYears(age: number): number {
+  return clampModelAge(age);
+}
+
+/**
+ * Strong age lock for image models (UI age often ignored if only "adult" is sent).
+ */
+export function modelAgeAppearanceGuidance(age: number): string {
+  const years = clampModelAge(age);
+
+  if (years < 4) {
+    return `Mandatory age: clearly a ${years}-year-old toddler — child face, child body proportions, not older child.`;
+  }
+  if (years < 13) {
+    return `Mandatory age: clearly ${years} years old — child face and age-appropriate body, not teen, not adult.`;
+  }
+  if (years < MODEL_AGE_ADULT) {
+    return `Mandatory age: clearly ${years} years old — teenage face and adolescent proportions, fully clothed, not adult woman.`;
+  }
+  if (years <= 23) {
+    return (
+      `Mandatory age: the model must look exactly ${years} years old — youthful young-adult face, fresh early-twenties appearance, ` +
+      `smooth skin without mature lines, not 28+, not 30+, not 35+, not 40+, not a mature older woman.`
+    );
+  }
+  if (years <= 27) {
+    return (
+      `Mandatory age: the model must look approximately ${years} years old — young adult in mid-twenties, ` +
+      `not 32+, not 35+, not 40+, not mature middle-aged appearance.`
+    );
+  }
+  if (years <= 34) {
+    return (
+      `Mandatory age: the model must look approximately ${years} years old — adult in late twenties to early thirties, ` +
+      `not 40+, not 50+.`
+    );
+  }
+  if (years <= 45) {
+    return `Mandatory age: the model must look approximately ${years} years old — mature adult, age-appropriate face, not early twenties.`;
+  }
+  return `Mandatory age: the model must look approximately ${years} years old — mature adult with natural age-appropriate features, not young 20s.`;
+}
+
+export function modelAgeNegativePhrase(age: number): string {
+  const years = clampModelAge(age);
+
+  if (years < MODEL_AGE_ADULT) {
+    return "adult woman, mature 25+ face, sexualized styling";
+  }
+  if (years <= 23) {
+    return `face or body that looks 28, 30, 35, 40 or older, mature middle-aged woman, deep wrinkles, crow's feet`;
+  }
+  if (years <= 27) {
+    return "face that looks 32, 35, 40 or older, mature middle-aged woman";
+  }
+  if (years <= 34) {
+    return "face that looks 45 or older, elderly appearance";
+  }
+  if (years <= 45) {
+    return "face that looks early twenties or teenage";
+  }
+  return "face that looks 25-year-old when model should be mature";
 }
 
 export function minorRestrictedChoice(settings: {

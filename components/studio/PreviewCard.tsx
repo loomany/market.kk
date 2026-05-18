@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
 
@@ -16,7 +17,41 @@ type PreviewCardProps = {
   footer?: ReactNode;
   /** Overrides url / empty when set (e.g. result with error fallback) */
   content?: ReactNode;
+  loading?: boolean;
+  loadingDetail?: string | null;
+  /** Shown under loadingDetail when preview already has image(s) */
+  loadingSubdetail?: string | null;
 };
+
+function PreviewLoadingOverlay({
+  detail,
+  subdetail,
+  fullBleed,
+}: {
+  detail: string;
+  subdetail?: string | null;
+  fullBleed?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex flex-col items-center justify-center gap-2 px-4 py-6 text-center",
+        fullBleed
+          ? "absolute inset-x-0 bottom-0 z-10 border-t border-teal-100/90 bg-white/95 py-4 shadow-[0_-8px_24px_rgba(15,23,42,0.06)] backdrop-blur-sm"
+          : "flex-1"
+      )}
+    >
+      <Loader2
+        className="h-8 w-8 animate-spin text-teal-600"
+        aria-hidden
+      />
+      <p className="text-sm font-medium text-slate-800">{detail}</p>
+      {subdetail ? (
+        <p className="max-w-xs text-xs leading-5 text-slate-500">{subdetail}</p>
+      ) : null}
+    </div>
+  );
+}
 
 export function PreviewCard({
   title,
@@ -25,7 +60,16 @@ export function PreviewCard({
   badge,
   footer,
   content,
+  loading = false,
+  loadingDetail = null,
+  loadingSubdetail = null,
 }: PreviewCardProps) {
+  const hasPreview = Boolean(content || url);
+  const loadingText = loadingDetail?.trim() || "Генерируем…";
+  const subdetail =
+    loadingSubdetail?.trim() ||
+    (loading && hasPreview ? "Остальные ракурсы ещё генерируются…" : null);
+
   return (
     <div
       className={cn(
@@ -36,7 +80,7 @@ export function PreviewCard({
         <p className={studioColumnTitleClass}>{title}</p>
         {badge ? <Badge variant="violet">{badge}</Badge> : null}
       </div>
-      <div className="flex min-h-[260px] flex-1 flex-col border-t border-border bg-slate-50">
+      <div className="relative flex min-h-[260px] flex-1 flex-col border-t border-border bg-slate-50">
         {content ? (
           content
         ) : url ? (
@@ -48,11 +92,20 @@ export function PreviewCard({
               className="max-h-[460px] w-full object-contain"
             />
           </div>
+        ) : loading ? (
+          <PreviewLoadingOverlay detail={loadingText} subdetail={subdetail} />
         ) : (
           <div className="flex flex-1 items-center justify-center p-4 text-center text-sm leading-6 text-slate-500">
             {empty}
           </div>
         )}
+        {loading && hasPreview ? (
+          <PreviewLoadingOverlay
+            detail={loadingText}
+            subdetail={subdetail}
+            fullBleed
+          />
+        ) : null}
       </div>
       {footer ? (
         <div className="shrink-0 border-t border-border/70 bg-white p-3">

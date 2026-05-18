@@ -1,6 +1,7 @@
 import { MODEL_CUSTOM_TEXT_MAX } from "@/lib/ai/modelCustomParams";
 
-export const MAX_MODEL_ANGLES = 8;
+/** Один ракурс за запуск (1 товар + 1 модель + 1 примерка). */
+export const MAX_MODEL_ANGLES = 1;
 
 /** Ракурсы съёмки (без «Все варианты»). */
 export const MODEL_ANGLE_SHOT_PRESET_IDS = [
@@ -65,42 +66,42 @@ export const MODEL_ANGLE_PRESETS: {
     label: "Главное фото",
     hint: "Во весь рост, спереди",
     prompt:
-      "standing straight facing the camera, full-body head-to-toe in frame, arms relaxed at sides, plain white seamless studio background, classic marketplace hero product photo",
+      "editorial full-length hero shot facing camera, natural relaxed posture with subtle weight on one leg and soft knee bend, shoulders easy not squared, slight asymmetric hand placement (one hand on hip or resting on outer thigh), calm confident expression, premium DTC fashion catalog aesthetic, clean seamless studio background, full body head-to-toe in frame",
   },
   {
     id: "close-up-detail",
     label: "Крупный план",
     hint: "Верх и детали изделия",
     prompt:
-      "front-facing close catalog shot from chest to upper thighs, focus on garment upper area, fabric texture and construction details clearly visible, soft even studio light, hands not covering product",
+      "editorial close shot from collarbone to upper thighs, torso slightly angled to show garment drape and fabric texture, relaxed shoulders and natural neckline, hands away from product details, soft directional studio light, premium ecommerce detail framing",
   },
   {
     id: "angle-three-quarter",
     label: "Полуоборот",
     hint: "Фото под углом",
     prompt:
-      "standing three-quarter view, torso turned about 35–45 degrees toward camera, face slightly toward camera, hips and shoulders visible, neutral catalog pose, plain light studio background",
+      "three-quarter full or mid-length shot, body turned about 30–40 degrees with organic S-curve posture, chin gently toward camera, one hip shifted, arms in natural asymmetric relaxed position, modern editorial catalog energy, soft light studio background",
   },
   {
     id: "front-hands-side",
     label: "Спереди",
     hint: "Руки по бокам",
     prompt:
-      "standing front-facing, medium full shot from head to mid-thigh, arms relaxed along the body or hands resting lightly on outer thighs, confident neutral catalog pose, clean off-white studio background",
+      "front-facing mid-full shot from head to mid-thigh, approachable editorial stance with personality, arms along body with soft elbow bend or one hand lightly on outer thigh, weight on back leg, relaxed confident expression, clean off-white studio background",
   },
   {
     id: "back-view",
     label: "Вид сзади",
     hint: "Спина и посадка сзади",
     prompt:
-      "standing back view facing away from camera, medium full shot showing back and shoulders down to upper thighs, arms relaxed, hair not blocking garment back area, plain studio background",
+      "back or back three-quarter view, natural spine curve and relaxed shoulders, medium full framing showing garment back and fit, hair styled away from garment, subtle head turn if needed, editorial catalog not rigid parade-rest stance",
   },
   {
     id: "seated-lifestyle",
     label: "Сидя",
     hint: "Lifestyle-фото",
     prompt:
-      "seated on a neutral studio sofa or stool, relaxed lifestyle catalog pose, front-facing three-quarter view from neck to knees, natural posture, soft lifestyle studio setting, garment clearly visible",
+      "seated lifestyle editorial pose on minimal studio stool or block, relaxed asymmetric posture with knees angled naturally, torso slightly turned toward camera, calm confident expression, modern premium fashion catalog mood, garment clearly visible",
   },
 ];
 
@@ -149,7 +150,7 @@ export function resolveSelectedModelAngles(
     resolved.push({
       key: `custom:${custom.id}`,
       label: text.length > 48 ? `${text.slice(0, 45)}…` : text,
-      prompt: `${text}, professional e-commerce catalog camera angle and framing`,
+      prompt: `${text}, natural editorial camera angle and framing with relaxed believable body language, premium fashion catalog aesthetic`,
     });
   }
 
@@ -200,7 +201,7 @@ export function validateModelAngles(
 ): string | null {
   const angles = resolveSelectedModelAngles(input);
   if (angles.length === 0) {
-    return "Выберите хотя бы один ракурс или сохраните свой вариант галочкой.";
+    return "Выберите ракурс, возьмите его с фото товара или сохраните свой вариант галочкой.";
   }
   if (countSelectedModelAngles(input) > MAX_MODEL_ANGLES) {
     return `Можно выбрать не больше ${MAX_MODEL_ANGLES} ракурсов.`;
@@ -218,10 +219,11 @@ export function modelAnglesSummaryRu(
 ): string {
   const angles = resolveSelectedModelAngles(input);
   if (angles.length === 0) return "ракурсы не выбраны";
+  const labels = angles.map((item) => item.label);
   if (input.anglePresets.includes(FULL_CARD_ANGLE_PRESET_ID)) {
-    return "выбрать всё (полный набор)";
+    return `полный набор (${labels.length}): ${labels.join(", ")}`;
   }
-  return angles.map((item) => item.label).join("; ");
+  return labels.join("; ");
 }
 
 export function createEmptyCustomAngle(): ModelCustomAngle {

@@ -12,6 +12,7 @@ import {
   FAL_MODEL_RESOLUTIONS,
 } from "@/lib/ai/modelOutputSizes";
 import {
+  MODEL_CAMERA_ANGLE_PROMPT_MAX,
   MODEL_CUSTOM_TEXT_MAX,
   MODEL_PARAM_CUSTOM,
 } from "@/lib/ai/modelCustomParams";
@@ -52,7 +53,13 @@ export const generateModelRequestSchema = z
   seed: z.number().int().optional(),
   customDescription: z.string().trim().max(1000).optional(),
   /** Per-angle camera framing (English or translated on server) */
-  cameraAnglePrompt: z.string().trim().max(MODEL_CUSTOM_TEXT_MAX).optional(),
+  cameraAnglePrompt: z
+    .string()
+    .trim()
+    .max(MODEL_CAMERA_ANGLE_PROMPT_MAX)
+    .optional(),
+  /** Hero image URL — when set, uses image edit to preserve face and outfit */
+  referenceImageUrl: z.string().url().max(2048).optional(),
   /** Locale of customDescription in the UI; server translates to English for Fal */
   promptLocale: promptLocaleSchema.optional(),
 })

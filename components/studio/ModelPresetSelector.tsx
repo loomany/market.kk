@@ -27,11 +27,9 @@ import {
 } from "@/lib/ai/modelCustomParams";
 import { buildModelBaseSettingsSummaryRu } from "@/lib/ai/modelSettingsSummary";
 import { ModelAnglesField } from "@/components/studio/ModelAnglesField";
+import type { ResolvedModelAngle } from "@/lib/ai/modelAngles";
 import { ModelPromptComposer } from "@/components/studio/ModelPromptComposer";
-import {
-  ModelReadyCard,
-  downloadModelImage,
-} from "@/components/studio/ModelReadyCard";
+import { ModelReadyCard } from "@/components/studio/ModelReadyCard";
 import {
   MODEL_BODY_TYPES,
   type ModelBackground,
@@ -53,12 +51,20 @@ type ModelPresetSelectorProps = {
   enhancingDescription?: boolean;
   generating?: boolean;
   generateError?: string | null;
-  generatedPreviewUrl?: string | null;
+  generateNotice?: string | null;
+  generateProgress?: string | null;
+  generatedPreviewItems?: { id: string; url: string; label: string }[];
   isModelSaved?: boolean;
   onSaveModel?: () => void;
   onStartOverModel?: () => void;
   outputSize: Partial<ModelOutputSizeSelection>;
   onOutputSizeChange: (patch: Partial<ModelOutputSizeSelection>) => void;
+  productPhotoCount?: number;
+  useProductSampleAngles?: boolean;
+  productSampleAngles?: ResolvedModelAngle[] | null;
+  analyzingProductAngles?: boolean;
+  onApplyAnglesFromProducts?: () => void;
+  onClearProductSampleAngles?: () => void;
 };
 
 function SettingField({
@@ -383,12 +389,20 @@ export function ModelPresetSelector({
   enhancingDescription,
   generating,
   generateError,
-  generatedPreviewUrl,
+  generateNotice,
+  generateProgress,
+  generatedPreviewItems = [],
   isModelSaved = false,
   onSaveModel,
   onStartOverModel,
   outputSize,
   onOutputSizeChange,
+  productPhotoCount = 0,
+  useProductSampleAngles = false,
+  productSampleAngles = null,
+  analyzingProductAngles = false,
+  onApplyAnglesFromProducts,
+  onClearProductSampleAngles,
 }: ModelPresetSelectorProps) {
   const patch = (partial: Partial<ModelGenerationSettings>) =>
     onSettingsChange(
@@ -417,7 +431,7 @@ export function ModelPresetSelector({
 
   const ageDescription = isMinor
     ? "До 18 лет недоступны сценарий «Бельё / купальники» и тип «Бикини / купальники»."
-    : "Для взрослой одежды обычно 18–35 лет. Для детского платья — укажите возраст ребёнка.";
+    : "Влияет на лицо и пропорции: 21 — молодая 20+, 30 — зрелее. Для детской одежды укажите возраст ребёнка.";
 
   const isPromptLocked = Boolean(generating || enhancingDescription);
   const outputSizeReady = isModelOutputSizeComplete(outputSize);
@@ -470,18 +484,6 @@ export function ModelPresetSelector({
               emptyHint="Введите национальность и подтвердите галочкой"
               confirmAriaLabel="Сохранить национальность"
               onChange={(modelNationality) => patch({ modelNationality })}
-            />
-          </SettingField>
-          <SettingField
-            label="Ракурсы"
-            description="Сколько ракурсов выберете — столько готовых фото на модели получите после примерки."
-          >
-            <ModelAnglesField
-              anglePresets={settings.anglePresets}
-              customAngles={settings.customAngles}
-              disabled={isPromptLocked}
-              onPresetsChange={(anglePresets) => patch({ anglePresets })}
-              onCustomAnglesChange={(customAngles) => patch({ customAngles })}
             />
           </SettingField>
           <SelectWithCustomField
@@ -585,6 +587,28 @@ export function ModelPresetSelector({
               })
             }
           />
+          <SettingField
+            label="Ракурсы"
+            description={
+              useProductSampleAngles && productSampleAngles
+                ? "Ракурс взят с фото товара — модель и примерка в этом кадре. Следующий товар: замените фото и запустите снова."
+                : "Один ракурс за запуск. Для серии товаров меняйте фото и нажимайте «Создать фото на модели» снова."
+            }
+          >
+            <ModelAnglesField
+              anglePresets={settings.anglePresets}
+              customAngles={settings.customAngles}
+              disabled={isPromptLocked}
+              productPhotoCount={productPhotoCount}
+              useProductSampleAngles={useProductSampleAngles}
+              productSampleAngles={productSampleAngles}
+              analyzingProductAngles={analyzingProductAngles}
+              onApplyAnglesFromProducts={onApplyAnglesFromProducts}
+              onClearProductSampleAngles={onClearProductSampleAngles}
+              onPresetsChange={(anglePresets) => patch({ anglePresets })}
+              onCustomAnglesChange={(customAngles) => patch({ customAngles })}
+            />
+          </SettingField>
         </div>
       </div>
 
@@ -643,20 +667,29 @@ export function ModelPresetSelector({
           : "Сгенерировать AI-модель"}
       </Button>
 
+      {generating ? (
+        <p className="rounded-[12px] border border-teal-100 bg-teal-50 px-3 py-2 text-sm text-teal-900">
+          {generateProgress ?? "Генерируем AI-модель…"}
+        </p>
+      ) : null}
+
       {generateError ? (
         <p className="rounded-[12px] border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {generateError}
         </p>
       ) : null}
 
-      {generatedPreviewUrl && !generating ? (
+      {generateNotice && !generateError ? (
+        <p className="rounded-[12px] border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          {generateNotice}
+        </p>
+      ) : null}
+
+      {generatedPreviewItems.length > 0 && !generating ? (
         <ModelReadyCard
-          imageUrl={generatedPreviewUrl}
+          previewItems={generatedPreviewItems}
           isSaved={isModelSaved}
           onSave={() => onSaveModel?.()}
-          onDownload={() =>
-            downloadModelImage(generatedPreviewUrl, "vitrina-ai-model.png")
-          }
           onStartOver={() => onStartOverModel?.()}
         />
       ) : null}

@@ -26,9 +26,13 @@ import {
   type ModelOutputSizeSelection,
 } from "@/lib/ai/modelOutputSizes";
 import {
-  resolveSelectedModelAngles,
+  type ResolvedModelAngle,
   validateModelAngles,
 } from "@/lib/ai/modelAngles";
+import {
+  resolveAnglesForGeneration,
+  validateProductSampleAnglesMatch,
+} from "@/lib/studio/resolveModelAngles";
 import { validateModelCustomParams } from "@/lib/ai/modelGenerationValidation";
 import { buildGenerateModelRequestBody } from "@/lib/studio/buildGenerateModelRequest";
 import { buildModelBaseSettingsSummaryRu } from "@/lib/ai/modelSettingsSummary";
@@ -64,7 +68,13 @@ import {
   CardTitle,
 } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { ImageUploader } from "./ImageUploader";
+import { ProductPhotosUploader } from "./ProductPhotosUploader";
+import {
+  createStudioProductPhoto,
+  revokeStudioProductPhoto,
+  revokeStudioProductPhotos,
+  type StudioProductPhoto,
+} from "@/lib/studio/productPhotos";
 import {
   ModelSourcePanel,
   type ModelSourceKind,
@@ -74,6 +84,21 @@ import { GarmentSettingsPanel } from "./GarmentSettingsPanel";
 import { ProductShotSettingsPanel } from "./ProductShotSettingsPanel";
 import { StudioModeSelector } from "./StudioModeSelector";
 import { GenerationResultGrid } from "./GenerationResultGrid";
+import {
+  PreviewImageCarousel,
+  type PreviewCarouselItem,
+} from "./PreviewImageCarousel";
+
+function upsertModelPreviewItem(
+  items: PreviewCarouselItem[],
+  entry: PreviewCarouselItem
+): PreviewCarouselItem[] {
+  const index = items.findIndex((item) => item.id === entry.id);
+  if (index === -1) return [...items, entry];
+  const next = [...items];
+  next[index] = entry;
+  return next;
+}
 import { PreviewCard } from "./PreviewCard";
 import type { ProductMaskApplyResult } from "./ProductMaskEditor";
 import { ProductSelectionPanel } from "./ProductSelectionPanel";
@@ -131,12 +156,32 @@ function friendlyAiError(errorCode?: string, message?: string): string {
     return "Не удалось создать примерку. Попробуйте режим «Баланс» или другое фото модели.";
   }
 
+  if (errorCode === "FAL_MODEL_GENERATION_FAILED") {
+    return "Не удалось сгенерировать этот ракурс. Подождите 10–20 секунд и нажмите «Сгенерировать» снова — уже готовые кадры сохранятся.";
+  }
+
+  if (message?.includes("did not generate the expected output")) {
+    return "Fal не смог обработать этот ракурс (фильтр или формат). Для белья 2+ ракурсы идут без edit — попробуйте ещё раз.";
+  }
+
+  if (errorCode === "FAL_MODEL_GENERATION_TIMEOUT") {
+    return "Генерация ракурса заняла слишком долго (лимит ~2 мин). Попробуйте ещё раз или уменьшите число ракурсов.";
+  }
+
+  if (errorCode === "FAL_MODEL_CONTENT_BLOCKED") {
+    return "Fal отклонил этот ракурс (фильтр контента). Попробуйте другой ракурс, свет или сценарий «Одежда» вместо белья.";
+  }
+
   if (message?.includes("Product image file or URL is required")) {
     return "Загрузите фото товара.";
   }
 
   if (message?.includes("Product and model image sources are required")) {
     return "Загрузите фото товара и модель или сгенерируйте AI-модель.";
+  }
+
+  if (errorCode === "VALIDATION_ERROR") {
+    return "Проверьте настройки модели (возраст, ракурсы, размер кадра) и попробуйте ещё раз.";
   }
 
   if (message?.includes("Invalid")) {
@@ -192,15 +237,13 @@ export function StudioShell({
   locale?: Locale;
 }) {
   const promptLocale = useStudioLocale(localeProp);
-  const productPreview = useObjectUrlPreview();
   const modelPreview = useObjectUrlPreview();
 
   const [studioMode, setStudioMode] = useState<StudioMode>("clothing-tryon");
-  const [productFile, setProductFile] = useState<File | null>(null);
+  const [productPhotos, setProductPhotos] = useState<StudioProductPhoto[]>([]);
+  const [activeProductId, setActiveProductId] = useState<string | null>(null);
+  const productPhotosRef = useRef<StudioProductPhoto[]>([]);
   const [modelFile, setModelFile] = useState<File | null>(null);
-  const [productPreviewUrl, setProductPreviewUrl] = useState<string | null>(
-    null
-  );
   const [modelPreviewUrl, setModelPreviewUrl] = useState<string | null>(null);
   const [productCategory, setProductCategory] =
     useState<ProductCategory>("auto");
@@ -220,6 +263,9 @@ export function StudioShell({
   const [generatedModelUrl, setGeneratedModelUrl] = useState<string | null>(
     null
   );
+  const [generatedModelPreviews, setGeneratedModelPreviews] = useState<
+    PreviewCarouselItem[]
+  >([]);
   const [savedStudioModel, setSavedStudioModel] =
     useState<SavedStudioModel | null>(null);
   const [modelSource, setModelSource] = useState<ModelSourceKind>(null);
@@ -229,6 +275,17 @@ export function StudioShell({
   const [modelGenerateError, setModelGenerateError] = useState<string | null>(
     null
   );
+  const [modelGenerateNotice, setModelGenerateNotice] = useState<string | null>(
+    null
+  );
+  const [modelGenerateProgress, setModelGenerateProgress] = useState<
+    string | null
+  >(null);
+  const [productSampleAngles, setProductSampleAngles] = useState<
+    ResolvedModelAngle[] | null
+  >(null);
+  const [useProductSampleAngles, setUseProductSampleAngles] = useState(false);
+  const [analyzingProductAngles, setAnalyzingProductAngles] = useState(false);
   const [modelOutputSize, setModelOutputSize] = useState<
     Partial<ModelOutputSizeSelection>
   >({});
@@ -257,20 +314,158 @@ export function StudioShell({
     setMaskEditorOpen(false);
   }, []);
 
-  const handleProductFile = useCallback(
-    (file: File) => {
-      const validationError = validateImageFileClient(file);
-      if (validationError) {
-        setError(validationError);
+  productPhotosRef.current = productPhotos;
+
+  useEffect(() => {
+    if (productPhotos.length === 0) {
+      setUseProductSampleAngles(false);
+      setProductSampleAngles(null);
+    }
+  }, [productPhotos.length]);
+
+  const generationAnglesOptions = useMemo(
+    () => ({
+      useProductSampleAngles,
+      productSampleAngles,
+    }),
+    [useProductSampleAngles, productSampleAngles]
+  );
+
+  const resolveGenerationAngles = useCallback(
+    () => resolveAnglesForGeneration(modelSettings, generationAnglesOptions),
+    [modelSettings, generationAnglesOptions]
+  );
+
+  const validateGenerationAngles = useCallback((): string | null => {
+    if (useProductSampleAngles) {
+      return validateProductSampleAnglesMatch(
+        productPhotos.length,
+        productSampleAngles,
+        true
+      );
+    }
+    return validateModelAngles(modelSettings);
+  }, [
+    useProductSampleAngles,
+    productPhotos.length,
+    productSampleAngles,
+    modelSettings,
+  ]);
+
+  const handleApplyAnglesFromProducts = useCallback(async () => {
+    if (productPhotos.length === 0) {
+      setModelGenerateError("Сначала загрузите образцы товара.");
+      return;
+    }
+    setAnalyzingProductAngles(true);
+    setModelGenerateError(null);
+    setModelGenerateNotice(null);
+    try {
+      const formData = new FormData();
+      formData.append("productImageFile", productPhotos[0]!.file);
+      const res = await fetch("/api/ai/analyze-product-angles", {
+        method: "POST",
+        body: formData,
+      });
+      const data = (await res.json()) as {
+        ok: boolean;
+        angles?: ResolvedModelAngle[];
+        message?: string;
+        usedPresetFallback?: boolean;
+      };
+      if (!res.ok) {
+        setModelGenerateError(
+          data.message ?? `Ошибка сервера (${res.status}). Попробуйте ещё раз.`
+        );
         return;
       }
+      if (!data.ok || !data.angles?.length) {
+        setModelGenerateError(
+          data.message ?? "Не удалось разобрать ракурс с фото товара."
+        );
+        return;
+      }
+      setProductSampleAngles(data.angles.slice(0, 1));
+      setUseProductSampleAngles(true);
+      if (data.usedPresetFallback && data.message) {
+        setModelGenerateNotice(data.message);
+      }
+    } catch {
+      setModelGenerateError("Не удалось разобрать ракурс. Попробуйте ещё раз.");
+    } finally {
+      setAnalyzingProductAngles(false);
+    }
+  }, [productPhotos]);
+
+  const handleClearProductSampleAngles = useCallback(() => {
+    setUseProductSampleAngles(false);
+    setProductSampleAngles(null);
+  }, []);
+
+  const activeProduct = useMemo(
+    () =>
+      productPhotos.find((photo) => photo.id === activeProductId) ??
+      productPhotos[0] ??
+      null,
+    [productPhotos, activeProductId]
+  );
+
+  const productFile = activeProduct?.file ?? null;
+  const effectiveProductPreviewUrl = activeProduct?.previewUrl ?? null;
+
+  const productCarouselItems = useMemo(
+    (): PreviewCarouselItem[] =>
+      productPhotos.map((photo, index) => ({
+        id: photo.id,
+        url: photo.previewUrl,
+        label: `Фото ${index + 1}`,
+      })),
+    [productPhotos]
+  );
+
+  const handleAddProductFiles = useCallback(
+    (files: File[]) => {
+      if (files.length === 0) return;
       setError(null);
-      setProductFile(file);
-      setProductPreviewUrl(productPreview.setFromFile(file));
+      const file = files[0]!;
+      const newPhoto = createStudioProductPhoto(file);
+      setProductPhotos((prev) => {
+        revokeStudioProductPhotos(prev);
+        return [newPhoto];
+      });
+      setActiveProductId(newPhoto.id);
+      setUseProductSampleAngles(false);
+      setProductSampleAngles(null);
       clearSelectedProduct();
     },
-    [productPreview, clearSelectedProduct]
+    [clearSelectedProduct]
   );
+
+  const handleRemoveProductPhoto = useCallback(
+    (id: string) => {
+      setProductPhotos((prev) => {
+        const removed = prev.find((photo) => photo.id === id);
+        if (removed) revokeStudioProductPhoto(removed);
+        const next = prev.filter((photo) => photo.id !== id);
+        setActiveProductId((active) => {
+          if (active !== id) return active;
+          return next[0]?.id ?? null;
+        });
+        return next;
+      });
+      clearSelectedProduct();
+    },
+    [clearSelectedProduct]
+  );
+
+  const clearProductPhotos = useCallback(() => {
+    setProductPhotos((prev) => {
+      revokeStudioProductPhotos(prev);
+      return [];
+    });
+    setActiveProductId(null);
+    clearSelectedProduct();
+  }, [clearSelectedProduct]);
 
   const handleModelFile = useCallback(
     (file: File) => {
@@ -281,6 +476,7 @@ export function StudioShell({
       }
       setError(null);
       setGeneratedModelUrl(null);
+      setGeneratedModelPreviews([]);
       setModelGenerateError(null);
       setModelFile(file);
       setModelPreviewUrl(modelPreview.setFromFile(file));
@@ -289,14 +485,9 @@ export function StudioShell({
     [modelPreview]
   );
 
-  const clearProductFile = useCallback(() => {
-    setProductFile(null);
-    setProductPreviewUrl(productPreview.setFromFile(null));
-    clearSelectedProduct();
-  }, [productPreview, clearSelectedProduct]);
-
   useEffect(() => {
     return () => {
+      revokeStudioProductPhotos(productPhotosRef.current);
       if (selectedProductPreviewRef.current) {
         URL.revokeObjectURL(selectedProductPreviewRef.current);
       }
@@ -340,6 +531,13 @@ export function StudioShell({
     setModelPreviewUrl(modelPreview.setFromFile(null));
     setModelSource("saved");
     setGeneratedModelUrl(savedStudioModel.url);
+    setGeneratedModelPreviews([
+      {
+        id: "saved-model",
+        url: savedStudioModel.url,
+        label: "Сохранённая модель",
+      },
+    ]);
     restoreSavedModelParameters(savedStudioModel.settings);
     setError(null);
   }, [modelPreview, restoreSavedModelParameters, savedStudioModel]);
@@ -353,6 +551,13 @@ export function StudioShell({
         setModelFile(null);
         setModelPreviewUrl(modelPreview.setFromFile(null));
         setGeneratedModelUrl(model.url);
+        setGeneratedModelPreviews([
+          {
+            id: "saved-model",
+            url: model.url,
+            label: "Сохранённая модель",
+          },
+        ]);
       }
     },
     [modelPreview, restoreSavedModelParameters]
@@ -455,7 +660,9 @@ export function StudioShell({
 
   const handleStartOverModel = useCallback(() => {
     setGeneratedModelUrl(null);
+    setGeneratedModelPreviews([]);
     setModelGenerateError(null);
+    setModelGenerateProgress(null);
   }, []);
 
   const savedModelPersistenceHint = savedModelUrl
@@ -598,6 +805,25 @@ export function StudioShell({
     (generatedModelUrl && !modelFile ? generatedModelUrl : null) ??
     (mockMode ? MOCK_MODEL_IMAGE : null);
 
+  const modelCarouselItems = useMemo((): PreviewCarouselItem[] => {
+    if (generatedModelPreviews.length > 0) {
+      return generatedModelPreviews;
+    }
+    if (!effectiveModelPreview) return [];
+    return [
+      {
+        id: "current-model",
+        url: effectiveModelPreview,
+        label:
+          modelSource === "saved"
+            ? "Сохранённая модель"
+            : modelSource === "upload"
+              ? "Загруженная модель"
+              : "AI-модель",
+      },
+    ];
+  }, [generatedModelPreviews, effectiveModelPreview, modelSource]);
+
   const handleModelSettingsChange = useCallback(
     (settings: ModelGenerationSettings) => {
       setModelSettings(settings);
@@ -609,6 +835,7 @@ export function StudioShell({
     const useSeed = seedOverride ?? modelGenerationSeed;
     setModelGenerating(true);
     setModelGenerateError(null);
+    setModelGenerateNotice(null);
 
     const minorRestriction = minorRestrictedChoice(modelSettings);
     if (minorRestriction) {
@@ -625,7 +852,7 @@ export function StudioShell({
       return;
     }
 
-    const anglesError = validateModelAngles(modelSettings);
+    const anglesError = validateGenerationAngles();
     if (anglesError) {
       setModelGenerateError(anglesError);
       setModelGenerating(false);
@@ -639,38 +866,131 @@ export function StudioShell({
       return;
     }
 
-    const angles = resolveSelectedModelAngles(modelSettings);
+    const angles = resolveGenerationAngles();
+    const collected: PreviewCarouselItem[] = [];
+    setGeneratedModelPreviews([]);
+    setGeneratedModelUrl(null);
+    let identityReferenceUrl: string | null = null;
 
     try {
-      const res = await fetch("/api/ai/generate-model", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          buildGenerateModelRequestBody({
-            settings: modelSettings,
-            outputSize: modelOutputSize,
-            modelDescription,
-            promptLocale,
-            seed: useSeed,
-            angle: angles[0],
-          })
-        ),
-      });
+      for (let index = 0; index < angles.length; index++) {
+        const angle = angles[index]!;
+        setModelGenerateProgress(
+          angles.length > 1
+            ? index === 0
+              ? `Ракурс 1 из ${angles.length}: ${angle.label} (базовая модель)`
+              : `Ракурс ${index + 1} из ${angles.length}: ${angle.label} (то же лицо и образ)`
+            : "Генерируем AI-модель…"
+        );
 
-      const data = (await res.json()) as GenerateModelResponse;
+        const controller = new AbortController();
+        const requestTimeoutMs = 150_000;
+        const timeoutId = window.setTimeout(
+          () => controller.abort(),
+          requestTimeoutMs
+        );
 
-      if (!data.ok) {
-        setModelGenerateError(friendlyAiError(data.errorCode, data.message));
-        return;
+        let res: Response;
+        try {
+          res = await fetch("/api/ai/generate-model", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(
+              buildGenerateModelRequestBody({
+                settings: modelSettings,
+                outputSize: modelOutputSize,
+                modelDescription,
+                promptLocale,
+                seed: useSeed,
+                angle,
+                referenceImageUrl:
+                  index > 0 ? identityReferenceUrl : undefined,
+              })
+            ),
+            signal: controller.signal,
+          });
+        } catch (fetchError) {
+          if (
+            fetchError instanceof Error &&
+            fetchError.name === "AbortError"
+          ) {
+            if (collected.length > 0) {
+              setGeneratedModelPreviews([...collected]);
+              setGeneratedModelUrl(collected[0]!.url);
+            }
+            setModelGenerateError(
+              `Ракурс «${angle.label}»: генерация заняла слишком долго (больше 2,5 мин).` +
+                (collected.length > 0
+                  ? ` Готово ${collected.length} из ${angles.length}.`
+                  : "")
+            );
+            return;
+          }
+          throw fetchError;
+        } finally {
+          window.clearTimeout(timeoutId);
+        }
+
+        const data = (await res.json()) as GenerateModelResponse & {
+          detail?: string;
+          usedAngleEditFallback?: boolean;
+        };
+
+        if (!data.ok) {
+          if (collected.length > 0) {
+            setGeneratedModelPreviews([...collected]);
+            setGeneratedModelUrl(collected[0]!.url);
+          }
+          const partialHint =
+            collected.length > 0
+              ? ` Готово ${collected.length} из ${angles.length}.`
+              : "";
+          const detailHint = data.detail
+            ? ` (${data.detail.slice(0, 120)}…)`
+            : "";
+          setModelGenerateError(
+            (angles.length > 1
+              ? `Ракурс «${angle.label}»: ${friendlyAiError(
+                  data.errorCode,
+                  data.message
+                )}`
+              : friendlyAiError(data.errorCode, data.message)) +
+              partialHint +
+              detailHint
+          );
+          return;
+        }
+
+        if (data.usedAngleEditFallback && index > 0) {
+          setModelGenerateProgress(
+            `Ракурс ${index + 1} из ${angles.length}: ${angle.label} (отдельная генерация, то же лицо по промпту)`
+          );
+        }
+
+        const url = data.images[0]?.url;
+        if (!url) {
+          setModelGenerateError(
+            angles.length > 1
+              ? `Ракурс «${angle.label}»: модель не вернула изображение.`
+              : "Модель не вернула изображение. Попробуйте ещё раз."
+          );
+          return;
+        }
+
+        collected.push({ id: angle.key, url, label: angle.label });
+        setGeneratedModelPreviews([...collected]);
+        if (index === 0) {
+          identityReferenceUrl = url;
+        }
       }
 
-      const url = data.images[0]?.url;
-      if (!url) {
+      const primaryUrl = collected[0]?.url;
+      if (!primaryUrl) {
         setModelGenerateError("Модель не вернула изображение. Попробуйте ещё раз.");
         return;
       }
 
-      setGeneratedModelUrl(url);
+      setGeneratedModelUrl(primaryUrl);
       setModelFile(null);
       setModelPreviewUrl(modelPreview.setFromFile(null));
       setModelSource(null);
@@ -681,6 +1001,7 @@ export function StudioShell({
       );
     } finally {
       setModelGenerating(false);
+      setModelGenerateProgress(null);
     }
   };
 
@@ -728,12 +1049,12 @@ export function StudioShell({
   const handleGenerateTryOn = async (seedOverride?: number) => {
     const useSeed = seedOverride ?? generationSeed;
 
-    if (!productFile) {
+    if (!productFile && !useProductSampleAngles) {
       setError("Загрузите фото товара.");
       return;
     }
 
-    const anglesError = validateModelAngles(modelSettings);
+    const anglesError = validateGenerationAngles();
     if (anglesError) {
       setError(anglesError);
       return;
@@ -745,7 +1066,7 @@ export function StudioShell({
       return;
     }
 
-    const angles = resolveSelectedModelAngles(modelSettings);
+    const angles = resolveGenerationAngles();
     const resolvedModelUrl = modelFile ? null : resolveModelImageUrl();
     const canUseExistingModel =
       angles.length === 1 &&
@@ -755,7 +1076,7 @@ export function StudioShell({
     if (!canUseExistingModel) {
       if (!isModelOutputSizeComplete(modelOutputSize)) {
         setError(
-          "Выберите соотношение сторон и разрешение — для каждого ракурса создаётся своя AI-модель."
+          "Выберите соотношение сторон и разрешение — они нужны для генерации AI-модели."
         );
         return;
       }
@@ -780,9 +1101,9 @@ export function StudioShell({
     setTryOnProgress(null);
     setError(null);
     setResults([]);
-
     const allResults: StudioResultImage[] = [];
     const perStepTimeoutMs = 120_000;
+    let identityReferenceUrl: string | null = null;
 
     try {
       for (let index = 0; index < angles.length; index++) {
@@ -795,8 +1116,30 @@ export function StudioShell({
         let modelImageFile: File | null = null;
 
         if (canUseExistingModel && index === 0) {
-          if (modelFile) modelImageFile = modelFile;
-          else modelImageUrl = resolvedModelUrl;
+          if (modelFile) {
+            modelImageFile = modelFile;
+            if (modelPreviewUrl) {
+              setGeneratedModelPreviews((prev) =>
+                upsertModelPreviewItem(prev, {
+                  id: angle.key,
+                  url: modelPreviewUrl,
+                  label: angle.label,
+                })
+              );
+            }
+          } else {
+            modelImageUrl = resolvedModelUrl;
+            if (modelImageUrl) {
+              const existingModelUrl = modelImageUrl;
+              setGeneratedModelPreviews((prev) =>
+                upsertModelPreviewItem(prev, {
+                  id: angle.key,
+                  url: existingModelUrl,
+                  label: angle.label,
+                })
+              );
+            }
+          }
         } else {
           const modelRes = await fetch("/api/ai/generate-model", {
             method: "POST",
@@ -807,8 +1150,10 @@ export function StudioShell({
                 outputSize: modelOutputSize as ModelOutputSizeSelection,
                 modelDescription,
                 promptLocale,
-                seed: useSeed + index,
+                seed: useSeed,
                 angle,
+                referenceImageUrl:
+                  index > 0 ? identityReferenceUrl : undefined,
               })
             ),
           });
@@ -830,16 +1175,32 @@ export function StudioShell({
             return;
           }
 
-          if (index === angles.length - 1) {
-            setGeneratedModelUrl(modelImageUrl);
+          const generatedModelPreviewUrl = modelImageUrl;
+          setGeneratedModelPreviews((prev) =>
+            upsertModelPreviewItem(prev, {
+              id: angle.key,
+              url: generatedModelPreviewUrl,
+              label: angle.label,
+            })
+          );
+
+          if (index === 0) {
+            identityReferenceUrl = generatedModelPreviewUrl;
+            setGeneratedModelUrl(generatedModelPreviewUrl);
             setModelFile(null);
             setModelPreviewUrl(modelPreview.setFromFile(null));
             setModelSource(null);
           }
         }
 
+        const stepProductFile = productFile;
+        if (!stepProductFile) {
+          setError(`Ракурс «${angle.label}»: нет фото товара для этого ракурса.`);
+          return;
+        }
+
         const formData = new FormData();
-        formData.append("productImageFile", productFile);
+        formData.append("productImageFile", stepProductFile);
         if (modelImageFile) formData.append("modelImageFile", modelImageFile);
         else if (modelImageUrl) formData.append("modelImageUrl", modelImageUrl);
         formData.append("category", mapCategoryForTryOn(productCategory));
@@ -904,7 +1265,7 @@ export function StudioShell({
         mapResultsToSessionAssets(allResults, "tryon", {
           mode: "clothing-tryon",
           provider: allResults[0]?.provider,
-          sourceImageUrl: productPreviewUrl ?? undefined,
+          sourceImageUrl: effectiveProductPreviewUrl ?? undefined,
         })
       );
       setGenerationSeed(nextGenerationSeed());
@@ -912,7 +1273,7 @@ export function StudioShell({
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         setError(
-          "Примерка заняла слишком много времени. Попробуйте меньше ракурсов или режим «1K» / «0.5K»."
+          "Примерка заняла слишком много времени. Попробуйте режим «1K» / «0.5K» или другое фото модели."
         );
         return;
       }
@@ -1020,7 +1381,8 @@ export function StudioShell({
           provider: bgProvider,
           model: bgData.ok ? bgData.model : undefined,
           requestId: bgData.ok ? bgData.requestId : undefined,
-          sourceImageUrl: productPreviewUrl ?? selectedProductPreviewUrl ?? undefined,
+          sourceImageUrl:
+            effectiveProductPreviewUrl ?? selectedProductPreviewUrl ?? undefined,
         })
       );
     } catch (error) {
@@ -1051,8 +1413,7 @@ export function StudioShell({
   const isClothingMode = studioMode === "clothing-tryon";
   const isProductShotMode = studioMode === "product-shot";
   const isPostProcessingMode = studioMode === "post-processing";
-  const effectiveProductPreviewUrl = productPreviewUrl;
-  const hasProductInput = Boolean(productFile);
+  const hasProductInput = productPhotos.length > 0;
   const hasModelInput = Boolean(
     (modelSource === "upload" && modelFile) ||
       (modelSource === "saved" && isRemoteImageUrl(savedModelUrl)) ||
@@ -1063,15 +1424,12 @@ export function StudioShell({
     if (!hasProductInput) return "Сначала загрузите фото.";
 
     if (isClothingMode) {
-      const anglesError = validateModelAngles(modelSettings);
+      const anglesError = validateGenerationAngles();
       if (anglesError) return anglesError;
 
-      const angles = resolveSelectedModelAngles(modelSettings);
-      if (angles.length > 1) {
-        if (!isModelOutputSizeComplete(modelOutputSize)) {
-          return "Выберите соотношение сторон и разрешение для ракурсов.";
-        }
-        return null;
+      const angles = resolveGenerationAngles();
+      if (!hasModelInput && !isModelOutputSizeComplete(modelOutputSize)) {
+        return "Выберите соотношение сторон и разрешение для AI-модели.";
       }
 
       if (!hasModelInput) {
@@ -1152,15 +1510,15 @@ export function StudioShell({
                       step={1}
                         label="Фото товара"
                     >
-                      <ImageUploader
+                      <ProductPhotosUploader
                         label="Загрузите фото товара"
-                        hint={
-                          "Лучше всего: товар хорошо виден, без сильного размытия и без лишних предметов."
-                        }
-                        previewUrl={effectiveProductPreviewUrl}
-                        selectedFile={productFile}
-                        onFileSelect={handleProductFile}
-                        onClearFile={clearProductFile}
+                        hint="Одно фото за раз. Для следующего SKU замените файл после примерки."
+                        photos={productPhotos}
+                        activePhotoId={activeProductId}
+                        onAddFiles={handleAddProductFiles}
+                        onSelectPhoto={setActiveProductId}
+                        onRemovePhoto={handleRemoveProductPhoto}
+                        onClearAll={clearProductPhotos}
                       />
                     </StudioWorkflowStep>
 
@@ -1233,10 +1591,10 @@ export function StudioShell({
                             enhancingDescription={modelDescriptionEnhancing}
                             generating={modelGenerating}
                             generateError={modelGenerateError}
-                            generatedPreviewUrl={
-                              generatedModelUrl && !modelFile
-                                ? generatedModelUrl
-                                : null
+                            generateNotice={modelGenerateNotice}
+                            generateProgress={modelGenerateProgress}
+                            generatedPreviewItems={
+                              !modelFile ? generatedModelPreviews : []
                             }
                             isModelSaved={Boolean(
                               savedModelUrl &&
@@ -1259,6 +1617,16 @@ export function StudioShell({
                                 }
                                 return next;
                               })
+                            }
+                            productPhotoCount={productPhotos.length}
+                            useProductSampleAngles={useProductSampleAngles}
+                            productSampleAngles={productSampleAngles}
+                            analyzingProductAngles={analyzingProductAngles}
+                            onApplyAnglesFromProducts={() =>
+                              void handleApplyAnglesFromProducts()
+                            }
+                            onClearProductSampleAngles={
+                              handleClearProductSampleAngles
                             }
                           />
                         </StudioWorkflowStep>
@@ -1329,13 +1697,40 @@ export function StudioShell({
                 <div className="grid items-stretch gap-4 sm:grid-cols-2">
                   <PreviewCard
                     title="Товар"
-                    url={effectiveProductPreviewUrl}
+                    url={
+                      productCarouselItems.length === 1
+                        ? (productCarouselItems[0]?.url ?? null)
+                        : null
+                    }
                     empty="Загрузите фото товара"
+                    content={
+                      productCarouselItems.length > 1 ? (
+                        <PreviewImageCarousel
+                          items={productCarouselItems}
+                          showDownloadActions={false}
+                          className="min-h-[260px]"
+                        />
+                      ) : undefined
+                    }
                   />
                   <PreviewCard
                     title="AI-модель"
-                    url={effectiveModelPreview}
+                    url={
+                      modelCarouselItems.length === 1
+                        ? (modelCarouselItems[0]?.url ?? null)
+                        : null
+                    }
                     empty="Сгенерируйте или загрузите модель"
+                    loading={modelGenerating}
+                    loadingDetail={modelGenerateProgress}
+                    content={
+                      modelCarouselItems.length > 1 ? (
+                        <PreviewImageCarousel
+                          items={modelCarouselItems}
+                          className="min-h-[260px]"
+                        />
+                      ) : undefined
+                    }
                     badge={
                       modelSource === "saved" && savedModelUrl
                         ? "AI-модель"
@@ -1346,8 +1741,21 @@ export function StudioShell({
               ) : (
                 <PreviewCard
                   title="Товар"
-                  url={effectiveProductPreviewUrl}
+                  url={
+                    productCarouselItems.length === 1
+                      ? (productCarouselItems[0]?.url ?? null)
+                      : null
+                  }
                   empty="Загрузите фото"
+                  content={
+                    productCarouselItems.length > 1 ? (
+                      <PreviewImageCarousel
+                        items={productCarouselItems}
+                        showDownloadActions={false}
+                        className="min-h-[260px]"
+                      />
+                    ) : undefined
+                  }
                 />
               )}
             </div>
@@ -1370,6 +1778,7 @@ export function StudioShell({
                     loadingDetail={tryOnProgress}
                     isProductShotMode={isProductShotMode}
                     productPreviewUrl={effectiveProductPreviewUrl}
+                    productPreviewItems={productCarouselItems}
                     onStartOver={handleStartOver}
                     embedded
                   />
