@@ -45,13 +45,12 @@ export function Hero() {
           </Badge>
 
           <h1 className="max-w-3xl text-4xl font-bold tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
-            AI-фото товаров для маркетплейсов
+            AI-студия товарных фото и видео для маркетплейсов
           </h1>
 
           <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600 sm:text-xl">
-            Загрузите фото одежды, белья, бижутерии или аксессуара — получите
-            аккуратные карточки товара на AI-модели, с чистым фоном и ручной
-            проверкой качества.
+            Создавайте фото на модели, точные карточки товара, фоны, Reels и
+            короткие видео из одного изображения.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">

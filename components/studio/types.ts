@@ -96,7 +96,7 @@ export const DEFAULT_MODEL_GENERATION_SETTINGS: ModelGenerationSettings = {
 export type StudioMode =
   | "clothing-tryon"
   | "product-shot"
-  | "background-remove-only";
+  | "post-processing";
 
 export const STUDIO_MODES: {
   id: StudioMode;
@@ -108,23 +108,53 @@ export const STUDIO_MODES: {
     id: "clothing-tryon",
     label: "Одежда на модели",
     description:
-      "Для платьев, футболок, белья, костюмов и другой одежды.",
+      "Перенесите одежду, бельё или комплект на AI-модель.",
     recommendedFor: "Рекомендуем для одежды",
   },
   {
     id: "product-shot",
-    label: "Product Shot",
+    label: "Товарная карточка",
     description:
-      "Товарное фото без модели для бижутерии, сумок, обуви, аксессуаров и небольших товаров.",
-    recommendedFor: "Рекомендуем для аксессуаров",
+      "Создайте чистую карточку товара для маркетплейса или креативную сцену для витрины.",
+    recommendedFor: "Рекомендуем для карточек",
   },
   {
-    id: "background-remove-only",
-    label: "Удалить фон",
-    description: "Быстро убрать фон у готового изображения.",
-    recommendedFor: "Рекомендуем для готовых фото",
+    id: "post-processing",
+    label: "Проработка",
+    description:
+      "Доработайте уже созданные изображения: видео, фон, сцена, Reels.",
+    recommendedFor: "Рекомендуем после генерации",
   },
 ];
+
+export type StudioAssetType =
+  | "tryon"
+  | "exact-card"
+  | "creative-card"
+  | "background-removed"
+  | "video"
+  | "scene";
+
+export type StudioSessionAsset = {
+  id: string;
+  type: StudioAssetType;
+  url: string;
+  sourceImageUrl?: string;
+  mode: StudioMode | "video" | "scene";
+  provider?: string;
+  model?: string;
+  requestId?: string;
+  createdAt: string;
+  prompt?: string;
+  enhancedPrompt?: string;
+  estimatedCost?: number;
+  reviewStatus?: ResultReviewStatus;
+  width?: number;
+  height?: number;
+  duration?: number;
+  format?: string;
+  label?: string;
+};
 
 export type ProductShotScenePreset =
   | "marketplace-clean"

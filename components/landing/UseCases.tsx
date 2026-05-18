@@ -31,7 +31,7 @@ const features = [
   },
   {
     icon: Sparkles,
-    title: "Product Shot / товарное фото",
+    title: "Товарная карточка",
     description:
       "Товарное фото без модели на белом, светлом или более красивом фоне.",
     badge: "Без модели",

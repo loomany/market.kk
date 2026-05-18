@@ -6,21 +6,17 @@ import {
   AlertTriangle,
   ArrowLeft,
   Camera,
-  Eraser,
   ShieldCheck,
   Sparkles,
   Wand2,
 } from "lucide-react";
 import { MOCK_MODEL_IMAGE } from "@/lib/ai/mockResults";
 import type { GenerateModelResponse } from "@/lib/ai/modelGenerationSchemas";
+import type { PromptEnhanceResponse } from "@/lib/ai/promptEnhanceSchemas";
 import type { RemoveBackgroundResponse } from "@/lib/ai/backgroundRemovalSchemas";
 import { mapCategoryForTryOn, type TryOnResponse } from "@/lib/ai/falSchemas";
 import { validateImageFileClient } from "@/lib/ai/clientImageValidation";
-import {
-  centerTransparentCutout,
-  fitCutoutToShotSize,
-  refineCutoutWithUserMask,
-} from "@/lib/studio/cutoutImage";
+import { fitCutoutToShotSize, refineCutoutWithUserMask } from "@/lib/studio/cutoutImage";
 import { shotSizePresetToDimensions } from "@/lib/ai/productShotSchemas";
 import {
   composeExactProductCard,
@@ -32,6 +28,7 @@ import {
   nextGenerationSeed,
 } from "@/lib/studio/resultUtils";
 import { Button } from "@/components/ui/Button";
+import { WhatsAppLoginModal } from "@/components/auth/WhatsAppLoginModal";
 import {
   Card,
   CardContent,
@@ -48,6 +45,7 @@ import { GenerationResultGrid } from "./GenerationResultGrid";
 import type { ProductMaskApplyResult } from "./ProductMaskEditor";
 import { ProductSelectionPanel } from "./ProductSelectionPanel";
 import { StudioWorkflowStep } from "./StudioWorkflowStep";
+import { ProcessedAssetsPanel } from "./ProcessedAssetsPanel";
 import {
   DEFAULT_MODEL_GENERATION_SETTINGS,
   DEFAULT_PRODUCT_SHOT_SETTINGS,
@@ -60,6 +58,7 @@ import {
   type QualityMode,
   type StudioMode,
   type StudioResultImage,
+  type StudioSessionAsset,
   type LastGenerationMode,
 } from "./types";
 
@@ -96,18 +95,18 @@ const MODE_STEPS: Record<
       description: "Проверьте результат и примите только точный вариант.",
     },
   ],
-  "background-remove-only": [
+  "post-processing": [
     {
-      title: "Загрузите фото",
-      description: "Выберите файл JPEG, PNG или WEBP.",
+      title: "Выберите результат",
+      description: "Работайте с уже созданным фото из текущей сессии.",
     },
     {
-      title: "Удалите фон",
-      description: "Сервис создаст вариант без фона.",
+      title: "Выберите действие",
+      description: "Видео, фон, продолжение сцены, улучшение или Reels.",
     },
     {
-      title: "Скачайте PNG",
-      description: "Сначала проверьте края товара и прозрачность.",
+      title: "Проверьте и скачайте",
+      description: "AI может менять детали товара, поэтому нужен ручной контроль.",
     },
   ],
 };
@@ -189,6 +188,9 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
   const [modelSettings, setModelSettings] = useState<ModelGenerationSettings>(
     DEFAULT_MODEL_GENERATION_SETTINGS
   );
+  const [modelDescription, setModelDescription] = useState("");
+  const [modelDescriptionEnhancing, setModelDescriptionEnhancing] =
+    useState(false);
   const [productShotSettings, setProductShotSettings] =
     useState<ProductShotSettings>(DEFAULT_PRODUCT_SHOT_SETTINGS);
   const [generatedModelUrl, setGeneratedModelUrl] = useState<string | null>(
@@ -200,6 +202,7 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
   );
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<StudioResultImage[]>([]);
+  const [sessionAssets, setSessionAssets] = useState<StudioSessionAsset[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [generationSeed, setGenerationSeed] = useState(42);
   const [modelGenerationSeed, setModelGenerationSeed] = useState(42);
@@ -285,6 +288,100 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
     setModelPreviewUrl(modelPreview.setFromFile(null));
   }, [modelPreview]);
 
+  const persistAsset = useCallback(async (asset: StudioSessionAsset) => {
+    try {
+      await fetch("/api/studio/assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(asset),
+      });
+    } catch {
+      // Session-only mode must keep working when auth or Supabase is absent.
+    }
+  }, []);
+
+  const loadSavedAssets = useCallback(async () => {
+    try {
+      const res = await fetch("/api/studio/assets", { cache: "no-store" });
+      const data = (await res.json()) as {
+        ok: boolean;
+        assets?: StudioSessionAsset[];
+      };
+      if (!data.ok || !data.assets?.length) return;
+      setSessionAssets((prev) => {
+        const savedIds = new Set(data.assets?.map((asset) => asset.id));
+        return [
+          ...(data.assets ?? []),
+          ...prev.filter((asset) => !savedIds.has(asset.id)),
+        ].slice(0, 48);
+      });
+    } catch {
+      // History is an enhancement; anonymous/local studio flow should not fail.
+    }
+  }, []);
+
+  useEffect(() => {
+    const scheduleLoad = () => window.setTimeout(() => void loadSavedAssets(), 0);
+    scheduleLoad();
+    const handler = () => scheduleLoad();
+    window.addEventListener("vitrina-auth-changed", handler);
+    return () => window.removeEventListener("vitrina-auth-changed", handler);
+  }, [loadSavedAssets]);
+
+  const addAssetsToSession = useCallback((assets: StudioSessionAsset[]) => {
+    setSessionAssets((prev) => [...assets, ...prev].slice(0, 48));
+    assets.forEach((asset) => void persistAsset(asset));
+  }, [persistAsset]);
+
+  const addSingleAssetToSession = useCallback((asset: StudioSessionAsset) => {
+    setSessionAssets((prev) => [asset, ...prev].slice(0, 48));
+    void persistAsset(asset);
+  }, [persistAsset]);
+
+  const deleteSessionAsset = useCallback((id: string) => {
+    setSessionAssets((prev) => prev.filter((asset) => asset.id !== id));
+    void fetch("/api/studio/assets", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    }).catch(() => undefined);
+  }, []);
+
+  const mapResultsToSessionAssets = useCallback(
+    (
+      mappedResults: StudioResultImage[],
+      type: StudioSessionAsset["type"],
+      metadata: {
+        mode: StudioSessionAsset["mode"];
+        provider?: string;
+        model?: string;
+        requestId?: string;
+        sourceImageUrl?: string;
+        prompt?: string;
+        estimatedCost?: number;
+      }
+    ): StudioSessionAsset[] =>
+      mappedResults.map((result) => ({
+        id: result.id,
+        type,
+        url: result.url,
+        sourceImageUrl: metadata.sourceImageUrl,
+        mode: metadata.mode,
+        provider: metadata.provider ?? result.provider,
+        model: metadata.model,
+        requestId: metadata.requestId,
+        createdAt: new Date().toISOString(),
+        prompt: metadata.prompt,
+        estimatedCost: metadata.estimatedCost,
+        reviewStatus: result.reviewStatus,
+        width: result.width,
+        height: result.height,
+        format: type === "video" ? "mp4" : "png",
+        label: result.label,
+      })),
+    []
+  );
+
   const resolveModelImageUrl = useCallback((): string | null => {
     if (modelFile) return null;
     if (generatedModelUrl) return generatedModelUrl;
@@ -337,6 +434,7 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
           resolution: "1K",
           numImages: 1,
           seed: useSeed,
+          customDescription: modelDescription || undefined,
         }),
       });
 
@@ -363,6 +461,37 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
       );
     } finally {
       setModelGenerating(false);
+    }
+  };
+
+  const handleEnhanceModelDescription = async () => {
+    if (!modelDescription.trim()) {
+      setModelGenerateError("Сначала опишите модель в одном-двух предложениях.");
+      return;
+    }
+    setModelDescriptionEnhancing(true);
+    setModelGenerateError(null);
+    try {
+      const res = await fetch("/api/ai/prompt/enhance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          context: "model-description",
+          userPrompt: modelDescription,
+          targetPlatform: "marketplace",
+          language: "ru",
+        }),
+      });
+      const data = (await res.json()) as PromptEnhanceResponse;
+      if (!data.ok) {
+        setModelGenerateError(data.message);
+        return;
+      }
+      setModelDescription(data.enhancedPrompt);
+    } catch {
+      setModelGenerateError("Не удалось усилить промт. Попробуйте ещё раз.");
+    } finally {
+      setModelDescriptionEnhancing(false);
     }
   };
 
@@ -410,7 +539,21 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
         return;
       }
 
-      setResults(mapApiImagesToStudioResults(data.images, "Вариант", data.provider));
+      const mappedResults = mapApiImagesToStudioResults(
+        data.images,
+        "Вариант",
+        data.provider
+      );
+      setResults(mappedResults);
+      addAssetsToSession(
+        mapResultsToSessionAssets(mappedResults, "tryon", {
+          mode: "clothing-tryon",
+          provider: data.provider,
+          model: data.model,
+          requestId: data.requestId,
+          sourceImageUrl: productPreviewUrl ?? undefined,
+        })
+      );
       setLastGenerationMode("clothing-tryon");
       setGenerationSeed(nextGenerationSeed());
     } catch {
@@ -487,18 +630,26 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
         shotSizePreset: productShotSettings.shotSizePreset,
       });
 
-      setResults(
-        mapProductShotStudioResults(
-          [{ url: cardUrl, width: exportWidth, height: exportHeight }],
-          "exact-card",
-          {
-            cutoutPreviewUrl: sizedCutoutUrl,
-            selectedProductPreviewUrl: selectedProductPreviewUrl ?? undefined,
-            manualMaskUsed: maskUsed,
-            exactCardWithoutMask: !maskUsed,
-            provider: bgProvider,
-          }
-        )
+      const mappedResults = mapProductShotStudioResults(
+        [{ url: cardUrl, width: exportWidth, height: exportHeight }],
+        "exact-card",
+        {
+          cutoutPreviewUrl: sizedCutoutUrl,
+          selectedProductPreviewUrl: selectedProductPreviewUrl ?? undefined,
+          manualMaskUsed: maskUsed,
+          exactCardWithoutMask: !maskUsed,
+          provider: bgProvider,
+        }
+      );
+      setResults(mappedResults);
+      addAssetsToSession(
+        mapResultsToSessionAssets(mappedResults, "exact-card", {
+          mode: "product-shot",
+          provider: bgProvider,
+          model: bgData.ok ? bgData.model : undefined,
+          requestId: bgData.ok ? bgData.requestId : undefined,
+          sourceImageUrl: productPreviewUrl ?? selectedProductPreviewUrl ?? undefined,
+        })
       );
       setLastGenerationMode("product-shot");
     } catch (error) {
@@ -514,39 +665,6 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
 
   const handleProductShot = async () => {
     await handleExactProductCard();
-  };
-
-  const handleBackgroundRemoveOnly = async () => {
-    if (!productFile) {
-      setError("Загрузите изображение.");
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    setResults([]);
-
-    try {
-      const data = await removeBackgroundForProduct(productFile);
-
-      if (!data.ok) {
-        setError(friendlyAiError(data.errorCode, data.message));
-        return;
-      }
-
-      setResults(
-        mapApiImagesToStudioResults(
-          [{ url: data.image.url }],
-          "Без фона",
-          data.provider
-        )
-      );
-      setLastGenerationMode("background-remove-only");
-    } catch {
-      setError("Не удалось удалить фон. Попробуйте ещё раз.");
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleStartOver = useCallback(() => {
@@ -567,13 +685,12 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
 
   const handlePrimaryAction = () => {
     if (studioMode === "clothing-tryon") return handleGenerateTryOn();
-    if (studioMode === "product-shot") return handleProductShot();
-    return handleBackgroundRemoveOnly();
+    return handleProductShot();
   };
 
   const isClothingMode = studioMode === "clothing-tryon";
   const isProductShotMode = studioMode === "product-shot";
-  const isBgOnlyMode = studioMode === "background-remove-only";
+  const isPostProcessingMode = studioMode === "post-processing";
   const effectiveProductPreviewUrl = productPreviewUrl;
   const hasProductInput = Boolean(productFile);
   const hasModelInput = Boolean(
@@ -593,15 +710,9 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
 
   const primaryButtonLabel = isClothingMode
     ? "Создать фото на модели"
-    : isProductShotMode
-      ? "Создать карточку"
-      : "Удалить фон";
+    : "Создать карточку";
 
-  const PrimaryIcon = isClothingMode
-    ? Wand2
-    : isProductShotMode
-      ? Camera
-      : Eraser;
+  const PrimaryIcon = isClothingMode ? Wand2 : Camera;
   return (
     <div className="min-h-screen">
       <header className="border-b border-border/70 bg-white/85 backdrop-blur-xl">
@@ -616,6 +727,7 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
           <span className="hidden text-sm font-bold tracking-tight text-slate-950 sm:inline">
             Vitrina <span className="text-teal-700">AI</span>
           </span>
+          <WhatsAppLoginModal />
         </div>
       </header>
 
@@ -626,13 +738,23 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
               <Sparkles className="h-3.5 w-3.5" />
               Vitrina AI Studio
             </Badge>
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <Badge variant={mockMode ? "success" : "warning"}>
+                {mockMode ? "Демо-режим" : "Реальный AI-режим"}
+              </Badge>
+              <span className="text-xs leading-5 text-slate-500">
+                {mockMode
+                  ? "Можно проверять интерфейс без списаний."
+                  : "Fal и другие AI-сервисы могут списывать деньги за генерацию."}
+              </span>
+            </div>
             <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
               Студия товарных фото
             </h1>
             <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600 sm:text-lg">
-              Создавайте фото для карточек товаров: одежда на модели, Product
-              Shot для аксессуаров и удаление фона. Перед скачиванием проверьте
-              результат по чеклисту.
+              Создавайте фото для карточек товаров: одежда на модели, точная
+              товарная карточка и проработка готовых изображений для видео,
+              фона и Reels.
             </p>
           </div>
 
@@ -640,8 +762,10 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
             <div className="flex items-start gap-3">
               <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-teal-700" />
               <p>
-                Фото не сохраняются в нашей базе. Для генерации изображения
-                временно обрабатываются в защищённом облачном AI-сервисе.
+                В анонимном режиме файлы остаются только в этой сессии. После
+                входа через WhatsApp можно сохранять историю в Supabase. В
+                реальном AI-режиме изображения отправляются на серверные
+                AI-сервисы, а перед платными генерациями нужна оценка стоимости.
               </p>
             </div>
           </div>
@@ -650,6 +774,14 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
         <StudioModeSelector value={studioMode} onChange={setStudioMode} />
         <ModeStepper mode={studioMode} />
 
+        {isPostProcessingMode ? (
+          <ProcessedAssetsPanel
+            assets={sessionAssets}
+            mockMode={mockMode}
+            onDeleteAsset={deleteSessionAsset}
+            onAssetCreated={addSingleAssetToSession}
+          />
+        ) : (
         <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
           <aside className="space-y-4">
             <Card>
@@ -657,20 +789,12 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
               <>
                     <StudioWorkflowStep
                       step={1}
-                      label={
-                        isBgOnlyMode ? "Исходное фото" : "Фото товара"
-                      }
+                        label="Фото товара"
                     >
                       <ImageUploader
-                        label={
-                          isBgOnlyMode
-                            ? "Изображение для удаления фона"
-                            : "Загрузите фото товара"
-                        }
+                        label="Загрузите фото товара"
                         hint={
-                          isBgOnlyMode
-                            ? "Загрузите готовое фото — сервис уберёт фон и вернёт PNG."
-                            : "Лучше всего: товар хорошо виден, без сильного размытия и без лишних предметов."
+                          "Лучше всего: товар хорошо виден, без сильного размытия и без лишних предметов."
                         }
                         previewUrl={effectiveProductPreviewUrl}
                         selectedFile={productFile}
@@ -730,6 +854,12 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
                             settings={modelSettings}
                             onSettingsChange={handleModelSettingsChange}
                             onGenerate={() => void handleGenerateModel()}
+                            modelDescription={modelDescription}
+                            onModelDescriptionChange={setModelDescription}
+                            onEnhanceModelDescription={() =>
+                              void handleEnhanceModelDescription()
+                            }
+                            enhancingDescription={modelDescriptionEnhancing}
                             generating={modelGenerating}
                             generateError={modelGenerateError}
                             generatedPreviewUrl={
@@ -773,7 +903,7 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
 
                     <StudioWorkflowStep
                       step={
-                        isClothingMode ? 5 : isProductShotMode ? 4 : 2
+                        isClothingMode ? 5 : 4
                       }
                       label="Готово"
                       isLast
@@ -821,7 +951,7 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
               </div>
             ) : (
               <PreviewCard
-                title={isBgOnlyMode ? "Исходник" : "Товар"}
+                title="Товар"
                 url={effectiveProductPreviewUrl}
                 empty="Загрузите фото"
               />
@@ -847,7 +977,7 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
                 results={results}
                 loading={loading}
                 showRegenerate={
-                  !isBgOnlyMode && !isProductShotMode && results.length > 0
+                  !isProductShotMode && results.length > 0
                 }
                 regenerateLoading={loading}
                 isProductShotMode={isProductShotMode}
@@ -858,6 +988,7 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
             </Card>
           </section>
         </div>
+        )}
       </main>
     </div>
   );

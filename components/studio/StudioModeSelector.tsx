@@ -1,6 +1,6 @@
 "use client";
 
-import { Eraser, Gem, Shirt } from "lucide-react";
+import { Clapperboard, Gem, Shirt } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { STUDIO_MODES, type StudioMode } from "./types";
 
@@ -12,7 +12,7 @@ type StudioModeSelectorProps = {
 const modeIcons = {
   "clothing-tryon": Shirt,
   "product-shot": Gem,
-  "background-remove-only": Eraser,
+  "post-processing": Clapperboard,
 } satisfies Record<StudioMode, typeof Shirt>;
 
 export function StudioModeSelector({

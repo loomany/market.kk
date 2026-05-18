@@ -42,7 +42,7 @@ export function ProductShotSettingsPanel({
     <div className="space-y-4 rounded-[22px] border border-border bg-white p-4 shadow-sm">
       <div>
         <h3 className="text-sm font-semibold text-slate-950">
-          Настройки Product Shot
+          Настройки товарной карточки
         </h3>
         <p className="mt-1 text-xs leading-5 text-slate-600">
           Точная карточка для маркетплейсов: фон меняется, товар остаётся как на
