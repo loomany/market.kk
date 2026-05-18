@@ -10,6 +10,8 @@ export const promptEnhanceRequestSchema = z.object({
     "scene",
   ]),
   userPrompt: z.string().trim().min(2).max(2000),
+  /** Locked parameter summary — enhance must not override (model-description) */
+  lockedBasePrompt: z.string().trim().max(2000).optional(),
   sourceImageDescription: z.string().trim().max(1000).optional(),
   targetPlatform: z
     .enum(["marketplace", "instagram", "reels", "catalog"])

@@ -25,7 +25,8 @@ import {
   MODEL_CUSTOM_TEXT_MAX,
   MODEL_PARAM_CUSTOM,
 } from "@/lib/ai/modelCustomParams";
-import { buildModelSettingsSummaryRu } from "@/lib/ai/modelSettingsSummary";
+import { buildModelBaseSettingsSummaryRu } from "@/lib/ai/modelSettingsSummary";
+import { ModelPromptComposer } from "@/components/studio/ModelPromptComposer";
 import {
   MODEL_BODY_TYPES,
   type ModelBackground,
@@ -43,7 +44,7 @@ type ModelPresetSelectorProps = {
   onGenerate: () => void;
   modelDescription: string;
   onModelDescriptionChange: (value: string) => void;
-  onEnhanceModelDescription: () => void;
+  onEnhanceModelDescription: (draft: string) => Promise<string | null>;
   enhancingDescription?: boolean;
   generating?: boolean;
   generateError?: string | null;
@@ -410,20 +411,19 @@ export function ModelPresetSelector({
 
   const aspectRatioDescription = outputSize.aspectRatio
     ? hintForOption(FAL_MODEL_ASPECT_RATIO_OPTIONS, outputSize.aspectRatio)
-    : "Формат кадра для карточки — параметр aspect_ratio в Fal.";
+    : "Формат кадра для карточки.";
 
   const resolutionDescription = outputSize.resolution
     ? hintForOption(FAL_MODEL_RESOLUTION_OPTIONS, outputSize.resolution)
-    : "Качество изображения — параметр resolution в Fal.";
+    : "Качество изображения.";
 
-  const settingsSummary = useMemo(
-    () =>
-      buildModelSettingsSummaryRu(settings, outputSize, modelDescription),
-    [settings, outputSize, modelDescription]
+  const basePrompt = useMemo(
+    () => buildModelBaseSettingsSummaryRu(settings, outputSize),
+    [settings, outputSize]
   );
 
   return (
-    <section className="space-y-5 rounded-[22px] border border-border bg-white p-4 shadow-sm">
+    <section className="space-y-6">
       <header>
         <h3 className="text-sm font-semibold text-slate-950">
           AI-модель для одежды
@@ -434,8 +434,8 @@ export function ModelPresetSelector({
         </p>
       </header>
 
-      <div className="rounded-[16px] border border-border/80 bg-slate-50/70 p-3">
-        <span className="mb-3 block px-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+      <div className="space-y-4">
+        <span className="block px-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
           Параметры съёмки
         </span>
         <div className="flex flex-col gap-4">
@@ -557,55 +557,18 @@ export function ModelPresetSelector({
         </p>
       ) : null}
 
-      <div className="space-y-2 rounded-[16px] border border-border/80 bg-slate-50/60 p-3">
-        <div className="space-y-0.5 px-0.5">
-          <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            Итоговый промт
-          </span>
-          <p className="text-xs leading-5 text-slate-500">
-            Собирается из параметров выше. Так же уходит в генерацию (на английском
-            для AI) вместе с дополнением ниже.
-          </p>
-        </div>
-        <textarea
-          readOnly
-          value={settingsSummary}
-          rows={4}
-          aria-readonly="true"
-          className="w-full resize-none rounded-[12px] border border-border bg-white px-3 py-3 text-sm leading-6 text-slate-800 outline-none"
+      <div className="border-t border-border/50 pt-5">
+        <ModelPromptComposer
+          basePrompt={basePrompt}
+          description={modelDescription}
+          onDescriptionChange={onModelDescriptionChange}
+          onEnhanceDescription={onEnhanceModelDescription}
+          enhancing={enhancingDescription}
+          disabled={isPromptLocked}
         />
       </div>
 
-      <div className="space-y-2">
-        <div className="space-y-0.5 px-0.5">
-          <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            Опишите модель
-          </label>
-          <p className="text-xs leading-5 text-slate-500">
-            Дополняет итоговый промт, не заменяет тип фигуры и возраст.
-          </p>
-        </div>
-        <textarea
-          value={modelDescription}
-          onChange={(event) => onModelDescriptionChange(event.target.value)}
-          rows={3}
-          disabled={isPromptLocked}
-          placeholder="Например: взрослая plus-size модель, уверенная поза, смотрит в камеру, светлая студия, руки не закрывают одежду"
-          className="w-full rounded-[16px] border border-border bg-white px-3 py-3 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-600"
-        />
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full"
-          loading={enhancingDescription}
-          disabled={isPromptLocked}
-          onClick={onEnhanceModelDescription}
-        >
-          Усилить промт
-        </Button>
-      </div>
-
-      <div className="space-y-4">
+      <div className="space-y-4 border-t border-border/50 pt-5">
         <SelectField
           label="Соотношение сторон"
           description={aspectRatioDescription}
@@ -649,12 +612,12 @@ export function ModelPresetSelector({
       ) : null}
 
       {generatedPreviewUrl && !generating ? (
-        <div className="space-y-2 rounded-[16px] border border-emerald-200/80 bg-emerald-50/40 p-3">
+        <div className="space-y-2 rounded-[12px] bg-emerald-50/50 p-3">
           <p className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800">
             <CheckCircle2 className="h-4 w-4 shrink-0" />
             AI-модель готова — можно запускать примерку
           </p>
-          <div className="overflow-hidden rounded-[14px] border border-white/80 bg-white shadow-sm">
+          <div className="overflow-hidden rounded-[12px] bg-white shadow-sm">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={generatedPreviewUrl}

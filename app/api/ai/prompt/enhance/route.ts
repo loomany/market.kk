@@ -25,6 +25,7 @@ function buildMockEnhancedPrompt(input: {
   userPrompt: string;
   targetPlatform: string;
   language: Locale;
+  lockedBasePrompt?: string;
 }) {
   const base = input.userPrompt.trim();
   const fidelityEn =
@@ -195,6 +196,7 @@ export async function POST(request: Request) {
                 text: JSON.stringify({
                   context: data.context,
                   userPrompt: data.userPrompt,
+                  lockedBasePrompt: data.lockedBasePrompt,
                   sourceImageDescription: data.sourceImageDescription,
                   targetPlatform: data.targetPlatform,
                   displayLanguage,
@@ -204,7 +206,15 @@ export async function POST(request: Request) {
                     "For clothing model: adult only, non-explicit, commercial catalog style.",
                     "For marketplace: no fake claims, no logos, no text, no watermark.",
                     "For video: describe motion, camera, duration, product fidelity.",
-                    `enhancedPrompt: write ONLY in ${displayLanguage}. This is what the user reads and edits.`,
+                    ...(data.context === "model-description" && data.lockedBasePrompt
+                      ? [
+                          "lockedBasePrompt is fixed UI parameters (age, body type, pose, crop, background). Do NOT rewrite or contradict it.",
+                          "Enhance ONLY userPrompt — the user's optional addition (location, lighting, mood).",
+                          `enhancedPrompt must contain ONLY the improved user addition in ${displayLanguage}, not the locked base.`,
+                        ]
+                      : [
+                          `enhancedPrompt: write ONLY in ${displayLanguage}. This is what the user reads and edits.`,
+                        ]),
                     "generationPrompt: same instructions in English for Fal/image/video models. No extra details.",
                     "negativePrompt: English only.",
                     `safetyNotes and suggestions: ${displayLanguage} only.`,

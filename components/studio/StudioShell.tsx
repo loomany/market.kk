@@ -25,6 +25,7 @@ import {
   type ModelOutputSizeSelection,
 } from "@/lib/ai/modelOutputSizes";
 import { validateModelCustomParams } from "@/lib/ai/modelGenerationValidation";
+import { buildModelBaseSettingsSummaryRu } from "@/lib/ai/modelSettingsSummary";
 import { validateImageFileClient } from "@/lib/ai/clientImageValidation";
 import { fitCutoutToShotSize, refineCutoutWithUserMask } from "@/lib/studio/cutoutImage";
 import { shotSizePresetToDimensions } from "@/lib/ai/productShotSchemas";
@@ -56,6 +57,7 @@ import { PreviewCard } from "./PreviewCard";
 import { StudioPanelCard } from "./StudioPanelCard";
 import type { ProductMaskApplyResult } from "./ProductMaskEditor";
 import { ProductSelectionPanel } from "./ProductSelectionPanel";
+import { StudioWorkflowRail } from "./StudioWorkflowRail";
 import { StudioWorkflowStep } from "./StudioWorkflowStep";
 import { ProcessedAssetsPanel } from "./ProcessedAssetsPanel";
 import { useStudioLocale } from "./useStudioLocale";
@@ -72,55 +74,6 @@ import {
   type StudioSessionAsset,
   type LastGenerationMode,
 } from "./types";
-
-const MODE_STEPS: Record<
-  StudioMode,
-  { title: string; description: string }[]
-> = {
-  "clothing-tryon": [
-    {
-      title: "Загрузите товар",
-      description: "Фото одежды или белья. Если товар на человеке, выберите это в настройках.",
-    },
-    {
-      title: "Выберите модель",
-      description: "Загрузите фото модели или сгенерируйте взрослую AI-модель.",
-    },
-    {
-      title: "Проверьте результат",
-      description: "Сравните цвет, форму, узор, посадку и детали изделия.",
-    },
-  ],
-  "product-shot": [
-    {
-      title: "Загрузите товар",
-      description: "Фото бижутерии, сумки, обуви, аксессуара или небольшого товара.",
-    },
-    {
-      title: "Выделите товар",
-      description:
-        "Если рядом есть ветки, руки или декор — закрасьте только товар кистью.",
-    },
-    {
-      title: "Создайте карточку",
-      description: "Проверьте результат и примите только точный вариант.",
-    },
-  ],
-  "post-processing": [
-    {
-      title: "Выберите результат",
-      description: "Работайте с уже созданным фото из текущей сессии.",
-    },
-    {
-      title: "Выберите действие",
-      description: "Видео, фон, продолжение сцены, улучшение или Reels.",
-    },
-    {
-      title: "Проверьте и скачайте",
-      description: "AI может менять детали товара, поэтому нужен ручной контроль.",
-    },
-  ],
-};
 
 function friendlyAiError(errorCode?: string, message?: string): string {
   if (errorCode === "FAL_KEY_MISSING") {
@@ -504,20 +457,29 @@ export function StudioShell({
     }
   };
 
-  const handleEnhanceModelDescription = async () => {
-    if (!modelDescription.trim()) {
-      setModelGenerateError("Сначала опишите модель в одном-двух предложениях.");
-      return;
+  const handleEnhanceModelDescription = async (
+    draft: string
+  ): Promise<string | null> => {
+    if (!draft.trim()) {
+      setModelGenerateError(
+        "Сначала добавьте описание — локация, свет или настроение."
+      );
+      return null;
     }
     setModelDescriptionEnhancing(true);
     setModelGenerateError(null);
+    const lockedBasePrompt = buildModelBaseSettingsSummaryRu(
+      modelSettings,
+      modelOutputSize
+    );
     try {
       const res = await fetch("/api/ai/prompt/enhance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           context: "model-description",
-          userPrompt: modelDescription,
+          userPrompt: draft,
+          lockedBasePrompt,
           targetPlatform: "marketplace",
           language: promptLocale,
         }),
@@ -525,11 +487,12 @@ export function StudioShell({
       const data = (await res.json()) as PromptEnhanceResponse;
       if (!data.ok) {
         setModelGenerateError(data.message);
-        return;
+        return null;
       }
-      setModelDescription(data.enhancedPrompt);
+      return data.enhancedPrompt;
     } catch {
       setModelGenerateError("Не удалось усилить промт. Попробуйте ещё раз.");
+      return null;
     } finally {
       setModelDescriptionEnhancing(false);
     }
@@ -789,7 +752,6 @@ export function StudioShell({
         </section>
 
         <StudioModeSelector value={studioMode} onChange={setStudioMode} />
-        <ModeStepper mode={studioMode} />
 
         {isPostProcessingMode ? (
           <ProcessedAssetsPanel
@@ -802,9 +764,9 @@ export function StudioShell({
         ) : (
         <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
           <aside className="space-y-4">
-            <Card>
-            <CardContent className="pt-6">
-              <>
+            <Card className="border-0 bg-transparent shadow-none">
+            <CardContent className="overflow-visible px-0 pb-2 pt-2">
+              <StudioWorkflowRail>
                     <StudioWorkflowStep
                       step={1}
                         label="Фото товара"
@@ -851,6 +813,7 @@ export function StudioShell({
                         <StudioWorkflowStep
                           step={2}
                           label="Фото модели"
+                          softCorner="bottom"
                         >
                           <ImageUploader
                             label="Загрузите фото модели или сгенерируйте AI-модель"
@@ -865,6 +828,7 @@ export function StudioShell({
                         <StudioWorkflowStep
                           step={3}
                           label="AI-модель"
+                          softCorner="top"
                         >
                           <ModelPresetSelector
                             settings={modelSettings}
@@ -872,8 +836,8 @@ export function StudioShell({
                             onGenerate={() => void handleGenerateModel()}
                             modelDescription={modelDescription}
                             onModelDescriptionChange={setModelDescription}
-                            onEnhanceModelDescription={() =>
-                              void handleEnhanceModelDescription()
+                            onEnhanceModelDescription={
+                              handleEnhanceModelDescription
                             }
                             enhancingDescription={modelDescriptionEnhancing}
                             generating={modelGenerating}
@@ -956,13 +920,13 @@ export function StudioShell({
                         </p>
                       ) : null}
                     </StudioWorkflowStep>
-              </>
+              </StudioWorkflowRail>
             </CardContent>
             </Card>
           </aside>
 
           <section className="min-h-full">
-            <div className="sticky top-6 z-10 space-y-4 -mx-1 bg-white/95 px-1 pb-2 pt-0 backdrop-blur-sm supports-backdrop-filter:bg-white/85">
+            <div className="sticky top-6 z-10 space-y-4 pt-2">
               {isClothingMode ? (
                 <div className="grid gap-4 sm:grid-cols-2">
                   <PreviewCard
@@ -1020,33 +984,6 @@ export function StudioShell({
         )}
       </main>
     </div>
-  );
-}
-
-function ModeStepper({ mode }: { mode: StudioMode }) {
-  const steps = MODE_STEPS[mode];
-
-  return (
-    <section className="grid gap-2 sm:grid-cols-3" aria-label="Порядок работы">
-      {steps.map((step, index) => (
-        <div
-          key={step.title}
-          className="flex min-h-[112px] gap-3 rounded-[20px] border border-border bg-white p-4 shadow-sm"
-        >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-700 text-sm font-bold text-white">
-            {index + 1}
-          </span>
-          <div>
-            <h2 className="text-sm font-semibold text-slate-950">
-              {step.title}
-            </h2>
-            <p className="mt-1 text-xs leading-5 text-slate-600">
-              {step.description}
-            </p>
-          </div>
-        </div>
-      ))}
-    </section>
   );
 }
 

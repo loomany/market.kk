@@ -72,11 +72,10 @@ function ageSummary(age: number): string {
   return `подростковая модель, ${age} лет`;
 }
 
-/** Human-readable Russian summary of shooting parameters for the UI */
-export function buildModelSettingsSummaryRu(
+/** Base prompt from shooting parameters only (read-only in UI). */
+export function buildModelBaseSettingsSummaryRu(
   settings: ModelGenerationSettings,
-  outputSize: Partial<ModelOutputSizeSelection>,
-  extraDescription?: string
+  outputSize: Partial<ModelOutputSizeSelection>
 ): string {
   const parts = [
     GENDER_LABELS[settings.gender],
@@ -97,11 +96,26 @@ export function buildModelSettingsSummaryRu(
     parts.push(`размер кадра: ${sizeBits} (выберите оба параметра)`);
   }
 
-  let text = parts.join(", ");
+  return parts.join(", ");
+}
 
-  if (extraDescription?.trim()) {
-    text += `\n\nДополнение: ${extraDescription.trim()}`;
-  }
+export function buildModelCombinedPromptRu(
+  basePrompt: string,
+  extraDescription?: string
+): string {
+  const extra = extraDescription?.trim();
+  if (!extra) return basePrompt;
+  return `${basePrompt}\n\nДополнение: ${extra}`;
+}
 
-  return text;
+/** Human-readable Russian summary of shooting parameters for the UI */
+export function buildModelSettingsSummaryRu(
+  settings: ModelGenerationSettings,
+  outputSize: Partial<ModelOutputSizeSelection>,
+  extraDescription?: string
+): string {
+  return buildModelCombinedPromptRu(
+    buildModelBaseSettingsSummaryRu(settings, outputSize),
+    extraDescription
+  );
 }
