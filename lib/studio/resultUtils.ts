@@ -12,18 +12,32 @@ export function newResultId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+export type TryOnResultMeta = {
+  provider?: string;
+  model?: string;
+  requestId?: string;
+  seed?: number;
+  estimatedCost?: number;
+  promptPreview?: string;
+};
+
 export function mapApiImagesToStudioResults(
   images: { url: string; width?: number; height?: number }[],
   labelPrefix: string,
-  provider?: string
+  meta?: TryOnResultMeta
 ): StudioResultImage[] {
   return images.map((img, i) => ({
     id: newResultId(),
     url: img.url,
     width: img.width,
     height: img.height,
-    label: `${labelPrefix} ${i + 1}`,
-    provider,
+    label: images.length === 1 ? labelPrefix : `${labelPrefix} ${i + 1}`,
+    provider: meta?.provider,
+    model: meta?.model,
+    requestId: meta?.requestId,
+    seed: meta?.seed,
+    estimatedCost: meta?.estimatedCost,
+    promptPreview: meta?.promptPreview,
     reviewStatus: "pending_review",
     checklist: createDefaultChecklist(),
   }));

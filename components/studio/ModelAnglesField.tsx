@@ -151,7 +151,7 @@ export function ModelAnglesField({
   const atLimit = selectedCount >= MAX_MODEL_ANGLES;
 
   const presetOptions = MODEL_ANGLE_PRESETS.filter(
-    (preset) => !preset.isBundle
+    (preset) => !preset.isBundle && preset.id !== FULL_CARD_ANGLE_PRESET_ID
   ).map((preset) => ({
     value: preset.id,
     label: preset.label,
@@ -188,7 +188,7 @@ export function ModelAnglesField({
           : `свои ракурсы (${savedCustomCount})`
       );
     }
-    if (parts.length === 0) return "Выберите ракурсы";
+    if (parts.length === 0) return "Выберите вариант";
     if (parts.length === 1) return parts[0]!;
     return parts.join(", ");
   };
@@ -231,9 +231,16 @@ export function ModelAnglesField({
     <div className="space-y-3">
       {productPhotoCount > 0 && onApplyAnglesFromProducts ? (
         <div className="space-y-2 rounded-[14px] border border-teal-100 bg-teal-50/50 p-3">
+          <p className="text-xs font-medium text-teal-950">
+            Подобрать позу модели по фото товара
+          </p>
           <p className="text-xs leading-5 text-teal-950">
-            AI прочитает позу и кадр с загруженного фото товара — для генерации
-            модели в том же ракурсе (плюс ваши настройки: возраст, свет, фигура).
+            AI посмотрит на фото товара и попробует сгенерировать модель в похожей
+            позе. Финальная примерка зависит от позы выбранной модели.
+          </p>
+          <p className="text-xs leading-5 text-teal-800/90">
+            Если вы уже сгенерировали модель и меняете только товар, поза модели
+            останется прежней.
           </p>
           <Button
             type="button"
@@ -244,7 +251,7 @@ export function ModelAnglesField({
             disabled={disabled || analyzingProductAngles}
             onClick={onApplyAnglesFromProducts}
           >
-            Взять ракурс с фото товара
+            Подобрать позу модели по фото товара
           </Button>
         </div>
       ) : null}
@@ -254,7 +261,7 @@ export function ModelAnglesField({
       productSampleAngles.length > 0 ? (
         <div className="space-y-2 rounded-[14px] border border-emerald-200 bg-emerald-50/60 p-3">
           <p className="text-xs font-semibold text-emerald-900">
-            Ракурс с фото товара
+            Поза по фото товара
           </p>
           <p className="text-xs text-emerald-950">
             {productSampleAngles[0]?.label ?? "—"}
@@ -266,7 +273,7 @@ export function ModelAnglesField({
               onClick={onClearProductSampleAngles}
               className="text-xs font-medium text-emerald-800 underline-offset-2 hover:underline"
             >
-              Выбрать ракурсы вручную
+              Выбрать вариант фото вручную
             </button>
           ) : null}
         </div>
@@ -276,7 +283,7 @@ export function ModelAnglesField({
         values={anglePresets}
         options={presetOptions}
         disabled={presetAnglesDisabled}
-        placeholder="Выберите ракурсы"
+        placeholder="Выберите вариант"
         triggerClassName="rounded-[12px] font-medium"
         menuMatchTriggerWidth
         formatTriggerLabel={formatTriggerLabel}
@@ -352,8 +359,8 @@ export function ModelAnglesField({
 
       <p className="px-0.5 text-xs text-slate-500">
         {useProductSampleAngles && productSampleAngles
-          ? `Будет ${productSampleAngles.length} AI-моделей под ракурсы образцов. Первый задаёт лицо и образ.`
-          : "Один ракурс за запуск: 1 товар, 1 модель, 1 примерка."}
+          ? "Поза для генерации модели взята с фото товара. За один запуск — одно итоговое фото."
+          : "За один запуск создаётся одно фото: 1 товар, 1 модель, 1 примерка."}
       </p>
     </div>
   );

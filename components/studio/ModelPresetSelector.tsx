@@ -33,7 +33,6 @@ import { ModelReadyCard } from "@/components/studio/ModelReadyCard";
 import {
   MODEL_BODY_TYPES,
   type ModelBackground,
-  type ModelBodyType,
   type ModelCategoryContext,
   type ModelCrop,
   type ModelGender,
@@ -588,11 +587,11 @@ export function ModelPresetSelector({
             }
           />
           <SettingField
-            label="Ракурсы"
+            label="Варианты фото"
             description={
               useProductSampleAngles && productSampleAngles
-                ? "Ракурс взят с фото товара — модель и примерка в этом кадре. Следующий товар: замените фото и запустите снова."
-                : "Один ракурс за запуск. Для серии товаров меняйте фото и нажимайте «Создать фото на модели» снова."
+                ? "Поза модели подобрана по фото товара. За один запуск создаётся один результат."
+                : "Выберите, какое фото нужно для карточки товара. Сейчас создаётся один вариант за запуск."
             }
           >
             <ModelAnglesField
@@ -615,7 +614,8 @@ export function ModelPresetSelector({
       {isLingerieScenario ? (
         <p className="rounded-[12px] border border-amber-200/80 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">
           Для белья: взрослая модель, нейтральная поза, руки не закрывают грудь,
-          талию и бёдра.
+          талию и бёдра. Рекомендуемые варианты: «Главное фото», «Детали
+          изделия», «Полуоборот», «Сзади».
         </p>
       ) : null}
 

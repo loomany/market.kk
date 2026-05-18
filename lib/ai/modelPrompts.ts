@@ -8,7 +8,7 @@ import {
 import {
   neutralBaseOutfitGuidance,
   neutralBaseOutfitLockForEdit,
-  useNeutralBaseModelGeneration,
+  shouldUseNeutralBaseModelGeneration,
 } from "@/lib/ai/modelIdentityPipeline";
 import { lightingPromptPhrase } from "@/lib/ai/modelLighting";
 import {
@@ -192,7 +192,7 @@ export function buildModelGenerationPrompt(
   options?: { followUpAngle?: boolean; neutralBaseForTryOn?: boolean }
 ): string {
   const neutralBase =
-    options?.neutralBaseForTryOn ?? useNeutralBaseModelGeneration(input);
+    options?.neutralBaseForTryOn ?? shouldUseNeutralBaseModelGeneration(input);
   const bodyType = bodyTypePromptPhrase(input.bodyType, input.bodyTypeCustom);
   const ageLabel = modelAgePromptPhrase(input.modelAge);
   const adult = isAdultModelAge(input.modelAge);
@@ -304,7 +304,7 @@ export function buildModelAngleEditPrompt(input: GenerateModelRequest): string {
     throw new Error("cameraAnglePrompt is required for model angle edit");
   }
 
-  const neutralBase = useNeutralBaseModelGeneration(input);
+  const neutralBase = shouldUseNeutralBaseModelGeneration(input);
   const outfitLock =
     input.categoryContext === "lingerie" && neutralBase
       ? neutralBaseOutfitLockForEdit()

@@ -70,15 +70,15 @@ export const MODEL_ANGLE_PRESETS: {
   },
   {
     id: "close-up-detail",
-    label: "Крупный план",
-    hint: "Верх и детали изделия",
+    label: "Детали изделия",
+    hint: "Крупный план кружева и посадки",
     prompt:
       "editorial close shot from collarbone to upper thighs, torso slightly angled to show garment drape and fabric texture, relaxed shoulders and natural neckline, hands away from product details, soft directional studio light, premium ecommerce detail framing",
   },
   {
     id: "angle-three-quarter",
     label: "Полуоборот",
-    hint: "Фото под углом",
+    hint: "Фото под углом 45°",
     prompt:
       "three-quarter full or mid-length shot, body turned about 30–40 degrees with organic S-curve posture, chin gently toward camera, one hip shifted, arms in natural asymmetric relaxed position, modern editorial catalog energy, soft light studio background",
   },
@@ -91,15 +91,15 @@ export const MODEL_ANGLE_PRESETS: {
   },
   {
     id: "back-view",
-    label: "Вид сзади",
-    hint: "Спина и посадка сзади",
+    label: "Сзади",
+    hint: "Вид со спины",
     prompt:
       "back or back three-quarter view, natural spine curve and relaxed shoulders, medium full framing showing garment back and fit, hair styled away from garment, subtle head turn if needed, editorial catalog not rigid parade-rest stance",
   },
   {
     id: "seated-lifestyle",
     label: "Сидя",
-    hint: "Lifestyle-фото",
+    hint: "Дополнительное lifestyle-фото",
     prompt:
       "seated lifestyle editorial pose on minimal studio stool or block, relaxed asymmetric posture with knees angled naturally, torso slightly turned toward camera, calm confident expression, modern premium fashion catalog mood, garment clearly visible",
   },
@@ -201,7 +201,7 @@ export function validateModelAngles(
 ): string | null {
   const angles = resolveSelectedModelAngles(input);
   if (angles.length === 0) {
-    return "Выберите ракурс, возьмите его с фото товара или сохраните свой вариант галочкой.";
+    return "Выберите вариант фото, подберите позу по фото товара или сохраните свой вариант галочкой.";
   }
   if (countSelectedModelAngles(input) > MAX_MODEL_ANGLES) {
     return `Можно выбрать не больше ${MAX_MODEL_ANGLES} ракурсов.`;

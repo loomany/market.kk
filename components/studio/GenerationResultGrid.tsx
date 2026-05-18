@@ -18,17 +18,24 @@ import {
 } from "./PreviewCard";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
+import { TryOnCostEstimate } from "./TryOnCostEstimate";
+import { TryOnResultMeta } from "./TryOnResultMeta";
 
 type GenerationResultGridProps = {
   results: StudioResultImage[];
   loading?: boolean;
   loadingDetail?: string | null;
   isProductShotMode?: boolean;
+  isClothingTryOnMode?: boolean;
   /** Side-by-side compare cards in studio (no extra outer frame) */
   embedded?: boolean;
   productPreviewUrl?: string | null;
   productPreviewItems?: PreviewCarouselItem[];
   onStartOver: () => void;
+  onRegenerateTryOn?: () => void;
+  onRegenerateModel?: () => void;
+  mockMode?: boolean;
+  paidAiRunsAllowed?: boolean;
 };
 
 function ResultCompareGrid({ children }: { children: ReactNode }) {
@@ -247,15 +254,16 @@ function ResultImage({
 
 function ResultAlerts({
   result,
+  isClothingTryOnMode,
 }: {
   result: StudioResultImage;
+  isClothingTryOnMode?: boolean;
 }) {
   return (
     <>
-      {result.provider === "mock" && (
+      {result.provider === "mock" && !isClothingTryOnMode && (
         <div className="rounded-[18px] border border-violet-100 bg-violet-50 px-4 py-3 text-xs leading-5 text-violet-800">
-          Показан тестовый пример. Для финального результата запустите генерацию
-          в студии.
+          Демо: показан тестовый пример без списаний.
         </div>
       )}
       {result.exactCardWithoutMask &&
@@ -269,15 +277,65 @@ function ResultAlerts({
   );
 }
 
+function ClothingTryOnResultActions({
+  onRegenerateTryOn,
+  onRegenerateModel,
+  mockMode,
+  paidAiRunsAllowed,
+}: {
+  onRegenerateTryOn?: () => void;
+  onRegenerateModel?: () => void;
+  mockMode?: boolean;
+  paidAiRunsAllowed?: boolean;
+}) {
+  return (
+    <div className="space-y-2 border-t border-border/70 p-4">
+      {onRegenerateTryOn ? (
+        <>
+          <TryOnCostEstimate
+            mockMode={Boolean(mockMode)}
+            paidAiRunsAllowed={Boolean(paidAiRunsAllowed)}
+            tryOnOnly
+          />
+          <Button
+            variant="secondary"
+            size="sm"
+            className="w-full"
+            onClick={onRegenerateTryOn}
+          >
+            <RotateCcw className="h-4 w-4" />
+            Перегенерировать примерку
+          </Button>
+        </>
+      ) : null}
+      {onRegenerateModel ? (
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full"
+          onClick={onRegenerateModel}
+        >
+          Сгенерировать другую модель
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
 export function GenerationResultGrid({
   results,
   loading,
   loadingDetail,
   isProductShotMode = false,
+  isClothingTryOnMode = false,
   embedded = false,
   productPreviewUrl = null,
   productPreviewItems = [],
   onStartOver,
+  onRegenerateTryOn,
+  onRegenerateModel,
+  mockMode = false,
+  paidAiRunsAllowed = false,
 }: GenerationResultGridProps) {
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
 
@@ -369,10 +427,20 @@ export function GenerationResultGrid({
         const resultTitle =
           label ?? (isProductShotMode ? "Готовая карточка" : "Результат");
         const resultActions = (
-          <ResultColumnActions
-            onDownload={() => downloadPng(result.url, `${result.id}.png`)}
-            onStartOver={onStartOver}
-          />
+          <>
+            <ResultColumnActions
+              onDownload={() => downloadPng(result.url, `${result.id}.png`)}
+              onStartOver={onStartOver}
+            />
+            {isClothingTryOnMode ? (
+              <ClothingTryOnResultActions
+                onRegenerateTryOn={onRegenerateTryOn}
+                onRegenerateModel={onRegenerateModel}
+                mockMode={mockMode}
+                paidAiRunsAllowed={paidAiRunsAllowed}
+              />
+            ) : null}
+          </>
         );
         const resultImageContent = (
           <div className="flex flex-1 items-center justify-center p-2">
@@ -393,7 +461,10 @@ export function GenerationResultGrid({
         if (embedded && showExactCardRow && result.width && result.height) {
           return (
             <div key={result.id} className="space-y-4">
-              <ResultAlerts result={result} />
+              <ResultAlerts
+                result={result}
+                isClothingTryOnMode={isClothingTryOnMode}
+              />
               <ResultCompareGrid>
                 <ProductCompareColumn
               productPreviewUrl={productPreviewUrl}
@@ -465,7 +536,10 @@ export function GenerationResultGrid({
         if (embedded) {
           return (
             <div key={result.id} className="space-y-4">
-              <ResultAlerts result={result} />
+              <ResultAlerts
+                result={result}
+                isClothingTryOnMode={isClothingTryOnMode}
+              />
               <ResultCompareGrid>
                 <ProductCompareColumn
               productPreviewUrl={productPreviewUrl}
@@ -476,7 +550,14 @@ export function GenerationResultGrid({
                   url={null}
                   empty=""
                   content={resultImageContent}
-                  footer={resultActions}
+                  footer={
+                    <>
+                      {isClothingTryOnMode ? (
+                        <TryOnResultMeta result={result} />
+                      ) : null}
+                      {resultActions}
+                    </>
+                  }
                 />
               </ResultCompareGrid>
             </div>
@@ -560,10 +641,9 @@ export function GenerationResultGrid({
             key={result.id}
             className="overflow-hidden rounded-[24px] border border-border bg-white shadow-xl shadow-slate-200/60"
           >
-            {result.provider === "mock" && (
+            {result.provider === "mock" && !isClothingTryOnMode && (
               <div className="border-b border-violet-100 bg-violet-50 px-4 py-3 text-xs leading-5 text-violet-800">
-                Показан тестовый пример. Для финального результата запустите
-                генерацию в студии.
+                Демо: показан тестовый пример без списаний.
               </div>
             )}
 
@@ -600,6 +680,10 @@ export function GenerationResultGrid({
               </div>
             </div>
 
+            {isClothingTryOnMode && !showExactCardRow ? (
+              <TryOnResultMeta result={result} />
+            ) : null}
+
             {!showExactCardRow && (
               <div className="space-y-3 border-t border-border/70 p-4">
                 <Button
@@ -621,6 +705,15 @@ export function GenerationResultGrid({
                   <RotateCcw className="h-4 w-4" />
                   Начать сначала
                 </Button>
+
+                {isClothingTryOnMode ? (
+                  <ClothingTryOnResultActions
+                    onRegenerateTryOn={onRegenerateTryOn}
+                    onRegenerateModel={onRegenerateModel}
+                    mockMode={mockMode}
+                    paidAiRunsAllowed={paidAiRunsAllowed}
+                  />
+                ) : null}
               </div>
             )}
           </article>

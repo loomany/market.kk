@@ -4,7 +4,7 @@ import type { GenerateModelRequest } from "@/lib/ai/modelGenerationSchemas";
  * Для сценария «бельё» модель генерируем в нейтральном bodysuit (не кружево с карточки).
  * Ракурсы 2+ — через nano-banana edit (то же лицо). Финальный товар — только FASHN try-on.
  */
-export function useNeutralBaseModelGeneration(
+export function shouldUseNeutralBaseModelGeneration(
   input: Pick<GenerateModelRequest, "categoryContext">
 ): boolean {
   return input.categoryContext === "lingerie";

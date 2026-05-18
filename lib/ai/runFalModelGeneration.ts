@@ -16,7 +16,7 @@ import {
   buildModelAngleEditPrompt,
   buildModelGenerationPrompt,
 } from "@/lib/ai/modelPrompts";
-import { useNeutralBaseModelGeneration } from "@/lib/ai/modelIdentityPipeline";
+import { shouldUseNeutralBaseModelGeneration } from "@/lib/ai/modelIdentityPipeline";
 
 const EDIT_TIMEOUT_MS = 90_000;
 const GENERATE_TIMEOUT_MS = 120_000;
@@ -126,7 +126,7 @@ export async function runFalModelGeneration(input: {
 
   const generatePrompt = buildModelGenerationPrompt(generationInput, {
     followUpAngle: hasReference,
-    neutralBaseForTryOn: useNeutralBaseModelGeneration(generationInput),
+    neutralBaseForTryOn: shouldUseNeutralBaseModelGeneration(generationInput),
   });
   const generateInput = buildFalInput(generatePrompt, generationInput);
   const result = await subscribeOnce(

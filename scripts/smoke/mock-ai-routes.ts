@@ -31,6 +31,8 @@ const repoRoot = path.resolve(
 );
 const npmCommand = "npm";
 
+const DEFAULT_PROBE_PORTS = [3000, 3010, 3011];
+
 function getFreePort() {
   return new Promise<number>((resolve, reject) => {
     const server = createServer();
@@ -103,6 +105,18 @@ async function fetchJson(baseUrl: string, pathName: string, init?: RequestInit) 
   return { response, json };
 }
 
+async function readAiMode(baseUrl: string): Promise<JsonRecord | null> {
+  try {
+    const { response, json } = await fetchJson(baseUrl, "/api/system/ai-mode");
+    if (response.ok && typeof json.mockMode === "boolean") {
+      return json;
+    }
+  } catch {
+    // Server not ready or not running.
+  }
+  return null;
+}
+
 async function waitForAiMode(
   baseUrl: string,
   child: ChildProcess,
@@ -117,14 +131,8 @@ async function waitForAiMode(
       );
     }
 
-    try {
-      const { response, json } = await fetchJson(baseUrl, "/api/system/ai-mode");
-      if (response.ok && typeof json.mockMode === "boolean") {
-        return json;
-      }
-    } catch {
-      // Server is still booting.
-    }
+    const mode = await readAiMode(baseUrl);
+    if (mode) return mode;
 
     await delay(1_000);
   }
@@ -166,141 +174,175 @@ async function postJson(baseUrl: string, check: RouteCheck) {
   return json;
 }
 
+async function runChecksOnServer(
+  baseUrl: string,
+  scenario: Scenario,
+  options?: { skipModeAssert?: boolean }
+) {
+  const mode = await readAiMode(baseUrl);
+  assertCondition(mode, `Could not read ai-mode from ${baseUrl}`);
+
+  if (!options?.skipModeAssert) {
+    assertCondition(
+      mode!.mockMode === scenario.expectedMode.mockMode,
+      `${scenario.name}: unexpected mockMode`
+    );
+    assertCondition(
+      mode!.paidAiRunsAllowed === scenario.expectedMode.paidAiRunsAllowed,
+      `${scenario.name}: unexpected paidAiRunsAllowed`
+    );
+  }
+
+  for (const check of scenario.checks) {
+    await postJson(baseUrl, check);
+  }
+
+  console.log(`[smoke] ${scenario.name}: ok`);
+}
+
 async function runScenario(scenario: Scenario) {
   const port = await getFreePort();
   const baseUrl = `http://127.0.0.1:${port}`;
   const { child, recentLogs } = startDevServer(port, scenario.env);
 
   try {
-    const mode = await waitForAiMode(baseUrl, child, recentLogs);
-    assertCondition(
-      mode.mockMode === scenario.expectedMode.mockMode,
-      `${scenario.name}: unexpected mockMode`
-    );
-    assertCondition(
-      mode.paidAiRunsAllowed === scenario.expectedMode.paidAiRunsAllowed,
-      `${scenario.name}: unexpected paidAiRunsAllowed`
-    );
-
-    for (const check of scenario.checks) {
-      await postJson(baseUrl, check);
-    }
-
-    console.log(`[smoke] ${scenario.name}: ok`);
+    await waitForAiMode(baseUrl, child, recentLogs);
+    await runChecksOnServer(baseUrl, scenario);
   } finally {
     stopDevServer(child);
     await delay(1_500);
   }
 }
 
+async function detectRunningDevServer(): Promise<{
+  baseUrl: string;
+  mockMode: boolean;
+} | null> {
+  const explicit = process.env.SMOKE_BASE_URL?.trim();
+  const candidates = explicit
+    ? [explicit.replace(/\/$/, "")]
+    : DEFAULT_PROBE_PORTS.map((port) => `http://127.0.0.1:${port}`);
+
+  for (const baseUrl of candidates) {
+    const mode = await readAiMode(baseUrl);
+    if (mode) {
+      return { baseUrl, mockMode: mode.mockMode === true };
+    }
+  }
+
+  return null;
+}
+
 const commonImageUrl = "https://example.com/demo-product.png";
 
-const scenarios: Scenario[] = [
-  {
-    name: "forced mock routes",
-    env: {
-      AI_MOCK_MODE: "1",
-      ALLOW_PAID_AI_RUNS: "false",
-    },
-    expectedMode: { mockMode: true, paidAiRunsAllowed: false },
-    checks: [
-      {
-        name: "generate model mock",
-        path: "/api/ai/generate-model",
-        expectedProvider: "mock",
-        body: {
-          gender: "female",
-          bodyType: "standard",
-          modelAge: 25,
-          pose: "front",
-          crop: "full-body",
-          categoryContext: "clothing",
-          aspectRatio: "3:4",
-          resolution: "1K",
-          numImages: 1,
-        },
-      },
-      {
-        name: "try-on mock",
-        path: "/api/ai/tryon",
-        expectedProvider: "mock",
-        body: {
-          productImageUrl: commonImageUrl,
-          modelImageUrl: "https://example.com/demo-model.png",
-          category: "auto",
-          garmentPhotoType: "model",
-          mode: "balanced",
-          moderationLevel: "permissive",
-          numSamples: 1,
-          outputFormat: "png",
-        },
-      },
-      {
-        name: "product shot mock",
-        path: "/api/ai/product-shot",
-        expectedProvider: "mock",
-        body: {
-          productImageUrl: commonImageUrl,
-          scenePreset: "marketplace-clean",
-          numResults: 1,
-        },
-      },
-      {
-        name: "remove background mock",
-        path: "/api/ai/remove-background",
-        expectedProvider: "mock",
-        body: {
-          imageUrl: commonImageUrl,
-        },
-      },
-      {
-        name: "video mock",
-        path: "/api/ai/video/generate",
-        expectedProvider: "mock",
-        body: {
-          sourceImageUrl: commonImageUrl,
-          prompt: "модель плавно поворачивается, товар не меняется",
-          modelKey: "kling",
-          quality: "balanced",
-          durationSeconds: 5,
-          aspectRatio: "9:16",
-          motionPreset: "product-fidelity",
-        },
-      },
-      {
-        name: "scene mock",
-        path: "/api/ai/scene/generate",
-        expectedProvider: "mock",
-        body: {
-          sourceImageUrl: commonImageUrl,
-          prompt: "светлая студийная витрина",
-          mode: "exact-background",
-          aspectRatio: "1:1",
-          outputFormat: "png",
-        },
-      },
-      {
-        name: "prompt enhance mock",
-        path: "/api/ai/prompt/enhance",
-        expectedProvider: "mock",
-        body: {
-          context: "video",
-          userPrompt: "камера медленно приближается",
-          targetPlatform: "reels",
-          language: "ru",
-        },
-      },
-      {
-        name: "pricing dry estimate",
-        path: "/api/ai/pricing",
-        body: {
-          type: "video",
-          modelKey: "kling",
-          durationSeconds: 5,
-        },
-      },
-    ],
+const mockScenario: Scenario = {
+  name: "forced mock routes",
+  env: {
+    AI_MOCK_MODE: "1",
+    ALLOW_PAID_AI_RUNS: "false",
   },
+  expectedMode: { mockMode: true, paidAiRunsAllowed: false },
+  checks: [
+    {
+      name: "generate model mock",
+      path: "/api/ai/generate-model",
+      expectedProvider: "mock",
+      body: {
+        gender: "female",
+        bodyType: "standard",
+        modelAge: 25,
+        pose: "front",
+        crop: "full-body",
+        categoryContext: "clothing",
+        aspectRatio: "3:4",
+        resolution: "1K",
+        numImages: 1,
+      },
+    },
+    {
+      name: "try-on mock",
+      path: "/api/ai/tryon",
+      expectedProvider: "mock",
+      body: {
+        productImageUrl: commonImageUrl,
+        modelImageUrl: "https://example.com/demo-model.png",
+        category: "auto",
+        garmentPhotoType: "model",
+        mode: "quality",
+        moderationLevel: "permissive",
+        numSamples: 1,
+        outputFormat: "png",
+      },
+    },
+    {
+      name: "product shot mock",
+      path: "/api/ai/product-shot",
+      expectedProvider: "mock",
+      body: {
+        productImageUrl: commonImageUrl,
+        scenePreset: "marketplace-clean",
+        numResults: 1,
+      },
+    },
+    {
+      name: "remove background mock",
+      path: "/api/ai/remove-background",
+      expectedProvider: "mock",
+      body: {
+        imageUrl: commonImageUrl,
+      },
+    },
+    {
+      name: "video mock",
+      path: "/api/ai/video/generate",
+      expectedProvider: "mock",
+      body: {
+        sourceImageUrl: commonImageUrl,
+        prompt: "модель плавно поворачивается, товар не меняется",
+        modelKey: "kling",
+        quality: "balanced",
+        durationSeconds: 5,
+        aspectRatio: "9:16",
+        motionPreset: "product-fidelity",
+      },
+    },
+    {
+      name: "scene mock",
+      path: "/api/ai/scene/generate",
+      expectedProvider: "mock",
+      body: {
+        sourceImageUrl: commonImageUrl,
+        prompt: "светлая студийная витрина",
+        mode: "exact-background",
+        aspectRatio: "1:1",
+        outputFormat: "png",
+      },
+    },
+    {
+      name: "prompt enhance mock",
+      path: "/api/ai/prompt/enhance",
+      expectedProvider: "mock",
+      body: {
+        context: "video",
+        userPrompt: "камера медленно приближается",
+        targetPlatform: "reels",
+        language: "ru",
+      },
+    },
+    {
+      name: "pricing dry estimate",
+      path: "/api/ai/pricing",
+      body: {
+        type: "video",
+        modelKey: "kling",
+        durationSeconds: 5,
+      },
+    },
+  ],
+};
+
+const scenarios: Scenario[] = [
+  mockScenario,
   {
     name: "real mode disabled guard",
     env: {
@@ -392,8 +434,24 @@ const scenarios: Scenario[] = [
   },
 ];
 
-for (const scenario of scenarios) {
-  await runScenario(scenario);
+const existingDev = await detectRunningDevServer();
+
+if (existingDev) {
+  if (!existingDev.mockMode) {
+    console.error(
+      "Smoke остановлен: текущий сервер не в mock mode.",
+      `(${existingDev.baseUrl})`
+    );
+    process.exit(1);
+  }
+  console.log(`[smoke] Reusing mock server at ${existingDev.baseUrl}`);
+  await runChecksOnServer(existingDev.baseUrl, mockScenario, {
+    skipModeAssert: true,
+  });
+} else {
+  for (const scenario of scenarios) {
+    await runScenario(scenario);
+  }
 }
 
 console.log("[smoke] AI mock and paid guard checks passed");

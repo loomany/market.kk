@@ -28,10 +28,10 @@ export function validateProductSampleAnglesMatch(
 ): string | null {
   if (!useProductSampleAngles) return null;
   if (!productSampleAngles || productSampleAngles.length === 0) {
-    return "Нажмите «Взять ракурс с фото товара» или выберите ракурс вручную.";
+    return "Нажмите «Подобрать позу модели по фото товара» или выберите вариант фото вручную.";
   }
   if (productPhotoCount !== 1 || productSampleAngles.length !== 1) {
-    return "Заменили фото товара — снова нажмите «Взять ракурс с фото товара».";
+    return "Заменили фото товара — снова нажмите «Подобрать позу модели по фото товара».";
   }
   return null;
 }

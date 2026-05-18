@@ -318,6 +318,11 @@ export type StudioResultImage = {
   height?: number;
   label?: string;
   provider?: string;
+  model?: string;
+  requestId?: string;
+  seed?: number;
+  estimatedCost?: number;
+  promptPreview?: string;
   reviewStatus: ResultReviewStatus;
   checklist: QualityChecklistState;
   productShotFidelity?: ProductShotFidelityMode;

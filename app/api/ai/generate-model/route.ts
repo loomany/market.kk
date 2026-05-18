@@ -28,7 +28,7 @@ import {
 
 } from "@/lib/ai/falErrorMessage";
 
-import { useNeutralBaseModelGeneration } from "@/lib/ai/modelIdentityPipeline";
+import { shouldUseNeutralBaseModelGeneration } from "@/lib/ai/modelIdentityPipeline";
 import { runFalModelGeneration } from "@/lib/ai/runFalModelGeneration";
 
 import {
@@ -183,7 +183,7 @@ export async function POST(request: Request) {
 
   const useAngleEdit = Boolean(referenceImageUrl);
 
-  const neutralBaseForTryOn = useNeutralBaseModelGeneration(generationInput);
+  const neutralBaseForTryOn = shouldUseNeutralBaseModelGeneration(generationInput);
 
   const prompt = useAngleEdit
 
