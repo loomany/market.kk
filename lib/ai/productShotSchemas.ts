@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { FalModelResolution } from "@/lib/ai/modelOutputSizes";
 import { validateImageFile } from "@/lib/ai/imageConstraints";
 import {
   normalizeTryOnFormValue,
@@ -54,9 +55,64 @@ export const PRODUCT_SHOT_SIZE_OPTIONS: {
   },
 ];
 
-export function shotSizePresetToDimensions(
-  preset: ShotSizePreset
-): [number, number] {
+export const PRODUCT_SHOT_ASPECT_RATIO_OPTIONS = [
+  {
+    id: "1:1",
+    label: "1:1",
+    shortHint: "Квадрат",
+    hint: "Квадрат для маркетплейсов и превью",
+    presetId: "square" as const,
+  },
+  {
+    id: "4:5",
+    label: "4:5",
+    shortHint: "Вертикально",
+    hint: "Вертикаль для ленты и витрины",
+    presetId: "vertical_4_5" as const,
+  },
+  {
+    id: "3:4",
+    label: "3:4",
+    shortHint: "Каталог",
+    hint: "Портрет для Wildberries и Ozon",
+    presetId: "vertical_3_4" as const,
+  },
+  {
+    id: "4:3",
+    label: "4:3",
+    shortHint: "Горизонтально",
+    hint: "Горизонтальный каталог",
+    presetId: "horizontal_4_3" as const,
+  },
+  {
+    id: "9:16",
+    label: "9:16",
+    shortHint: "Stories",
+    hint: "Reels, Stories и TikTok",
+    presetId: "reels_9_16" as const,
+  },
+] as const;
+
+const PRODUCT_SHOT_QUALITY_SCALE: Record<FalModelResolution, number> = {
+  "0.5K": 0.5,
+  "1K": 1,
+  "2K": 2,
+};
+
+export function aspectRatioForShotSizePreset(preset: ShotSizePreset): string {
+  return (
+    PRODUCT_SHOT_SIZE_OPTIONS.find((item) => item.id === preset)?.ratio ?? "1:1"
+  );
+}
+
+export function shotSizePresetFromAspectRatio(
+  ratio: string
+): ShotSizePreset | undefined {
+  return PRODUCT_SHOT_ASPECT_RATIO_OPTIONS.find((item) => item.id === ratio)
+    ?.presetId;
+}
+
+function baseShotSizePresetDimensions(preset: ShotSizePreset): [number, number] {
   switch (preset) {
     case "vertical_4_5":
       return [1000, 1250];
@@ -72,10 +128,25 @@ export function shotSizePresetToDimensions(
   }
 }
 
+/** Export size for product card: aspect preset × quality tier (1K = базовый размер). */
+export function shotSizePresetToDimensions(
+  preset: ShotSizePreset,
+  quality: FalModelResolution = "1K"
+): [number, number] {
+  const [width, height] = baseShotSizePresetDimensions(preset);
+  const scale = PRODUCT_SHOT_QUALITY_SCALE[quality];
+  return [Math.round(width * scale), Math.round(height * scale)];
+}
+
 export const productShotRequestSchema = z.object({
   productImageUrl: z.string().min(1).optional(),
   scenePreset: z
-    .enum(["marketplace-clean", "white-studio", "light-gray-studio"])
+    .enum([
+      "marketplace-clean",
+      "white-studio",
+      "light-gray-studio",
+      "custom",
+    ])
     .default("marketplace-clean"),
   customSceneDescription: z.string().optional(),
   numResults: z.number().int().min(1).max(4).default(1),

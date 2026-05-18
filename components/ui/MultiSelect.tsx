@@ -9,42 +9,29 @@ import {
   useState,
   type CSSProperties,
   type KeyboardEvent,
+  type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { SelectOption } from "@/components/ui/Select";
 
-export type SelectOption<T extends string = string> = {
-  value: T;
-  label: string;
-  /** Secondary line in the menu */
-  description?: string;
-  /** Closed trigger text; defaults to label */
-  triggerLabel?: string;
-  disabled?: boolean;
-};
-
-type SelectProps<T extends string> = {
-  value?: T;
+type MultiSelectProps<T extends string> = {
+  values: T[];
   options: SelectOption<T>[];
-  onChange: (value: T) => void;
-  label?: string;
-  helper?: string;
+  onChange: (values: T[]) => void;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
-  labelClassName?: string;
   triggerClassName?: string;
   menuClassName?: string;
   size?: "sm" | "md";
-  align?: "start" | "end";
-  helperPosition?: "above" | "below";
-  /** If true, menu width matches trigger only. Default: grow to fit labels. */
   menuMatchTriggerWidth?: boolean;
-  /** Override text on closed trigger (dropdown items still use option.label). */
-  formatTriggerLabel?: (option: SelectOption<T>) => string;
-  /** Prefer opening above trigger when space below is tight. */
   menuPlacement?: "auto" | "top" | "bottom";
+  maxSelections?: number;
+  formatTriggerLabel?: (selected: SelectOption<T>[]) => string;
+  menuHeader?: ReactNode;
+  menuFooter?: ReactNode;
 };
 
 const triggerSizes = {
@@ -53,7 +40,7 @@ const triggerSizes = {
 };
 
 const MENU_GAP_PX = 6;
-const MENU_MAX_HEIGHT_PX = 240;
+const MENU_MAX_HEIGHT_PX = 280;
 
 function computeMenuStyle(
   trigger: HTMLElement,
@@ -92,25 +79,23 @@ function computeMenuStyle(
   };
 }
 
-export function Select<T extends string>({
-  value,
+export function MultiSelect<T extends string>({
+  values,
   options,
   onChange,
-  label,
-  helper,
   placeholder = "Выберите…",
   disabled,
   className,
-  labelClassName,
   triggerClassName,
   menuClassName,
   size = "md",
-  align = "start",
-  helperPosition = "above",
-  menuMatchTriggerWidth = false,
-  formatTriggerLabel,
+  menuMatchTriggerWidth = true,
   menuPlacement = "auto",
-}: SelectProps<T>) {
+  maxSelections,
+  formatTriggerLabel,
+  menuHeader,
+  menuFooter,
+}: MultiSelectProps<T>) {
   const listboxId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -122,10 +107,9 @@ export function Select<T extends string>({
     setMounted(true);
   }, []);
 
-  const selected =
-    value != null
-      ? options.find((option) => option.value === value)
-      : undefined;
+  const selectedOptions = options.filter((option) =>
+    values.includes(option.value)
+  );
 
   const close = useCallback(() => setOpen(false), []);
 
@@ -138,7 +122,7 @@ export function Select<T extends string>({
   useLayoutEffect(() => {
     if (!open) return;
     updateMenuPosition();
-  }, [open, updateMenuPosition, options.length, value]);
+  }, [open, updateMenuPosition, options.length, values.length]);
 
   useEffect(() => {
     if (!open) return;
@@ -169,9 +153,14 @@ export function Select<T extends string>({
     };
   }, [open, close, listboxId, updateMenuPosition]);
 
-  const pick = (next: T) => {
-    onChange(next);
-    close();
+  const toggle = (next: T) => {
+    const active = values.includes(next);
+    if (active) {
+      onChange(values.filter((value) => value !== next));
+      return;
+    }
+    if (maxSelections != null && values.length >= maxSelections) return;
+    onChange([...values, next]);
   };
 
   const onTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
@@ -186,14 +175,19 @@ export function Select<T extends string>({
     }
   };
 
+  const triggerLabel = formatTriggerLabel
+    ? formatTriggerLabel(selectedOptions)
+    : selectedOptions.length > 0
+      ? selectedOptions.map((item) => item.triggerLabel ?? item.label).join(", ")
+      : placeholder;
+  const isPlaceholder = triggerLabel === placeholder;
+
   const menu = open ? (
     <ul
       id={listboxId}
       role="listbox"
+      aria-multiselectable="true"
       style={menuStyle}
-      aria-activedescendant={
-        value != null ? `${listboxId}-${value}` : undefined
-      }
       className={cn(
         "overflow-auto rounded-[16px] border border-border bg-white p-1.5 shadow-xl shadow-slate-200/60",
         "[scrollbar-color:rgb(203_213_225)_transparent] [scrollbar-width:thin]",
@@ -202,8 +196,18 @@ export function Select<T extends string>({
         menuClassName
       )}
     >
+      {menuHeader ? (
+        <li role="presentation" className="mb-1 border-b border-slate-100 pb-1">
+          {menuHeader}
+        </li>
+      ) : null}
       {options.map((option) => {
-        const active = value != null && option.value === value;
+        const active = values.includes(option.value);
+        const optionDisabled =
+          option.disabled ||
+          (!active &&
+            maxSelections != null &&
+            values.length >= maxSelections);
         return (
           <li key={option.value} role="presentation">
             <button
@@ -211,14 +215,14 @@ export function Select<T extends string>({
               type="button"
               role="option"
               aria-selected={active}
-              disabled={option.disabled}
-              onClick={() => !option.disabled && pick(option.value)}
+              disabled={optionDisabled}
+              onClick={() => !optionDisabled && toggle(option.value)}
               className={cn(
                 "flex w-full items-center justify-between gap-2 rounded-[12px] px-3 py-2 text-left text-sm transition-colors",
                 active
                   ? "bg-teal-50 font-semibold text-teal-900"
                   : "font-medium text-slate-700 hover:bg-slate-50",
-                option.disabled && "cursor-not-allowed opacity-50"
+                optionDisabled && "cursor-not-allowed opacity-50"
               )}
             >
               <span className="min-w-0 flex-1">
@@ -238,25 +242,16 @@ export function Select<T extends string>({
           </li>
         );
       })}
+      {menuFooter ? (
+        <li role="presentation" className="mt-1 border-t border-slate-100 pt-1">
+          {menuFooter}
+        </li>
+      ) : null}
     </ul>
   ) : null;
 
   return (
-    <div ref={rootRef} className={cn("relative space-y-1.5", className)}>
-      {label ? (
-        <span
-          className={cn(
-            "block text-sm font-semibold text-slate-950",
-            labelClassName
-          )}
-        >
-          {label}
-        </span>
-      ) : null}
-      {helper && helperPosition === "above" ? (
-        <p className="text-xs leading-5 text-slate-500">{helper}</p>
-      ) : null}
-
+    <div ref={rootRef} className={cn("relative", className)}>
       <button
         ref={triggerRef}
         type="button"
@@ -278,14 +273,10 @@ export function Select<T extends string>({
         <span
           className={cn(
             "truncate text-left",
-            !selected && "font-normal text-slate-500"
+            isPlaceholder && "font-normal text-slate-500"
           )}
         >
-          {selected
-            ? (formatTriggerLabel?.(selected) ??
-              selected.triggerLabel ??
-              selected.label)
-            : placeholder}
+          {triggerLabel}
         </span>
         <ChevronDown
           className={cn(
@@ -297,10 +288,6 @@ export function Select<T extends string>({
       </button>
 
       {mounted && menu ? createPortal(menu, document.body) : null}
-
-      {helper && helperPosition === "below" ? (
-        <p className="text-xs leading-5 text-slate-500">{helper}</p>
-      ) : null}
     </div>
   );
 }

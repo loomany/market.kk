@@ -1,3 +1,4 @@
+import type { FalModelResolution } from "@/lib/ai/modelOutputSizes";
 import {
   shotSizePresetToDimensions,
   type ShotSizePreset,
@@ -213,9 +214,10 @@ export async function centerTransparentCutout(imageUrl: string): Promise<string>
 /** Place cutout on a transparent canvas matching the selected export size. */
 export async function fitCutoutToShotSize(
   imageUrl: string,
-  preset: ShotSizePreset
+  preset: ShotSizePreset,
+  quality: FalModelResolution = "1K"
 ): Promise<string> {
-  const [width, height] = shotSizePresetToDimensions(preset);
+  const [width, height] = shotSizePresetToDimensions(preset, quality);
   const img = await loadImage(imageUrl);
   const trimmed = prepareCutoutCanvas(img);
 

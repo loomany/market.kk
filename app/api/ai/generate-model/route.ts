@@ -57,9 +57,12 @@ export async function POST(request: Request) {
   try {
     const textFields = [
       "customDescription",
+      "modelNationality",
       "bodyTypeCustom",
       "poseCustom",
       "cropCustom",
+      "lightingCustom",
+      "cameraAnglePrompt",
     ] as const;
 
     for (const field of textFields) {

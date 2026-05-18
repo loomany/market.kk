@@ -613,17 +613,28 @@ export function ProductMaskEditor({
           )}
 
             <div className="border-t border-border/70 pt-4">
-              <Button
-                type="button"
-                variant="primary"
-                className="w-full"
-                size="lg"
-                onClick={handleApply}
-              >
-                <Check className="h-4 w-4" />
-                Сохранить выделение
-              </Button>
-              <p className="mt-2 text-center text-xs text-slate-500">
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="lg"
+                  className="w-full"
+                  onClick={handleApply}
+                >
+                  <Check className="h-4 w-4 shrink-0" />
+                  Сохранить
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  className="w-full"
+                  onClick={onCancel}
+                >
+                  Отменить
+                </Button>
+              </div>
+              <p className="mt-2 text-center text-xs leading-5 text-slate-500">
                 Вне выделения фон уберётся при создании карточки
               </p>
             </div>

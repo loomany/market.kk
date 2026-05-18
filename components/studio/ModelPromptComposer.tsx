@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, ChevronDown, ChevronUp, Plus, Sparkles } from "lucide-react";
+import { Check, ChevronUp, Plus, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buildModelCombinedPromptRu } from "@/lib/ai/modelSettingsSummary";
 import { Button } from "@/components/ui/Button";
@@ -26,7 +26,7 @@ export function ModelPromptComposer({
   disabled = false,
 }: ModelPromptComposerProps) {
   const hasSavedDescription = Boolean(description.trim());
-  const [additionOpen, setAdditionOpen] = useState(hasSavedDescription);
+  const [additionOpen, setAdditionOpen] = useState(false);
   const [draft, setDraft] = useState(description);
   const [lastConfirmed, setLastConfirmed] = useState<string | null>(
     hasSavedDescription ? description.trim() : null
@@ -35,9 +35,6 @@ export function ModelPromptComposer({
   useEffect(() => {
     setDraft(description);
     setLastConfirmed(description.trim() ? description.trim() : null);
-    if (description.trim()) {
-      setAdditionOpen(true);
-    }
   }, [description]);
 
   const trimmedDraft = draft.trim();
@@ -69,6 +66,7 @@ export function ModelPromptComposer({
     if (!canConfirm) return;
     onDescriptionChange(trimmedDraft);
     setLastConfirmed(trimmedDraft);
+    setAdditionOpen(false);
   };
 
   const handleEnhance = async () => {
@@ -255,15 +253,30 @@ export function ModelPromptComposer({
       )}
 
       {hasSavedDescription && !additionOpen ? (
-        <button
-          type="button"
-          className="flex w-full items-center justify-center gap-1 text-xs font-medium text-teal-700 transition hover:text-teal-900"
-          disabled={disabled || enhancing}
-          onClick={() => setAdditionOpen(true)}
-        >
-          <ChevronDown className="h-3.5 w-3.5" aria-hidden />
-          Изменить дополнение
-        </button>
+        <div className="rounded-[12px] border border-emerald-200/80 bg-white px-3 py-2.5 shadow-sm">
+          <div className="flex items-start gap-2.5">
+            <Check
+              className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"
+              aria-hidden
+            />
+            <div className="min-w-0 flex-1 space-y-1">
+              <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Ваше дополнение
+              </span>
+              <p className="line-clamp-3 text-sm leading-6 text-slate-700">
+                {description.trim()}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="shrink-0 text-xs font-semibold text-teal-700 transition hover:text-teal-900"
+              disabled={disabled || enhancing}
+              onClick={() => setAdditionOpen(true)}
+            >
+              Изменить
+            </button>
+          </div>
+        </div>
       ) : null}
     </div>
   );

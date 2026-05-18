@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { Check, CheckCircle2, UserRound } from "lucide-react";
+import { Check, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
@@ -26,7 +26,12 @@ import {
   MODEL_PARAM_CUSTOM,
 } from "@/lib/ai/modelCustomParams";
 import { buildModelBaseSettingsSummaryRu } from "@/lib/ai/modelSettingsSummary";
+import { ModelAnglesField } from "@/components/studio/ModelAnglesField";
 import { ModelPromptComposer } from "@/components/studio/ModelPromptComposer";
+import {
+  ModelReadyCard,
+  downloadModelImage,
+} from "@/components/studio/ModelReadyCard";
 import {
   MODEL_BODY_TYPES,
   type ModelBackground,
@@ -35,7 +40,7 @@ import {
   type ModelCrop,
   type ModelGender,
   type ModelGenerationSettings,
-  type ModelPose,
+  type ModelLighting,
 } from "./types";
 
 type ModelPresetSelectorProps = {
@@ -49,6 +54,9 @@ type ModelPresetSelectorProps = {
   generating?: boolean;
   generateError?: string | null;
   generatedPreviewUrl?: string | null;
+  isModelSaved?: boolean;
+  onSaveModel?: () => void;
+  onStartOverModel?: () => void;
   outputSize: Partial<ModelOutputSizeSelection>;
   onOutputSizeChange: (patch: Partial<ModelOutputSizeSelection>) => void;
 };
@@ -123,11 +131,19 @@ function CustomParamInput({
   onChange,
   placeholder,
   disabled,
+  emptyHint = "Опишите своими словами, затем подтвердите галочкой",
+  pendingHint = "Нажмите галочку или Enter, чтобы применить",
+  savedHint = "Сохранено — учтём при генерации",
+  confirmAriaLabel = "Сохранить описание",
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
   disabled?: boolean;
+  emptyHint?: string;
+  pendingHint?: string;
+  savedHint?: string;
+  confirmAriaLabel?: string;
 }) {
   const [lastConfirmed, setLastConfirmed] = useState<string | null>(null);
   const trimmed = value.trim();
@@ -167,9 +183,7 @@ function CustomParamInput({
         <button
           type="button"
           disabled={!canConfirm}
-          aria-label={
-            isConfirmed ? "Описание сохранено" : "Сохранить описание"
-          }
+          aria-label={isConfirmed ? "Сохранено" : confirmAriaLabel}
           aria-pressed={isConfirmed}
           onClick={handleConfirm}
           className={cn(
@@ -187,16 +201,12 @@ function CustomParamInput({
       {isConfirmed ? (
         <p className="flex items-center gap-1.5 px-0.5 text-xs font-medium text-emerald-700">
           <Check className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          Сохранено — учтём при генерации
+          {savedHint}
         </p>
       ) : canConfirm ? (
-        <p className="px-0.5 text-xs text-slate-500">
-          Нажмите галочку или Enter, чтобы применить
-        </p>
+        <p className="px-0.5 text-xs text-slate-500">{pendingHint}</p>
       ) : (
-        <p className="px-0.5 text-xs text-slate-500">
-          Опишите своими словами, затем подтвердите галочкой
-        </p>
+        <p className="px-0.5 text-xs text-slate-500">{emptyHint}</p>
       )}
     </div>
   );
@@ -271,24 +281,6 @@ const GENDER_OPTIONS: {
   },
 ];
 
-const POSE_OPTIONS: { id: ModelPose; label: string; hint: string }[] = [
-  {
-    id: MODEL_PARAM_CUSTOM,
-    label: MODEL_CUSTOM_SELECT_OPTION.label,
-    hint: MODEL_CUSTOM_SELECT_OPTION.hint,
-  },
-  {
-    id: "front",
-    label: "Прямо к камере",
-    hint: "Классическая каталожная поза, одежду видно целиком",
-  },
-  {
-    id: "slight-angle",
-    label: "Лёгкий поворот",
-    hint: "Чуть в сторону — объём фигуры и посадка рукавов",
-  },
-];
-
 const CROP_OPTIONS: { id: ModelCrop; label: string; hint: string }[] = [
   {
     id: MODEL_PARAM_CUSTOM,
@@ -326,6 +318,24 @@ const BACKGROUND_OPTIONS: {
     id: "studio",
     label: "Студийный",
     hint: "Лёгкая глубина и тени, чуть «дороже» каталог",
+  },
+];
+
+const LIGHTING_OPTIONS: { id: ModelLighting; label: string; hint: string }[] = [
+  {
+    id: MODEL_PARAM_CUSTOM,
+    label: MODEL_CUSTOM_SELECT_OPTION.label,
+    hint: MODEL_CUSTOM_SELECT_OPTION.hint,
+  },
+  {
+    id: "studio",
+    label: "Студийное",
+    hint: "Ровный свет софтбоксов — стандарт каталога маркетплейсов",
+  },
+  {
+    id: "sunny-outdoor",
+    label: "Солнечное уличное",
+    hint: "Яркий дневной свет на улице, живые тени",
   },
 ];
 
@@ -374,6 +384,9 @@ export function ModelPresetSelector({
   generating,
   generateError,
   generatedPreviewUrl,
+  isModelSaved = false,
+  onSaveModel,
+  onStartOverModel,
   outputSize,
   onOutputSizeChange,
 }: ModelPresetSelectorProps) {
@@ -390,17 +403,17 @@ export function ModelPresetSelector({
       : (MODEL_BODY_TYPES.find((item) => item.id === settings.bodyType)?.hint ??
         "Влияет на силуэт в генерации");
 
-  const poseDescription =
-    settings.pose === MODEL_PARAM_CUSTOM
-      ? settings.poseCustom.trim() || MODEL_CUSTOM_SELECT_OPTION.hint
-      : hintForOption(POSE_OPTIONS, settings.pose);
-
   const cropDescription =
     settings.crop === MODEL_PARAM_CUSTOM
       ? settings.cropCustom.trim() || MODEL_CUSTOM_SELECT_OPTION.hint
       : isLingerieScenario
         ? "Для белья — полный рост или по пояс с видимыми бёдрами."
         : hintForOption(CROP_OPTIONS, settings.crop);
+
+  const lightingDescription =
+    settings.lighting === MODEL_PARAM_CUSTOM
+      ? settings.lightingCustom.trim() || MODEL_CUSTOM_SELECT_OPTION.hint
+      : hintForOption(LIGHTING_OPTIONS, settings.lighting);
 
   const ageDescription = isMinor
     ? "До 18 лет недоступны сценарий «Бельё / купальники» и тип «Бикини / купальники»."
@@ -446,6 +459,31 @@ export function ModelPresetSelector({
             options={GENDER_OPTIONS}
             onChange={(gender) => patch({ gender })}
           />
+          <SettingField
+            label="Национальность модели"
+            description="Необязательно. Укажите, если важно для витрины и аудитории."
+          >
+            <CustomParamInput
+              value={settings.modelNationality}
+              disabled={isPromptLocked}
+              placeholder="Например: казахская, славянская"
+              emptyHint="Введите национальность и подтвердите галочкой"
+              confirmAriaLabel="Сохранить национальность"
+              onChange={(modelNationality) => patch({ modelNationality })}
+            />
+          </SettingField>
+          <SettingField
+            label="Ракурсы"
+            description="Сколько ракурсов выберете — столько готовых фото на модели получите после примерки."
+          >
+            <ModelAnglesField
+              anglePresets={settings.anglePresets}
+              customAngles={settings.customAngles}
+              disabled={isPromptLocked}
+              onPresetsChange={(anglePresets) => patch({ anglePresets })}
+              onCustomAnglesChange={(customAngles) => patch({ customAngles })}
+            />
+          </SettingField>
           <SelectWithCustomField
             label="Тип фигуры"
             description={bodyTypeDescription}
@@ -465,25 +503,6 @@ export function ModelPresetSelector({
             disabled={isPromptLocked}
             onChange={(bodyType) => patch({ bodyType })}
             onCustomTextChange={(bodyTypeCustom) => patch({ bodyTypeCustom })}
-          />
-          <SelectWithCustomField
-            label="Поза"
-            description={poseDescription}
-            placeholder="Выберите позу"
-            value={settings.pose}
-            customText={settings.poseCustom}
-            options={POSE_OPTIONS.map((item) => ({
-              id: item.id,
-              label: item.label,
-              shortHint:
-                item.id === MODEL_PARAM_CUSTOM
-                  ? MODEL_CUSTOM_SELECT_OPTION.shortHint
-                  : undefined,
-            }))}
-            customPlaceholder="Например: сидит на стуле, смотрит в камеру"
-            disabled={isPromptLocked}
-            onChange={(pose) => patch({ pose })}
-            onCustomTextChange={(poseCustom) => patch({ poseCustom })}
           />
           <SelectField
             label="Фон"
@@ -527,6 +546,25 @@ export function ModelPresetSelector({
               className="min-h-[42px] w-full rounded-[12px] border border-border bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-sm outline-none transition hover:border-slate-300 focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
             />
           </SettingField>
+          <SelectWithCustomField
+            label="Освещение"
+            description={lightingDescription}
+            placeholder="Выберите освещение"
+            value={settings.lighting}
+            customText={settings.lightingCustom}
+            options={LIGHTING_OPTIONS.map((item) => ({
+              id: item.id,
+              label: item.label,
+              shortHint:
+                item.id === MODEL_PARAM_CUSTOM
+                  ? MODEL_CUSTOM_SELECT_OPTION.shortHint
+                  : undefined,
+            }))}
+            customPlaceholder="Например: контровой свет, мягкая вспышка"
+            disabled={isPromptLocked}
+            onChange={(lighting) => patch({ lighting })}
+            onCustomTextChange={(lightingCustom) => patch({ lightingCustom })}
+          />
           <SelectField
             label="Сценарий"
             description={hintForOption(
@@ -612,20 +650,15 @@ export function ModelPresetSelector({
       ) : null}
 
       {generatedPreviewUrl && !generating ? (
-        <div className="space-y-2 rounded-[12px] bg-emerald-50/50 p-3">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800">
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-            AI-модель готова — можно запускать примерку
-          </p>
-          <div className="overflow-hidden rounded-[12px] bg-white shadow-sm">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={generatedPreviewUrl}
-              alt="Готовая AI-модель"
-              className="max-h-[460px] min-h-[200px] w-full object-contain"
-            />
-          </div>
-        </div>
+        <ModelReadyCard
+          imageUrl={generatedPreviewUrl}
+          isSaved={isModelSaved}
+          onSave={() => onSaveModel?.()}
+          onDownload={() =>
+            downloadModelImage(generatedPreviewUrl, "vitrina-ai-model.png")
+          }
+          onStartOver={() => onStartOverModel?.()}
+        />
       ) : null}
     </section>
   );

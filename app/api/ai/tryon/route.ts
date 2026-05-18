@@ -18,6 +18,8 @@ import {
 } from "@/lib/ai/paidAiGuard";
 
 export const runtime = "nodejs";
+/** Fal try-on can take 30–90s; avoid default route timeout in production. */
+export const maxDuration = 120;
 
 const ROUTE_ID = "/api/ai/tryon";
 

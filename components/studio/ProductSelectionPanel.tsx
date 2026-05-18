@@ -2,6 +2,7 @@
 
 import {
   CheckCircle2,
+  ImageIcon,
   MousePointerClick,
   PencilLine,
   RotateCcw,
@@ -36,7 +37,25 @@ export function ProductSelectionPanel({
   onCancelEditor,
   onClearSelection,
 }: ProductSelectionPanelProps) {
-  if (!active || !previewUrl) return null;
+  if (!active || !previewUrl) {
+    return (
+      <div className="rounded-[16px] border border-dashed border-slate-200 bg-slate-50/90 px-4 py-8 text-center">
+        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-[14px] bg-white text-slate-400 shadow-sm ring-1 ring-slate-200/80">
+          <ImageIcon className="h-6 w-6" aria-hidden />
+        </span>
+        <p className="mt-4 text-sm font-semibold text-slate-950">
+          Сначала загрузите фото товара
+        </p>
+        <p className="mx-auto mt-2 max-w-sm text-xs leading-6 text-slate-500">
+          На шаге 1 добавьте изображение. Здесь вы закрасите кистью только
+          товар — ветки, руки и лишний декор не попадут в карточку.
+        </p>
+        <p className="mt-4 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+          Шаг необязательный · можно пропустить
+        </p>
+      </div>
+    );
+  }
 
   if (maskEditorOpen) {
     return (

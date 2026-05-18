@@ -15,10 +15,12 @@ import {
   MODEL_CUSTOM_TEXT_MAX,
   MODEL_PARAM_CUSTOM,
 } from "@/lib/ai/modelCustomParams";
+import { MODEL_LIGHTING_PRESET_IDS } from "@/lib/ai/modelLighting";
 
 export const generateModelRequestSchema = z
   .object({
   gender: z.enum(["female", "male"]).default("female"),
+  modelNationality: z.string().trim().max(MODEL_CUSTOM_TEXT_MAX).optional(),
   bodyType: z.enum(MODEL_BODY_TYPE_IDS).default("standard"),
   modelAge: z
     .number()
@@ -36,6 +38,10 @@ export const generateModelRequestSchema = z
   cropCustom: z.string().trim().max(MODEL_CUSTOM_TEXT_MAX).optional(),
   bodyTypeCustom: z.string().trim().max(MODEL_CUSTOM_TEXT_MAX).optional(),
   background: z.enum(["white", "light-gray", "studio"]).default("white"),
+  lighting: z
+    .enum([...MODEL_LIGHTING_PRESET_IDS, MODEL_PARAM_CUSTOM])
+    .default("studio"),
+  lightingCustom: z.string().trim().max(MODEL_CUSTOM_TEXT_MAX).optional(),
   categoryContext: z
     .enum(["general", "clothing", "lingerie", "jewelry"])
     .default("clothing"),
@@ -45,6 +51,8 @@ export const generateModelRequestSchema = z
   numImages: z.number().int().min(1).max(4).default(1),
   seed: z.number().int().optional(),
   customDescription: z.string().trim().max(1000).optional(),
+  /** Per-angle camera framing (English or translated on server) */
+  cameraAnglePrompt: z.string().trim().max(MODEL_CUSTOM_TEXT_MAX).optional(),
   /** Locale of customDescription in the UI; server translates to English for Fal */
   promptLocale: promptLocaleSchema.optional(),
 })
@@ -68,6 +76,13 @@ export const generateModelRequestSchema = z
         code: z.ZodIssueCode.custom,
         message: "cropCustom is required when crop is custom",
         path: ["cropCustom"],
+      });
+    }
+    if (data.lighting === MODEL_PARAM_CUSTOM && !data.lightingCustom?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "lightingCustom is required when lighting is custom",
+        path: ["lightingCustom"],
       });
     }
     if (isAdultModelAge(data.modelAge)) return;

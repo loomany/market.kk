@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
 
@@ -12,32 +13,64 @@ type PreviewCardProps = {
   url: string | null;
   empty: string;
   badge?: string;
+  footer?: ReactNode;
+  /** Overrides url / empty when set (e.g. result with error fallback) */
+  content?: ReactNode;
 };
 
-export function PreviewCard({ title, url, empty, badge }: PreviewCardProps) {
+export function PreviewCard({
+  title,
+  url,
+  empty,
+  badge,
+  footer,
+  content,
+}: PreviewCardProps) {
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-[20px] border border-slate-200/90 bg-white shadow-sm"
+        "flex h-full min-h-0 flex-col overflow-hidden rounded-[20px] border border-slate-200/90 bg-white shadow-sm"
       )}
     >
-      <div className={cn(studioColumnHeaderClass, "justify-between")}>
+      <div className={cn(studioColumnHeaderClass, "shrink-0 justify-between")}>
         <p className={studioColumnTitleClass}>{title}</p>
         {badge ? <Badge variant="violet">{badge}</Badge> : null}
       </div>
-      <div className="border-t border-border bg-slate-50">
-        {url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={url}
-            alt={`Предпросмотр: ${title}`}
-            className="max-h-[460px] min-h-[220px] w-full object-contain"
-          />
+      <div className="flex min-h-[260px] flex-1 flex-col border-t border-border bg-slate-50">
+        {content ? (
+          content
+        ) : url ? (
+          <div className="flex flex-1 items-center justify-center p-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={url}
+              alt={`Предпросмотр: ${title}`}
+              className="max-h-[460px] w-full object-contain"
+            />
+          </div>
         ) : (
-          <div className="flex min-h-[260px] items-center justify-center p-4 text-center text-sm leading-6 text-slate-500">
+          <div className="flex flex-1 items-center justify-center p-4 text-center text-sm leading-6 text-slate-500">
             {empty}
           </div>
         )}
+      </div>
+      {footer ? (
+        <div className="shrink-0 border-t border-border/70 bg-white p-3">
+          {footer}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function ResultCompareSkeleton({ title = "Результат" }: { title?: string }) {
+  return (
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[20px] border border-slate-200/90 bg-white shadow-sm">
+      <div className={cn(studioColumnHeaderClass, "shrink-0")}>
+        <p className={studioColumnTitleClass}>{title}</p>
+      </div>
+      <div className="flex min-h-[260px] flex-1 flex-col border-t border-border bg-slate-50 p-4">
+        <div className="aspect-[3/4] w-full animate-pulse rounded-[18px] bg-slate-200" />
       </div>
     </div>
   );

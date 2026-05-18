@@ -25,6 +25,12 @@ export function validateImageFileClient(file: File): string | null {
   return null;
 }
 
+/** URL that Fal and the try-on API can fetch (not blob: or data:). */
+export function isRemoteImageUrl(url: string | null | undefined): url is string {
+  if (!url?.trim()) return false;
+  return /^https?:\/\//i.test(url.trim());
+}
+
 export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;

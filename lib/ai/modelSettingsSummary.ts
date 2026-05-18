@@ -1,5 +1,6 @@
 import { MODEL_BODY_TYPES, type ModelGenerationSettings } from "@/components/studio/types";
 import { isAdultModelAge } from "@/lib/ai/modelAge";
+import { modelAnglesSummaryRu } from "@/lib/ai/modelAngles";
 import { MODEL_PARAM_CUSTOM } from "@/lib/ai/modelCustomParams";
 import {
   formatModelOutputSizeLabel,
@@ -18,16 +19,18 @@ const BACKGROUND_LABELS: Record<ModelGenerationSettings["background"], string> =
   studio: "студийный фон",
 };
 
-const POSE_LABELS: Record<ModelGenerationSettings["pose"], string> = {
-  front: "прямо к камере",
-  "slight-angle": "лёгкий поворот",
-  [MODEL_PARAM_CUSTOM]: "свой вариант",
-};
-
 const CROP_LABELS: Record<ModelGenerationSettings["crop"], string> = {
   "full-body": "в полный рост",
   "upper-body": "по пояс",
   [MODEL_PARAM_CUSTOM]: "свой вариант",
+};
+
+const LIGHTING_LABELS: Record<
+  Exclude<ModelGenerationSettings["lighting"], typeof MODEL_PARAM_CUSTOM>,
+  string
+> = {
+  studio: "студийное",
+  "sunny-outdoor": "солнечное уличное",
 };
 
 const CONTEXT_LABELS: Record<
@@ -48,18 +51,18 @@ function bodyTypeSummary(settings: ModelGenerationSettings): string {
   return item?.label.toLowerCase() ?? settings.bodyType;
 }
 
-function poseSummary(settings: ModelGenerationSettings): string {
-  if (settings.pose === MODEL_PARAM_CUSTOM && settings.poseCustom.trim()) {
-    return settings.poseCustom.trim();
-  }
-  return POSE_LABELS[settings.pose];
-}
-
 function cropSummary(settings: ModelGenerationSettings): string {
   if (settings.crop === MODEL_PARAM_CUSTOM && settings.cropCustom.trim()) {
     return settings.cropCustom.trim();
   }
   return CROP_LABELS[settings.crop];
+}
+
+function lightingSummary(settings: ModelGenerationSettings): string {
+  if (settings.lighting === MODEL_PARAM_CUSTOM) {
+    return settings.lightingCustom.trim() || "свой вариант (уточните)";
+  }
+  return LIGHTING_LABELS[settings.lighting];
 }
 
 function ageSummary(age: number): string {
@@ -79,9 +82,13 @@ export function buildModelBaseSettingsSummaryRu(
 ): string {
   const parts = [
     GENDER_LABELS[settings.gender],
+    ...(settings.modelNationality.trim()
+      ? [`национальность: ${settings.modelNationality.trim()}`]
+      : []),
+    `ракурсы: ${modelAnglesSummaryRu(settings)}`,
     ageSummary(settings.modelAge),
+    `освещение: ${lightingSummary(settings)}`,
     `тип фигуры: ${bodyTypeSummary(settings)}`,
-    `поза: ${poseSummary(settings)}`,
     BACKGROUND_LABELS[settings.background],
     `кадр: ${cropSummary(settings)}`,
     `сценарий: ${CONTEXT_LABELS[settings.categoryContext]}`,

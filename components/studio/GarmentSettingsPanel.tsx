@@ -4,7 +4,7 @@ import { Select } from "@/components/ui/Select";
 import {
   GARMENT_PHOTO_TYPES,
   PRODUCT_CATEGORIES,
-  QUALITY_MODES,
+  TRY_ON_QUALITY_OPTIONS,
   type GarmentPhotoType,
   type ProductCategory,
   type QualityMode,
@@ -21,8 +21,12 @@ type GarmentSettingsPanelProps = {
 };
 
 export function GarmentSettingsPanel(props: GarmentSettingsPanelProps) {
+  const qualityDescription =
+    TRY_ON_QUALITY_OPTIONS.find((item) => item.id === props.qualityMode)?.hint ??
+    "Баланс качества и скорости";
+
   return (
-    <div className="space-y-4 rounded-[22px] border border-border bg-white p-4 shadow-sm">
+    <div className="space-y-4">
       <div>
         <h3 className="text-sm font-semibold text-slate-950">
           Настройки одежды
@@ -35,9 +39,8 @@ export function GarmentSettingsPanel(props: GarmentSettingsPanelProps) {
 
       {props.lingerieMode && (
         <div className="rounded-[16px] border border-teal-100 bg-teal-50 px-3 py-2 text-xs leading-5 text-teal-950">
-          Для белья на человеке используется тип исходного фото “Одежда на
-          человеке”, режим “Максимальное качество” и разрешение для
-          коммерческого белья/купальников.
+          Для белья на человеке по умолчанию «Авто» и «1K»; при слабом
+          результате попробуйте «Одежда на человеке» и «2K».
         </div>
       )}
 
@@ -71,11 +74,13 @@ export function GarmentSettingsPanel(props: GarmentSettingsPanelProps) {
       />
       <Select
         label="Качество"
-        helper="Максимальное качество может ждать дольше."
+        helper={qualityDescription}
         value={props.qualityMode}
-        options={QUALITY_MODES.filter((mode) => mode.id !== "performance").map(
-          (opt) => ({ value: opt.id, label: opt.label })
-        )}
+        options={TRY_ON_QUALITY_OPTIONS.map((opt) => ({
+          value: opt.id,
+          label: `${opt.label} — ${opt.shortHint}`,
+          triggerLabel: opt.label,
+        }))}
         onChange={props.onQualityModeChange}
       />
     </div>

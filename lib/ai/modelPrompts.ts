@@ -1,5 +1,6 @@
 import type { GenerateModelRequest } from "@/lib/ai/modelGenerationSchemas";
 import { bodyTypePromptPhrase } from "@/lib/ai/modelBodyTypes";
+import { lightingPromptPhrase } from "@/lib/ai/modelLighting";
 import { isAdultModelAge, modelAgePromptPhrase } from "@/lib/ai/modelAge";
 import { MODEL_PARAM_CUSTOM } from "@/lib/ai/modelCustomParams";
 
@@ -29,6 +30,11 @@ function backgroundLabel(
   return background;
 }
 
+function nationalityClause(input: GenerateModelRequest): string {
+  const value = input.modelNationality?.trim();
+  return value ? `, ${value} appearance` : "";
+}
+
 function safetyNegatives(modelAge: number): string {
   if (isAdultModelAge(modelAge)) {
     return "Do not generate: child, teen, explicit nudity, sexualized pose, watermark, text, logo, distorted hands, extra limbs, bad anatomy, blurry image.";
@@ -45,16 +51,19 @@ export function buildModelGenerationPrompt(
   const bodyType = bodyTypePromptPhrase(input.bodyType, input.bodyTypeCustom);
   const ageLabel = modelAgePromptPhrase(input.modelAge);
   const adult = isAdultModelAge(input.modelAge);
-  const pose = posePhrase(input);
+  const pose = input.cameraAnglePrompt?.trim()
+    ? `${input.cameraAnglePrompt.trim()}, catalog pose`
+    : posePhrase(input);
   const crop = cropPhrase(input);
+  const lighting = lightingPromptPhrase(input.lighting, input.lightingCustom);
 
   const parts =
     input.categoryContext === "lingerie"
       ? [
-          `Realistic full-body studio photo of an adult ${input.gender} fashion model for commercial lingerie catalog try-on, ${bodyType}, ${crop}, ${pose} pose, front-facing or slight natural turn, relaxed arms slightly away from torso, visible torso and hips, clean ${backgroundLabel(input.background)} studio background, natural proportions, no sunglasses, no heavy jewelry, no props, no text, no watermark, no logo, non-explicit, not sexualized, suitable for virtual try-on.`,
+          `Realistic full-body studio photo of an adult ${input.gender} fashion model${nationalityClause(input)} for commercial lingerie catalog try-on, ${bodyType}, ${crop}, ${pose} pose, ${lighting}, front-facing or slight natural turn, relaxed arms slightly away from torso, visible torso and hips, clean ${backgroundLabel(input.background)} studio background, natural proportions, no sunglasses, no heavy jewelry, no props, no text, no watermark, no logo, non-explicit, not sexualized, suitable for virtual try-on.`,
         ]
       : [
-          `Realistic professional e-commerce studio photo of a ${ageLabel} ${input.gender} fashion model, ${bodyType}, ${crop}, ${pose} pose, neutral expression, relaxed arms, clean ${backgroundLabel(input.background)} background, marketplace catalog photography, natural skin texture, realistic proportions, high detail, no text, no watermark, no logo.`,
+          `Realistic professional e-commerce studio photo of a ${ageLabel} ${input.gender} fashion model${nationalityClause(input)}, ${bodyType}, ${crop}, ${pose} pose, ${lighting}, neutral expression, relaxed arms, clean ${backgroundLabel(input.background)} background, marketplace catalog photography, natural skin texture, realistic proportions, high detail, no text, no watermark, no logo.`,
         ];
 
   if (input.categoryContext === "lingerie") {
@@ -83,9 +92,15 @@ export function buildModelGenerationPrompt(
     );
   }
 
-  parts.push(
-    "Model should face the camera clearly, body posture suitable for virtual clothing try-on, hands not covering torso, no oversized clothing, no complex props, no sunglasses."
-  );
+  if (input.cameraAnglePrompt?.trim()) {
+    parts.push(
+      "Follow this exact camera angle, body orientation, and framing. Do not change to a different viewpoint."
+    );
+  } else {
+    parts.push(
+      "Model should face the camera clearly, body posture suitable for virtual clothing try-on, hands not covering torso, no oversized clothing, no complex props, no sunglasses."
+    );
+  }
 
   parts.push(safetyNegatives(input.modelAge));
 

@@ -1,14 +1,16 @@
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/Badge";
-import { Card, CardContent } from "@/components/ui/Card";
 import { cn } from "@/lib/utils";
+import {
+  studioColumnHeaderClass,
+  studioColumnTitleClass,
+} from "./PreviewCard";
 
 type StudioPanelCardProps = {
   title: string;
   badge?: string;
   children: ReactNode;
   className?: string;
-  frameClassName?: string;
 };
 
 export function StudioPanelCard({
@@ -16,24 +18,21 @@ export function StudioPanelCard({
   badge,
   children,
   className,
-  frameClassName,
 }: StudioPanelCardProps) {
   return (
-    <Card className={cn("shadow-lg", className)}>
-      <CardContent className="p-4">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <p className="text-sm font-semibold text-slate-950">{title}</p>
-          {badge ? <Badge variant="violet">{badge}</Badge> : null}
-        </div>
-        <div
-          className={cn(
-            "overflow-hidden rounded-[18px] border border-border bg-slate-50",
-            frameClassName
-          )}
-        >
-          {children}
-        </div>
-      </CardContent>
-    </Card>
+    <div
+      className={cn(
+        "flex flex-col overflow-hidden rounded-[20px] border border-slate-200/90 bg-white shadow-sm",
+        className
+      )}
+    >
+      <div className={cn(studioColumnHeaderClass, "shrink-0 justify-between")}>
+        <p className={studioColumnTitleClass}>{title}</p>
+        {badge ? <Badge variant="violet">{badge}</Badge> : null}
+      </div>
+      <div className="flex min-h-[260px] flex-1 flex-col border-t border-border bg-slate-50">
+        {children}
+      </div>
+    </div>
   );
 }

@@ -5,24 +5,46 @@ import {
   Download,
   ExternalLink,
   ImageOff,
-  RefreshCw,
   RotateCcw,
 } from "lucide-react";
 import type { StudioResultImage } from "./types";
+import {
+  PreviewCard,
+  ResultCompareSkeleton,
+} from "./PreviewCard";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 
 type GenerationResultGridProps = {
   results: StudioResultImage[];
   loading?: boolean;
-  showRegenerate?: boolean;
-  regenerateLoading?: boolean;
+  loadingDetail?: string | null;
   isProductShotMode?: boolean;
-  /** Inside StudioPanelCard — no extra outer frame */
+  /** Side-by-side compare cards in studio (no extra outer frame) */
   embedded?: boolean;
+  productPreviewUrl?: string | null;
   onStartOver: () => void;
-  onRegenerate?: () => void;
 };
+
+function ResultCompareGrid({ children }: { children: ReactNode }) {
+  return (
+    <div className="grid items-stretch gap-4 sm:grid-cols-2">{children}</div>
+  );
+}
+
+function ProductCompareColumn({
+  productPreviewUrl,
+}: {
+  productPreviewUrl: string | null | undefined;
+}) {
+  return (
+    <PreviewCard
+      title="Товар"
+      url={productPreviewUrl ?? null}
+      empty="Загрузите фото товара"
+    />
+  );
+}
 
 const checkerboardStyle = {
   backgroundImage:
@@ -194,15 +216,38 @@ function ResultImage({
   );
 }
 
+function ResultAlerts({
+  result,
+}: {
+  result: StudioResultImage;
+}) {
+  return (
+    <>
+      {result.provider === "mock" && (
+        <div className="rounded-[18px] border border-violet-100 bg-violet-50 px-4 py-3 text-xs leading-5 text-violet-800">
+          Показан тестовый пример. Для финального результата запустите генерацию
+          в студии.
+        </div>
+      )}
+      {result.exactCardWithoutMask &&
+        result.productShotFidelity === "exact-card" && (
+          <div className="rounded-[18px] border border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900">
+            Карточка создана без ручного выделения. Проверьте, не попали ли
+            лишние предметы.
+          </div>
+        )}
+    </>
+  );
+}
+
 export function GenerationResultGrid({
   results,
   loading,
-  showRegenerate = true,
-  regenerateLoading,
+  loadingDetail,
   isProductShotMode = false,
   embedded = false,
+  productPreviewUrl = null,
   onStartOver,
-  onRegenerate,
 }: GenerationResultGridProps) {
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
 
@@ -210,40 +255,59 @@ export function GenerationResultGrid({
     setFailedImages((prev) => ({ ...prev, [imageKey]: true }));
   };
 
+  const loadingBanner = (
+    <div className="mb-4 rounded-[22px] border border-teal-100 bg-teal-50/70 px-4 py-3 text-sm leading-6 text-teal-950">
+      {loadingDetail ? (
+        <p className="font-medium text-teal-950">{loadingDetail}</p>
+      ) : null}
+      <p className={loadingDetail ? "mt-1" : undefined}>
+        Создаём изображение. Обычно это занимает от нескольких секунд до минуты —
+        не закрывайте страницу, пока идёт обработка.
+      </p>
+    </div>
+  );
+
   if (loading) {
+    if (embedded) {
+      return (
+        <div>
+          {loadingBanner}
+          <ResultCompareGrid>
+            <ProductCompareColumn productPreviewUrl={productPreviewUrl} />
+            <ResultCompareSkeleton />
+          </ResultCompareGrid>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-4">
-        <div className="rounded-[22px] border border-teal-100 bg-teal-50/70 px-4 py-3 text-sm leading-6 text-teal-950">
-          Создаём изображение. Обычно это занимает от нескольких секунд до
-          минуты — не закрывайте страницу, пока идёт обработка.
-        </div>
+        {loadingBanner}
         <div className="grid grid-cols-1 gap-4">
-          {Array.from({ length: 1 }).map((_, index) => (
-            <div
-              key={index}
-              className="aspect-[3/4] animate-pulse rounded-[24px] bg-slate-200"
-            />
-          ))}
+          <div className="aspect-[3/4] animate-pulse rounded-[24px] bg-slate-200" />
         </div>
       </div>
     );
   }
 
   if (results.length === 0) {
+    if (embedded) {
+      return (
+        <ResultCompareGrid>
+          <ProductCompareColumn productPreviewUrl={productPreviewUrl} />
+          <PreviewCard
+            title="Результат"
+            url={null}
+            empty="Здесь появится результат после генерации"
+          />
+        </ResultCompareGrid>
+      );
+    }
+
     return (
-      <div
-        className={cn(
-          "flex items-center justify-center text-center",
-          embedded ? "min-h-[260px] p-2" : "min-h-[320px] rounded-[24px] border border-border bg-slate-50 p-6"
-        )}
-      >
+      <div className="flex min-h-[320px] items-center justify-center rounded-[24px] border border-border bg-slate-50 p-6 text-center">
         <div className="max-w-sm">
-          <p
-            className={cn(
-              "font-semibold text-slate-950",
-              embedded ? "text-sm" : "text-base"
-            )}
-          >
+          <p className="text-base font-semibold text-slate-950">
             Здесь появятся готовые варианты
           </p>
           <p className="mt-2 text-sm leading-6 text-slate-500">
@@ -254,156 +318,247 @@ export function GenerationResultGrid({
     );
   }
 
-  return (
-    <div className="space-y-4">
-      {showRegenerate && onRegenerate && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full sm:w-auto"
-          loading={regenerateLoading}
-          onClick={onRegenerate}
-        >
-          <RefreshCw className="h-4 w-4" />
-          Сгенерировать ещё
-        </Button>
-      )}
+  const resultItems = results.map((result, index) => {
+        const label = result.label ?? `Вариант ${index + 1}`;
+        const removedUrl =
+          result.cutoutPreviewUrl ?? result.backgroundRemovedUrl;
+        const showExactCardRow =
+          isProductShotMode &&
+          result.productShotFidelity === "exact-card" &&
+          Boolean(removedUrl && result.width && result.height);
+        const exportPreviewSize =
+          result.width && result.height
+            ? getExportPreviewSize(result.width, result.height)
+            : null;
+        const resultTitle =
+          label ?? (isProductShotMode ? "Готовая карточка" : "Результат");
+        const resultActions = (
+          <ResultColumnActions
+            onDownload={() => downloadPng(result.url, `${result.id}.png`)}
+            onStartOver={onStartOver}
+          />
+        );
+        const resultImageContent = (
+          <div className="flex flex-1 items-center justify-center p-2">
+            <ResultImage
+              imageKey={`${result.id}:main`}
+              url={result.url}
+              alt={`${label}: готовый вариант`}
+              className={cn(
+                "max-h-[460px] w-full object-contain",
+                isProductShotMode && "rounded-[18px]"
+              )}
+              failed={Boolean(failedImages[`${result.id}:main`])}
+              onFail={markImageFailed}
+            />
+          </div>
+        );
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {results.map((result, index) => {
-          const label = result.label ?? `Вариант ${index + 1}`;
-          const removedUrl =
-            result.cutoutPreviewUrl ?? result.backgroundRemovedUrl;
-          const showExactCardRow =
-            isProductShotMode &&
-            result.productShotFidelity === "exact-card" &&
-            Boolean(removedUrl && result.width && result.height);
-          const exportPreviewSize =
-            result.width && result.height
-              ? getExportPreviewSize(result.width, result.height)
-              : null;
-
-          if (showExactCardRow && result.width && result.height && exportPreviewSize) {
-            return (
-              <Fragment key={result.id}>
-                {result.provider === "mock" && (
-                  <div
-                    key={`${result.id}-mock`}
-                    className="col-span-full rounded-[18px] border border-violet-100 bg-violet-50 px-4 py-3 text-xs leading-5 text-violet-800 lg:col-span-2"
-                  >
-                    Показан тестовый пример. Для финального результата запустите
-                    генерацию в студии.
-                  </div>
-                )}
-                {result.exactCardWithoutMask && (
-                  <div
-                    key={`${result.id}-warn`}
-                    className="col-span-full rounded-[18px] border border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900 lg:col-span-2"
-                  >
-                    Карточка создана без ручного выделения. Проверьте, не попали
-                    ли лишние предметы.
-                  </div>
-                )}
-                <ExactCardResultPanel
-                  key={`${result.id}-card`}
-                  title="Готовая карточка"
-                  exportPreviewSize={exportPreviewSize}
-                  onDownload={() => downloadPng(result.url, `${result.id}.png`)}
-                  onStartOver={onStartOver}
-                >
-                  <ExportSizeFrame
-                    width={result.width}
-                    height={result.height}
-                    className="bg-white ring-1 ring-slate-200"
-                  >
-                    <ResultImage
-                      imageKey={`${result.id}:main`}
-                      url={result.url}
-                      alt={`${label}: готовая карточка`}
-                      className="block h-full w-full"
-                      failed={Boolean(failedImages[`${result.id}:main`])}
-                      onFail={markImageFailed}
-                    />
-                  </ExportSizeFrame>
-                </ExactCardResultPanel>
-                <ExactCardResultPanel
-                  key={`${result.id}-cutout`}
-                  title="PNG без фона"
-                  exportPreviewSize={exportPreviewSize}
-                  onDownload={() =>
-                    downloadPng(removedUrl!, `${result.id}-no-bg.png`)
-                  }
-                  onStartOver={onStartOver}
-                >
-                  <ExportSizeFrame
-                    width={result.width}
-                    height={result.height}
-                    style={checkerboardStyle}
-                    className="bg-[length:12px_12px] bg-[position:0_0,6px_6px]"
-                  >
-                    <ResultImage
-                      imageKey={`${result.id}:removed`}
-                      url={removedUrl!}
-                      alt={`${label}: PNG без фона`}
-                      className="block h-full w-full"
-                      failed={Boolean(failedImages[`${result.id}:removed`])}
-                      onFail={markImageFailed}
-                    />
-                  </ExportSizeFrame>
-                </ExactCardResultPanel>
-              </Fragment>
-            );
-          }
-
+        if (embedded && showExactCardRow && result.width && result.height) {
           return (
-            <article
-              key={result.id}
-              className="overflow-hidden rounded-[24px] border border-border bg-white shadow-xl shadow-slate-200/60"
-            >
+            <div key={result.id} className="space-y-4">
+              <ResultAlerts result={result} />
+              <ResultCompareGrid>
+                <ProductCompareColumn productPreviewUrl={productPreviewUrl} />
+                <PreviewCard
+                  title="Готовая карточка"
+                  url={null}
+                  empty=""
+                  content={
+                    <div className="flex flex-1 items-center justify-center p-4">
+                      <ExportSizeFrame
+                        width={result.width}
+                        height={result.height}
+                        className="bg-white ring-1 ring-slate-200"
+                      >
+                        <ResultImage
+                          imageKey={`${result.id}:main`}
+                          url={result.url}
+                          alt={`${label}: готовая карточка`}
+                          className="block h-full w-full"
+                          failed={Boolean(failedImages[`${result.id}:main`])}
+                          onFail={markImageFailed}
+                        />
+                      </ExportSizeFrame>
+                    </div>
+                  }
+                  footer={resultActions}
+                />
+              </ResultCompareGrid>
+              <PreviewCard
+                title="PNG без фона"
+                url={null}
+                empty=""
+                content={
+                  <div className="flex flex-1 items-center justify-center p-4">
+                    <ExportSizeFrame
+                      width={result.width}
+                      height={result.height}
+                      style={checkerboardStyle}
+                      className="bg-[length:12px_12px] bg-[position:0_0,6px_6px]"
+                    >
+                      <ResultImage
+                        imageKey={`${result.id}:removed`}
+                        url={removedUrl!}
+                        alt={`${label}: PNG без фона`}
+                        className="block h-full w-full"
+                        failed={Boolean(
+                          failedImages[`${result.id}:removed`]
+                        )}
+                        onFail={markImageFailed}
+                      />
+                    </ExportSizeFrame>
+                  </div>
+                }
+                footer={
+                  <ResultColumnActions
+                    onDownload={() =>
+                      downloadPng(removedUrl!, `${result.id}-no-bg.png`)
+                    }
+                    onStartOver={onStartOver}
+                  />
+                }
+              />
+            </div>
+          );
+        }
+
+        if (embedded) {
+          return (
+            <div key={result.id} className="space-y-4">
+              <ResultAlerts result={result} />
+              <ResultCompareGrid>
+                <ProductCompareColumn productPreviewUrl={productPreviewUrl} />
+                <PreviewCard
+                  title={resultTitle}
+                  url={null}
+                  empty=""
+                  content={resultImageContent}
+                  footer={resultActions}
+                />
+              </ResultCompareGrid>
+            </div>
+          );
+        }
+
+        if (showExactCardRow && result.width && result.height && exportPreviewSize) {
+          return (
+            <Fragment key={result.id}>
               {result.provider === "mock" && (
-                <div className="border-b border-violet-100 bg-violet-50 px-4 py-3 text-xs leading-5 text-violet-800">
+                <div
+                  key={`${result.id}-mock`}
+                  className="col-span-full rounded-[18px] border border-violet-100 bg-violet-50 px-4 py-3 text-xs leading-5 text-violet-800 lg:col-span-2"
+                >
                   Показан тестовый пример. Для финального результата запустите
                   генерацию в студии.
                 </div>
               )}
-
-              {result.exactCardWithoutMask &&
-                result.productShotFidelity === "exact-card" && (
-                  <div className="border-b border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900">
-                    Карточка создана без ручного выделения. Проверьте, не попали
-                    ли лишние предметы.
-                  </div>
-                )}
-
-              <div className="space-y-3 p-3">
-                <>
-                <div>
-                  <p className="px-1 pb-2 text-xs font-semibold text-slate-500">
-                    {isProductShotMode ? "Готовая карточка" : "Готовый вариант"}
-                  </p>
-                  <div
-                    className={cn(
-                      "rounded-[18px]",
-                      isProductShotMode
-                        ? "bg-white ring-1 ring-slate-200"
-                        : "bg-slate-50"
-                    )}
-                  >
-                    <ResultImage
-                      imageKey={`${result.id}:main`}
-                      url={result.url}
-                      alt={`${label}: готовый вариант`}
-                      className="max-h-[560px] min-h-[260px] w-full rounded-[18px] object-contain"
-                      failed={Boolean(failedImages[`${result.id}:main`])}
-                      onFail={markImageFailed}
-                    />
-                  </div>
+              {result.exactCardWithoutMask && (
+                <div
+                  key={`${result.id}-warn`}
+                  className="col-span-full rounded-[18px] border border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900 lg:col-span-2"
+                >
+                  Карточка создана без ручного выделения. Проверьте, не попали
+                  ли лишние предметы.
                 </div>
+              )}
+              <ExactCardResultPanel
+                key={`${result.id}-card`}
+                title="Готовая карточка"
+                exportPreviewSize={exportPreviewSize}
+                onDownload={() => downloadPng(result.url, `${result.id}.png`)}
+                onStartOver={onStartOver}
+              >
+                <ExportSizeFrame
+                  width={result.width}
+                  height={result.height}
+                  className="bg-white ring-1 ring-slate-200"
+                >
+                  <ResultImage
+                    imageKey={`${result.id}:main`}
+                    url={result.url}
+                    alt={`${label}: готовая карточка`}
+                    className="block h-full w-full"
+                    failed={Boolean(failedImages[`${result.id}:main`])}
+                    onFail={markImageFailed}
+                  />
+                </ExportSizeFrame>
+              </ExactCardResultPanel>
+              <ExactCardResultPanel
+                key={`${result.id}-cutout`}
+                title="PNG без фона"
+                exportPreviewSize={exportPreviewSize}
+                onDownload={() =>
+                  downloadPng(removedUrl!, `${result.id}-no-bg.png`)
+                }
+                onStartOver={onStartOver}
+              >
+                <ExportSizeFrame
+                  width={result.width}
+                  height={result.height}
+                  style={checkerboardStyle}
+                  className="bg-[length:12px_12px] bg-[position:0_0,6px_6px]"
+                >
+                  <ResultImage
+                    imageKey={`${result.id}:removed`}
+                    url={removedUrl!}
+                    alt={`${label}: PNG без фона`}
+                    className="block h-full w-full"
+                    failed={Boolean(failedImages[`${result.id}:removed`])}
+                    onFail={markImageFailed}
+                  />
+                </ExportSizeFrame>
+              </ExactCardResultPanel>
+            </Fragment>
+          );
+        }
 
-                  </>
+        return (
+          <article
+            key={result.id}
+            className="overflow-hidden rounded-[24px] border border-border bg-white shadow-xl shadow-slate-200/60"
+          >
+            {result.provider === "mock" && (
+              <div className="border-b border-violet-100 bg-violet-50 px-4 py-3 text-xs leading-5 text-violet-800">
+                Показан тестовый пример. Для финального результата запустите
+                генерацию в студии.
               </div>
+            )}
 
-              {!showExactCardRow && (
+            {result.exactCardWithoutMask &&
+              result.productShotFidelity === "exact-card" && (
+                <div className="border-b border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900">
+                  Карточка создана без ручного выделения. Проверьте, не попали
+                  ли лишние предметы.
+                </div>
+              )}
+
+            <div className="space-y-3 p-3">
+              <div>
+                <p className="px-1 pb-2 text-xs font-semibold text-slate-500">
+                  {isProductShotMode ? "Готовая карточка" : "Готовый вариант"}
+                </p>
+                <div
+                  className={cn(
+                    "rounded-[18px]",
+                    isProductShotMode
+                      ? "bg-white ring-1 ring-slate-200"
+                      : "bg-slate-50"
+                  )}
+                >
+                  <ResultImage
+                    imageKey={`${result.id}:main`}
+                    url={result.url}
+                    alt={`${label}: готовый вариант`}
+                    className="max-h-[560px] min-h-[260px] w-full rounded-[18px] object-contain"
+                    failed={Boolean(failedImages[`${result.id}:main`])}
+                    onFail={markImageFailed}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {!showExactCardRow && (
               <div className="space-y-3 border-t border-border/70 p-4">
                 <Button
                   variant="secondary"
@@ -425,11 +580,18 @@ export function GenerationResultGrid({
                   Начать сначала
                 </Button>
               </div>
-              )}
-            </article>
-          );
-        })}
-      </div>
+            )}
+          </article>
+        );
+      });
+
+  return (
+    <div className="space-y-4">
+      {embedded ? (
+        resultItems
+      ) : (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">{resultItems}</div>
+      )}
     </div>
   );
 }

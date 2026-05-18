@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { Locale } from "@/lib/i18n/localeConfig";
 import {
@@ -14,6 +14,7 @@ import { MOCK_MODEL_IMAGE } from "@/lib/ai/mockResults";
 import type { GenerateModelResponse } from "@/lib/ai/modelGenerationSchemas";
 import type { PromptEnhanceResponse } from "@/lib/ai/promptEnhanceSchemas";
 import type { RemoveBackgroundResponse } from "@/lib/ai/backgroundRemovalSchemas";
+import { isRemoteImageUrl } from "@/lib/ai/clientImageValidation";
 import { mapCategoryForTryOn, type TryOnResponse } from "@/lib/ai/falSchemas";
 import {
   minorRestrictedChoice,
@@ -24,7 +25,12 @@ import {
   isModelOutputSizeComplete,
   type ModelOutputSizeSelection,
 } from "@/lib/ai/modelOutputSizes";
+import {
+  resolveSelectedModelAngles,
+  validateModelAngles,
+} from "@/lib/ai/modelAngles";
 import { validateModelCustomParams } from "@/lib/ai/modelGenerationValidation";
+import { buildGenerateModelRequestBody } from "@/lib/studio/buildGenerateModelRequest";
 import { buildModelBaseSettingsSummaryRu } from "@/lib/ai/modelSettingsSummary";
 import { validateImageFileClient } from "@/lib/ai/clientImageValidation";
 import { fitCutoutToShotSize, refineCutoutWithUserMask } from "@/lib/studio/cutoutImage";
@@ -38,6 +44,17 @@ import {
   mapProductShotStudioResults,
   nextGenerationSeed,
 } from "@/lib/studio/resultUtils";
+import {
+  clearSavedModelStorage,
+  readSavedModelFromStorage,
+  type SavedStudioModel,
+  writeSavedModelToStorage,
+} from "@/lib/studio/savedModel";
+import {
+  applySavedModelSnapshotToState,
+  buildSavedModelSnapshot,
+  parseSavedModelSnapshot,
+} from "@/lib/studio/savedModelSettings";
 import { Button } from "@/components/ui/Button";
 import { WhatsAppLoginModal } from "@/components/auth/WhatsAppLoginModal";
 import {
@@ -48,13 +65,16 @@ import {
 } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { ImageUploader } from "./ImageUploader";
+import {
+  ModelSourcePanel,
+  type ModelSourceKind,
+} from "./ModelSourcePanel";
 import { ModelPresetSelector } from "./ModelPresetSelector";
 import { GarmentSettingsPanel } from "./GarmentSettingsPanel";
 import { ProductShotSettingsPanel } from "./ProductShotSettingsPanel";
 import { StudioModeSelector } from "./StudioModeSelector";
 import { GenerationResultGrid } from "./GenerationResultGrid";
 import { PreviewCard } from "./PreviewCard";
-import { StudioPanelCard } from "./StudioPanelCard";
 import type { ProductMaskApplyResult } from "./ProductMaskEditor";
 import { ProductSelectionPanel } from "./ProductSelectionPanel";
 import { StudioWorkflowRail } from "./StudioWorkflowRail";
@@ -68,12 +88,35 @@ import {
   type ModelGenerationSettings,
   type ProductCategory,
   type ProductShotSettings,
+  DEFAULT_QUALITY_MODE,
   type QualityMode,
   type StudioMode,
   type StudioResultImage,
   type StudioSessionAsset,
-  type LastGenerationMode,
 } from "./types";
+
+async function readJsonResponse<T>(res: Response): Promise<
+  | { ok: true; data: T }
+  | { ok: false; error: string }
+> {
+  const text = await res.text();
+  if (!text.trim()) {
+    return {
+      ok: false,
+      error: res.ok
+        ? "Сервер вернул пустой ответ. Попробуйте ещё раз."
+        : `Сервер недоступен (${res.status}). Проверьте, что dev-сервер запущен, и попробуйте снова.`,
+    };
+  }
+  try {
+    return { ok: true, data: JSON.parse(text) as T };
+  } catch {
+    return {
+      ok: false,
+      error: `Сервер вернул некорректный ответ (${res.status}). Обновите страницу и попробуйте снова.`,
+    };
+  }
+}
 
 function friendlyAiError(errorCode?: string, message?: string): string {
   if (errorCode === "FAL_KEY_MISSING") {
@@ -82,6 +125,10 @@ function friendlyAiError(errorCode?: string, message?: string): string {
 
   if (errorCode === "FAL_UPLOAD_FAILED") {
     return "Не удалось временно отправить изображение в Fal. Попробуйте файл меньше 10MB в JPEG, PNG или WEBP.";
+  }
+
+  if (errorCode === "FAL_TRYON_FAILED") {
+    return "Не удалось создать примерку. Попробуйте режим «Баланс» или другое фото модели.";
   }
 
   if (message?.includes("Product image file or URL is required")) {
@@ -129,7 +176,10 @@ function useObjectUrlPreview() {
     };
   }, []);
 
-  return { setFromFile, setFromHttpUrl };
+  return useMemo(
+    () => ({ setFromFile, setFromHttpUrl }),
+    [setFromFile, setFromHttpUrl]
+  );
 }
 
 export function StudioShell({
@@ -156,7 +206,9 @@ export function StudioShell({
     useState<ProductCategory>("auto");
   const [garmentPhotoType, setGarmentPhotoType] =
     useState<GarmentPhotoType>("auto");
-  const [qualityMode, setQualityMode] = useState<QualityMode>("balanced");
+  const [qualityMode, setQualityMode] = useState<QualityMode>(
+    DEFAULT_QUALITY_MODE
+  );
   const [modelSettings, setModelSettings] = useState<ModelGenerationSettings>(
     DEFAULT_MODEL_GENERATION_SETTINGS
   );
@@ -168,6 +220,11 @@ export function StudioShell({
   const [generatedModelUrl, setGeneratedModelUrl] = useState<string | null>(
     null
   );
+  const [savedStudioModel, setSavedStudioModel] =
+    useState<SavedStudioModel | null>(null);
+  const [modelSource, setModelSource] = useState<ModelSourceKind>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const savedModelUrl = savedStudioModel?.url ?? null;
   const [modelGenerating, setModelGenerating] = useState(false);
   const [modelGenerateError, setModelGenerateError] = useState<string | null>(
     null
@@ -176,14 +233,12 @@ export function StudioShell({
     Partial<ModelOutputSizeSelection>
   >({});
   const [loading, setLoading] = useState(false);
+  const [tryOnProgress, setTryOnProgress] = useState<string | null>(null);
   const [results, setResults] = useState<StudioResultImage[]>([]);
   const [sessionAssets, setSessionAssets] = useState<StudioSessionAsset[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [generationSeed, setGenerationSeed] = useState(42);
   const [modelGenerationSeed, setModelGenerationSeed] = useState(42);
-  const [lastGenerationMode, setLastGenerationMode] =
-    useState<LastGenerationMode>("clothing-tryon");
-
   const [maskEditorOpen, setMaskEditorOpen] = useState(false);
   const [selectedProductFile, setSelectedProductFile] = useState<File | null>(
     null
@@ -229,6 +284,7 @@ export function StudioShell({
       setModelGenerateError(null);
       setModelFile(file);
       setModelPreviewUrl(modelPreview.setFromFile(file));
+      setModelSource("upload");
     },
     [modelPreview]
   );
@@ -261,7 +317,152 @@ export function StudioShell({
   const clearModelFile = useCallback(() => {
     setModelFile(null);
     setModelPreviewUrl(modelPreview.setFromFile(null));
-  }, [modelPreview]);
+    setModelSource(savedModelUrl ? "saved" : null);
+  }, [modelPreview, savedModelUrl]);
+
+  const restoreSavedModelParameters = useCallback(
+    (settings?: Record<string, unknown>) => {
+      const snapshot = parseSavedModelSnapshot(settings);
+      if (!snapshot) return;
+      const restored = applySavedModelSnapshotToState(snapshot);
+      setModelSettings(restored.generation);
+      if (restored.outputSize) {
+        setModelOutputSize(restored.outputSize);
+      }
+      setModelDescription(restored.modelDescription);
+    },
+    []
+  );
+
+  const handleSelectSavedModel = useCallback(() => {
+    if (!savedStudioModel?.url) return;
+    setModelFile(null);
+    setModelPreviewUrl(modelPreview.setFromFile(null));
+    setModelSource("saved");
+    setGeneratedModelUrl(savedStudioModel.url);
+    restoreSavedModelParameters(savedStudioModel.settings);
+    setError(null);
+  }, [modelPreview, restoreSavedModelParameters, savedStudioModel]);
+
+  const applySavedStudioModel = useCallback(
+    (model: SavedStudioModel, selectForTryOn = true) => {
+      setSavedStudioModel(model);
+      restoreSavedModelParameters(model.settings);
+      if (selectForTryOn) {
+        setModelSource("saved");
+        setModelFile(null);
+        setModelPreviewUrl(modelPreview.setFromFile(null));
+        setGeneratedModelUrl(model.url);
+      }
+    },
+    [modelPreview, restoreSavedModelParameters]
+  );
+
+  const loadPersistedSavedModel = useCallback(async () => {
+    const local = readSavedModelFromStorage();
+    if (local) {
+      applySavedStudioModel(local, true);
+    }
+
+    try {
+      const res = await fetch("/api/studio/saved-model", { cache: "no-store" });
+      const data = (await res.json()) as {
+        ok: boolean;
+        model?: SavedStudioModel | null;
+      };
+      if (data.ok && data.model?.url) {
+        writeSavedModelToStorage(data.model);
+        applySavedStudioModel(data.model, true);
+      }
+    } catch {
+      // Guest / offline — localStorage only.
+    }
+  }, [applySavedStudioModel]);
+
+  const handleSaveModel = useCallback(async () => {
+    if (!generatedModelUrl) return;
+    if (!isRemoteImageUrl(generatedModelUrl)) {
+      setModelGenerateError(
+        "Сначала дождитесь окончания генерации модели или сгенерируйте её заново."
+      );
+      return;
+    }
+
+    const localModel: SavedStudioModel = {
+      id: crypto.randomUUID(),
+      url: generatedModelUrl,
+      savedAt: new Date().toISOString(),
+      settings: buildSavedModelSnapshot({
+        generation: modelSettings,
+        outputSize: modelOutputSize,
+        modelDescription,
+      }),
+    };
+
+    writeSavedModelToStorage(localModel);
+    applySavedStudioModel(localModel, true);
+    setError(null);
+    setModelGenerateError(null);
+
+    try {
+      const res = await fetch("/api/studio/saved-model", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: generatedModelUrl,
+          settings: buildSavedModelSnapshot({
+            generation: modelSettings,
+            outputSize: modelOutputSize,
+            modelDescription,
+          }),
+        }),
+      });
+      const data = (await res.json()) as {
+        ok: boolean;
+        model?: SavedStudioModel;
+        message?: string;
+      };
+      if (data.ok && data.model?.url) {
+        writeSavedModelToStorage(data.model);
+        setSavedStudioModel(data.model);
+      } else if (!data.ok && res.status !== 401 && data.message) {
+        setModelGenerateError(data.message);
+      }
+    } catch {
+      // Local save already applied.
+    }
+  }, [
+    applySavedStudioModel,
+    generatedModelUrl,
+    modelDescription,
+    modelOutputSize,
+    modelSettings,
+  ]);
+
+  const handleDeleteSavedModel = useCallback(async () => {
+    clearSavedModelStorage();
+    setSavedStudioModel(null);
+    if (modelSource === "saved") {
+      setModelSource(null);
+    }
+
+    try {
+      await fetch("/api/studio/saved-model", { method: "DELETE" });
+    } catch {
+      // Guest — local clear is enough.
+    }
+  }, [modelSource]);
+
+  const handleStartOverModel = useCallback(() => {
+    setGeneratedModelUrl(null);
+    setModelGenerateError(null);
+  }, []);
+
+  const savedModelPersistenceHint = savedModelUrl
+    ? isAuthenticated
+      ? "Хранится в вашем аккаунте, пока не удалите."
+      : "Хранится на этом устройстве. Войдите, чтобы сохранить в аккаунте."
+    : undefined;
 
   const persistAsset = useCallback(async (asset: StudioSessionAsset) => {
     try {
@@ -296,12 +497,31 @@ export function StudioShell({
   }, []);
 
   useEffect(() => {
-    const scheduleLoad = () => window.setTimeout(() => void loadSavedAssets(), 0);
-    scheduleLoad();
-    const handler = () => scheduleLoad();
+    void fetch("/api/auth/me", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data: { user?: { id: string } | null }) => {
+        setIsAuthenticated(Boolean(data.user));
+      })
+      .catch(() => setIsAuthenticated(false));
+  }, []);
+
+  const persistedLoadStartedRef = useRef(false);
+
+  useEffect(() => {
+    const runPersistedLoad = () => {
+      void loadSavedAssets();
+      void loadPersistedSavedModel();
+    };
+
+    if (!persistedLoadStartedRef.current) {
+      persistedLoadStartedRef.current = true;
+      runPersistedLoad();
+    }
+
+    const handler = () => runPersistedLoad();
     window.addEventListener("vitrina-auth-changed", handler);
     return () => window.removeEventListener("vitrina-auth-changed", handler);
-  }, [loadSavedAssets]);
+  }, [loadSavedAssets, loadPersistedSavedModel]);
 
   const addAssetsToSession = useCallback((assets: StudioSessionAsset[]) => {
     setSessionAssets((prev) => [...assets, ...prev].slice(0, 48));
@@ -359,22 +579,28 @@ export function StudioShell({
 
   const resolveModelImageUrl = useCallback((): string | null => {
     if (modelFile) return null;
-    if (generatedModelUrl) return generatedModelUrl;
+    if (savedModelUrl && modelSource === "saved" && isRemoteImageUrl(savedModelUrl)) {
+      return savedModelUrl;
+    }
+    if (isRemoteImageUrl(generatedModelUrl)) return generatedModelUrl;
     return mockMode ? MOCK_MODEL_IMAGE : null;
-  }, [modelFile, generatedModelUrl, mockMode]);
+  }, [modelFile, savedModelUrl, modelSource, generatedModelUrl, mockMode]);
+
+  const step2ModelPreview =
+    modelSource === "upload"
+      ? modelPreviewUrl
+      : modelSource === "saved"
+        ? savedModelUrl
+        : null;
 
   const effectiveModelPreview =
-    modelPreviewUrl ??
+    step2ModelPreview ??
     (generatedModelUrl && !modelFile ? generatedModelUrl : null) ??
     (mockMode ? MOCK_MODEL_IMAGE : null);
 
   const handleModelSettingsChange = useCallback(
     (settings: ModelGenerationSettings) => {
       setModelSettings(settings);
-      if (settings.categoryContext === "lingerie") {
-        setGarmentPhotoType("model");
-        setQualityMode("quality");
-      }
     },
     []
   );
@@ -399,6 +625,13 @@ export function StudioShell({
       return;
     }
 
+    const anglesError = validateModelAngles(modelSettings);
+    if (anglesError) {
+      setModelGenerateError(anglesError);
+      setModelGenerating(false);
+      return;
+    }
+
     const customParamsError = validateModelCustomParams(modelSettings);
     if (customParamsError) {
       setModelGenerateError(customParamsError);
@@ -406,29 +639,22 @@ export function StudioShell({
       return;
     }
 
+    const angles = resolveSelectedModelAngles(modelSettings);
+
     try {
       const res = await fetch("/api/ai/generate-model", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          gender: modelSettings.gender,
-          bodyType: modelSettings.bodyType,
-          bodyTypeCustom: modelSettings.bodyTypeCustom.trim() || undefined,
-          modelAge: modelSettings.modelAge,
-          pose: modelSettings.pose,
-          poseCustom: modelSettings.poseCustom.trim() || undefined,
-          crop: modelSettings.crop,
-          cropCustom: modelSettings.cropCustom.trim() || undefined,
-          background: modelSettings.background,
-          categoryContext: modelSettings.categoryContext,
-          aspectRatio: modelOutputSize.aspectRatio,
-          outputFormat: "png",
-          resolution: modelOutputSize.resolution,
-          numImages: 1,
-          seed: useSeed,
-          customDescription: modelDescription || undefined,
-          promptLocale,
-        }),
+        body: JSON.stringify(
+          buildGenerateModelRequestBody({
+            settings: modelSettings,
+            outputSize: modelOutputSize,
+            modelDescription,
+            promptLocale,
+            seed: useSeed,
+            angle: angles[0],
+          })
+        ),
       });
 
       const data = (await res.json()) as GenerateModelResponse;
@@ -446,7 +672,8 @@ export function StudioShell({
 
       setGeneratedModelUrl(url);
       setModelFile(null);
-      setModelPreviewUrl(modelPreview.setFromHttpUrl(url));
+      setModelPreviewUrl(modelPreview.setFromFile(null));
+      setModelSource(null);
       setModelGenerationSeed(nextGenerationSeed());
     } catch {
       setModelGenerateError(
@@ -506,62 +733,200 @@ export function StudioShell({
       return;
     }
 
-    const resolvedModelUrl = modelFile ? null : resolveModelImageUrl();
+    const anglesError = validateModelAngles(modelSettings);
+    if (anglesError) {
+      setError(anglesError);
+      return;
+    }
 
-    if (!modelFile && !resolvedModelUrl) {
-      setError("Загрузите фото модели или сгенерируйте AI-модель.");
+    const customParamsError = validateModelCustomParams(modelSettings);
+    if (customParamsError) {
+      setError(customParamsError);
+      return;
+    }
+
+    const angles = resolveSelectedModelAngles(modelSettings);
+    const resolvedModelUrl = modelFile ? null : resolveModelImageUrl();
+    const canUseExistingModel =
+      angles.length === 1 &&
+      (Boolean(modelFile) ||
+        (resolvedModelUrl !== null && isRemoteImageUrl(resolvedModelUrl)));
+
+    if (!canUseExistingModel) {
+      if (!isModelOutputSizeComplete(modelOutputSize)) {
+        setError(
+          "Выберите соотношение сторон и разрешение — для каждого ракурса создаётся своя AI-модель."
+        );
+        return;
+      }
+
+      const minorRestriction = minorRestrictedChoice(modelSettings);
+      if (minorRestriction) {
+        setError(minorRestrictionMessage(minorRestriction));
+        return;
+      }
+    } else if (!modelFile && !resolvedModelUrl) {
+      if (generatedModelUrl && !isRemoteImageUrl(generatedModelUrl)) {
+        setError(
+          "Ссылка на AI-модель устарела. Нажмите «Сгенерировать модель» ещё раз или загрузите фото модели."
+        );
+      } else {
+        setError("Загрузите фото модели или сгенерируйте AI-модель.");
+      }
       return;
     }
 
     setLoading(true);
+    setTryOnProgress(null);
     setError(null);
     setResults([]);
 
+    const allResults: StudioResultImage[] = [];
+    const perStepTimeoutMs = 120_000;
+
     try {
-      const formData = new FormData();
-      formData.append("productImageFile", productFile);
-      if (modelFile) formData.append("modelImageFile", modelFile);
-      else if (resolvedModelUrl) {
-        formData.append("modelImageUrl", resolvedModelUrl);
+      for (let index = 0; index < angles.length; index++) {
+        const angle = angles[index];
+        setTryOnProgress(
+          `Ракурс ${index + 1} из ${angles.length}: ${angle.label}`
+        );
+
+        let modelImageUrl: string | null = null;
+        let modelImageFile: File | null = null;
+
+        if (canUseExistingModel && index === 0) {
+          if (modelFile) modelImageFile = modelFile;
+          else modelImageUrl = resolvedModelUrl;
+        } else {
+          const modelRes = await fetch("/api/ai/generate-model", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(
+              buildGenerateModelRequestBody({
+                settings: modelSettings,
+                outputSize: modelOutputSize as ModelOutputSizeSelection,
+                modelDescription,
+                promptLocale,
+                seed: useSeed + index,
+                angle,
+              })
+            ),
+          });
+
+          const modelData = (await modelRes.json()) as GenerateModelResponse;
+          if (!modelData.ok) {
+            setError(
+              `Ракурс «${angle.label}»: ${friendlyAiError(
+                modelData.errorCode,
+                modelData.message
+              )}`
+            );
+            return;
+          }
+
+          modelImageUrl = modelData.images[0]?.url ?? null;
+          if (!modelImageUrl) {
+            setError(`Ракурс «${angle.label}»: модель не вернула изображение.`);
+            return;
+          }
+
+          if (index === angles.length - 1) {
+            setGeneratedModelUrl(modelImageUrl);
+            setModelFile(null);
+            setModelPreviewUrl(modelPreview.setFromFile(null));
+            setModelSource(null);
+          }
+        }
+
+        const formData = new FormData();
+        formData.append("productImageFile", productFile);
+        if (modelImageFile) formData.append("modelImageFile", modelImageFile);
+        else if (modelImageUrl) formData.append("modelImageUrl", modelImageUrl);
+        formData.append("category", mapCategoryForTryOn(productCategory));
+        formData.append("garmentPhotoType", garmentPhotoType);
+        formData.append("mode", qualityMode);
+        formData.append("moderationLevel", "permissive");
+        formData.append("numSamples", "1");
+        formData.append("segmentationFree", "true");
+        formData.append("outputFormat", "png");
+        formData.append("seed", String(useSeed + index));
+
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(
+          () => controller.abort(),
+          perStepTimeoutMs
+        );
+
+        let res: Response;
+        try {
+          res = await fetch("/api/ai/tryon", {
+            method: "POST",
+            body: formData,
+            signal: controller.signal,
+          });
+        } finally {
+          window.clearTimeout(timeoutId);
+        }
+
+        const parsed = await readJsonResponse<TryOnResponse>(res);
+
+        if (!parsed.ok) {
+          setError(
+            parsed.error.startsWith("Ракурс")
+              ? parsed.error
+              : `Ракурс «${angle.label}»: ${parsed.error}`
+          );
+          return;
+        }
+
+        const data = parsed.data;
+
+        if (!data.ok) {
+          setError(
+            `Ракурс «${angle.label}»: ${friendlyAiError(
+              data.errorCode,
+              data.message
+            )}`
+          );
+          return;
+        }
+
+        const mappedResults = mapApiImagesToStudioResults(
+          data.images,
+          angle.label,
+          data.provider
+        );
+        allResults.push(...mappedResults);
+        setResults([...allResults]);
       }
-      formData.append("category", mapCategoryForTryOn(productCategory));
-      formData.append("garmentPhotoType", garmentPhotoType);
-      formData.append("mode", qualityMode);
-      formData.append("moderationLevel", "permissive");
-      formData.append("numSamples", "1");
-      formData.append("segmentationFree", "true");
-      formData.append("outputFormat", "png");
-      formData.append("seed", String(useSeed));
 
-      const res = await fetch("/api/ai/tryon", { method: "POST", body: formData });
-
-      const data = (await res.json()) as TryOnResponse;
-
-      if (!data.ok) {
-        setError(friendlyAiError(data.errorCode, data.message));
-        return;
-      }
-
-      const mappedResults = mapApiImagesToStudioResults(
-        data.images,
-        "Вариант",
-        data.provider
-      );
-      setResults(mappedResults);
       addAssetsToSession(
-        mapResultsToSessionAssets(mappedResults, "tryon", {
+        mapResultsToSessionAssets(allResults, "tryon", {
           mode: "clothing-tryon",
-          provider: data.provider,
-          model: data.model,
-          requestId: data.requestId,
+          provider: allResults[0]?.provider,
           sourceImageUrl: productPreviewUrl ?? undefined,
         })
       );
-      setLastGenerationMode("clothing-tryon");
       setGenerationSeed(nextGenerationSeed());
-    } catch {
-      setError("Не удалось связаться с сервером. Попробуйте ещё раз.");
+      setModelGenerationSeed(nextGenerationSeed());
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        setError(
+          "Примерка заняла слишком много времени. Попробуйте меньше ракурсов или режим «1K» / «0.5K»."
+        );
+        return;
+      }
+      const detail =
+        error instanceof Error && error.message
+          ? error.message
+          : "сеть или dev-сервер";
+      setError(
+        detail === "Failed to fetch"
+          ? "Не удалось связаться с сервером. Проверьте, что dev-сервер запущен (npm run dev), откройте ту же страницу без перезагрузки во время генерации и попробуйте снова."
+          : `Не удалось связаться с сервером (${detail}). Убедитесь, что приложение запущено, и попробуйте ещё раз.`
+      );
     } finally {
+      setTryOnProgress(null);
       setLoading(false);
     }
   };
@@ -614,23 +979,27 @@ export function StudioShell({
         cutoutUrl = bgData.image.url;
       }
       const [exportWidth, exportHeight] = shotSizePresetToDimensions(
-        productShotSettings.shotSizePreset
+        productShotSettings.shotSizePreset,
+        productShotSettings.imageQuality
       );
       let sizedCutoutUrl = cutoutUrl;
       try {
         sizedCutoutUrl = await fitCutoutToShotSize(
           cutoutUrl,
-          productShotSettings.shotSizePreset
+          productShotSettings.shotSizePreset,
+          productShotSettings.imageQuality
         );
       } catch {
         /* keep API url if canvas processing fails */
       }
       const background = scenePresetToExactBackground(
-        productShotSettings.scenePreset
+        productShotSettings.scenePreset,
+        productShotSettings.sceneCustomDescription
       );
       const cardUrl = await composeExactProductCard(sizedCutoutUrl, {
         background,
         shotSizePreset: productShotSettings.shotSizePreset,
+        imageQuality: productShotSettings.imageQuality,
       });
 
       const mappedResults = mapProductShotStudioResults(
@@ -654,7 +1023,6 @@ export function StudioShell({
           sourceImageUrl: productPreviewUrl ?? selectedProductPreviewUrl ?? undefined,
         })
       );
-      setLastGenerationMode("product-shot");
     } catch (error) {
       const message =
         error instanceof Error
@@ -675,17 +1043,6 @@ export function StudioShell({
     setError(null);
   }, []);
 
-  const handleRegenerate = () => {
-    const nextSeed = nextGenerationSeed();
-    setGenerationSeed(nextSeed);
-
-    if (lastGenerationMode === "clothing-tryon") {
-      void handleGenerateTryOn(nextSeed);
-    } else if (lastGenerationMode === "product-shot") {
-      void handleProductShot();
-    }
-  };
-
   const handlePrimaryAction = () => {
     if (studioMode === "clothing-tryon") return handleGenerateTryOn();
     return handleProductShot();
@@ -697,13 +1054,37 @@ export function StudioShell({
   const effectiveProductPreviewUrl = productPreviewUrl;
   const hasProductInput = Boolean(productFile);
   const hasModelInput = Boolean(
-    modelFile || generatedModelUrl || mockMode
+    (modelSource === "upload" && modelFile) ||
+      (modelSource === "saved" && isRemoteImageUrl(savedModelUrl)) ||
+      isRemoteImageUrl(generatedModelUrl) ||
+      mockMode
   );
   const primaryBlocker = (() => {
     if (!hasProductInput) return "Сначала загрузите фото.";
 
-    if (isClothingMode && !hasModelInput) {
-      return "Загрузите фото модели или сгенерируйте AI-модель.";
+    if (isClothingMode) {
+      const anglesError = validateModelAngles(modelSettings);
+      if (anglesError) return anglesError;
+
+      const angles = resolveSelectedModelAngles(modelSettings);
+      if (angles.length > 1) {
+        if (!isModelOutputSizeComplete(modelOutputSize)) {
+          return "Выберите соотношение сторон и разрешение для ракурсов.";
+        }
+        return null;
+      }
+
+      if (!hasModelInput) {
+        return "Загрузите фото модели или сгенерируйте AI-модель.";
+      }
+    }
+
+    if (
+      isProductShotMode &&
+      productShotSettings.scenePreset === "custom" &&
+      !productShotSettings.sceneCustomDescription.trim()
+    ) {
+      return "Опишите фон своими словами.";
     }
 
     return null;
@@ -762,7 +1143,7 @@ export function StudioShell({
             onAssetCreated={addSingleAssetToSession}
           />
         ) : (
-        <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
+        <div className="grid gap-6 lg:grid-cols-[420px_1fr] lg:items-stretch">
           <aside className="space-y-4">
             <Card className="border-0 bg-transparent shadow-none">
             <CardContent className="overflow-visible px-0 pb-2 pt-2">
@@ -815,10 +1196,15 @@ export function StudioShell({
                           label="Фото модели"
                           softCorner="bottom"
                         >
-                          <ImageUploader
+                          <ModelSourcePanel
                             label="Загрузите фото модели или сгенерируйте AI-модель"
                             hint="Для одежды лучше подходит фото в полный рост или по пояс, где одежду легко заменить."
-                            previewUrl={effectiveModelPreview}
+                            savedModelUrl={savedModelUrl}
+                            savedModelPersistenceHint={savedModelPersistenceHint}
+                            modelSource={modelSource}
+                            onSelectSaved={handleSelectSavedModel}
+                            onDeleteSaved={handleDeleteSavedModel}
+                            previewUrl={step2ModelPreview}
                             selectedFile={modelFile}
                             onFileSelect={handleModelFile}
                             onClearFile={clearModelFile}
@@ -831,6 +1217,11 @@ export function StudioShell({
                           softCorner="top"
                         >
                           <ModelPresetSelector
+                            key={
+                              modelSource === "saved" && savedStudioModel
+                                ? `saved-${savedStudioModel.id}`
+                                : "model-draft"
+                            }
                             settings={modelSettings}
                             onSettingsChange={handleModelSettingsChange}
                             onGenerate={() => void handleGenerateModel()}
@@ -847,6 +1238,13 @@ export function StudioShell({
                                 ? generatedModelUrl
                                 : null
                             }
+                            isModelSaved={Boolean(
+                              savedModelUrl &&
+                                generatedModelUrl &&
+                                savedModelUrl === generatedModelUrl
+                            )}
+                            onSaveModel={() => void handleSaveModel()}
+                            onStartOverModel={handleStartOverModel}
                             outputSize={modelOutputSize}
                             onOutputSizeChange={(patch) =>
                               setModelOutputSize((prev) => {
@@ -915,7 +1313,7 @@ export function StudioShell({
                         {primaryButtonLabel}
                       </Button>
                       {primaryHelper ? (
-                        <p className="mt-2 text-xs leading-5 text-amber-800">
+                        <p className="mt-2 text-center text-xs leading-5 text-amber-800">
                           {primaryHelper}
                         </p>
                       ) : null}
@@ -925,10 +1323,10 @@ export function StudioShell({
             </Card>
           </aside>
 
-          <section className="min-h-full">
-            <div className="sticky top-6 z-10 space-y-4 pt-2">
+          <section className="flex min-h-0 flex-col gap-4 pt-2 lg:self-stretch">
+            <div className="shrink-0">
               {isClothingMode ? (
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid items-stretch gap-4 sm:grid-cols-2">
                   <PreviewCard
                     title="Товар"
                     url={effectiveProductPreviewUrl}
@@ -939,7 +1337,9 @@ export function StudioShell({
                     url={effectiveModelPreview}
                     empty="Сгенерируйте или загрузите модель"
                     badge={
-                      generatedModelUrl && !modelFile ? "AI-модель" : undefined
+                      modelSource === "saved" && savedModelUrl
+                        ? "AI-модель"
+                        : undefined
                     }
                   />
                 </div>
@@ -950,12 +1350,13 @@ export function StudioShell({
                   empty="Загрузите фото"
                 />
               )}
+            </div>
 
-              <StudioPanelCard title="Результаты">
-                {error ? (
+            <div className="shrink-0 space-y-4 lg:sticky lg:top-6 lg:z-10">
+              {error ? (
                   <div
                     role="alert"
-                    className="border-b border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-800"
+                    className="rounded-[20px] border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-800"
                   >
                     <div className="flex items-start gap-2">
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -963,22 +1364,16 @@ export function StudioShell({
                     </div>
                   </div>
                 ) : null}
-                <div className="p-4">
-                  <GenerationResultGrid
+              <GenerationResultGrid
                     results={results}
                     loading={loading}
-                    showRegenerate={
-                      !isProductShotMode && results.length > 0
-                    }
-                    regenerateLoading={loading}
+                    loadingDetail={tryOnProgress}
                     isProductShotMode={isProductShotMode}
+                    productPreviewUrl={effectiveProductPreviewUrl}
                     onStartOver={handleStartOver}
-                    onRegenerate={handleRegenerate}
                     embedded
                   />
                 </div>
-              </StudioPanelCard>
-            </div>
           </section>
         </div>
         )}

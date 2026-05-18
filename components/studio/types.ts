@@ -1,6 +1,14 @@
 import type { ProductShotChecklistState as ProductShotChecklistStateType } from "@/lib/ai/productShotChecklist";
 import { DEFAULT_MODEL_AGE } from "@/lib/ai/modelAge";
-import { MODEL_PARAM_CUSTOM } from "@/lib/ai/modelCustomParams";
+import {
+  DEFAULT_MODEL_ANGLE_PRESETS,
+  type ModelAnglePresetId,
+  type ModelCustomAngle,
+} from "@/lib/ai/modelAngles";
+import {
+  MODEL_PARAM_CUSTOM,
+  type ModelParamCustom,
+} from "@/lib/ai/modelCustomParams";
 
 export type ProductCategory =
   | "auto"
@@ -12,6 +20,8 @@ export type ProductCategory =
 export type GarmentPhotoType = "auto" | "model" | "flat-lay";
 
 export type QualityMode = "performance" | "balanced" | "quality";
+
+export const DEFAULT_QUALITY_MODE: QualityMode = "balanced";
 
 export const PRODUCT_CATEGORIES: { id: ProductCategory; label: string }[] = [
   { id: "auto", label: "Авто" },
@@ -31,6 +41,33 @@ export const QUALITY_MODES: { id: QualityMode; label: string }[] = [
   { id: "performance", label: "Быстро" },
   { id: "balanced", label: "Баланс" },
   { id: "quality", label: "Максимальное качество" },
+];
+
+/** Try-on quality in UI (0.5K / 1K / 2K) → FASHN mode performance | balanced | quality */
+export const TRY_ON_QUALITY_OPTIONS: {
+  id: QualityMode;
+  label: string;
+  shortHint: string;
+  hint: string;
+}[] = [
+  {
+    id: "performance",
+    label: "0.5K",
+    shortHint: "черновик",
+    hint: "Быстрый черновик, ниже стоимость",
+  },
+  {
+    id: "balanced",
+    label: "1K",
+    shortHint: "баланс",
+    hint: "Баланс качества и скорости",
+  },
+  {
+    id: "quality",
+    label: "2K",
+    shortHint: "для зума",
+    hint: "Детализация для зума в карточке",
+  },
 ];
 
 export type ModelGender = "female" | "male";
@@ -91,14 +128,24 @@ export const MODEL_BODY_TYPE_IDS = MODEL_BODY_TYPES.map(
 export type ModelPose = "front" | "slight-angle" | typeof MODEL_PARAM_CUSTOM;
 export type ModelCrop = "full-body" | "upper-body" | typeof MODEL_PARAM_CUSTOM;
 export type ModelBackground = "white" | "light-gray" | "studio";
+export type ModelLighting =
+  | "studio"
+  | "sunny-outdoor"
+  | ModelParamCustom;
 export type ModelCategoryContext =
   | "general"
   | "clothing"
   | "lingerie"
   | "jewelry";
 
+export type { ModelAnglePresetId, ModelCustomAngle };
+
 export type ModelGenerationSettings = {
   gender: ModelGender;
+  /** Free-text; optional, included in generation prompt when set */
+  modelNationality: string;
+  anglePresets: ModelAnglePresetId[];
+  customAngles: ModelCustomAngle[];
   bodyType: ModelBodyType;
   bodyTypeCustom: string;
   modelAge: number;
@@ -107,11 +154,16 @@ export type ModelGenerationSettings = {
   crop: ModelCrop;
   cropCustom: string;
   background: ModelBackground;
+  lighting: ModelLighting;
+  lightingCustom: string;
   categoryContext: ModelCategoryContext;
 };
 
 export const DEFAULT_MODEL_GENERATION_SETTINGS: ModelGenerationSettings = {
   gender: "female",
+  modelNationality: "",
+  anglePresets: [...DEFAULT_MODEL_ANGLE_PRESETS],
+  customAngles: [],
   bodyType: "standard",
   bodyTypeCustom: "",
   modelAge: DEFAULT_MODEL_AGE,
@@ -120,6 +172,8 @@ export const DEFAULT_MODEL_GENERATION_SETTINGS: ModelGenerationSettings = {
   crop: "full-body",
   cropCustom: "",
   background: "white",
+  lighting: "studio",
+  lightingCustom: "",
   categoryContext: "clothing",
 };
 
@@ -189,8 +243,10 @@ export type StudioSessionAsset = {
 export type ProductShotScenePreset =
   | "marketplace-clean"
   | "white-studio"
-  | "light-gray-studio";
+  | "light-gray-studio"
+  | ModelParamCustom;
 
+import type { FalModelResolution } from "@/lib/ai/modelOutputSizes";
 import type { ShotSizePreset } from "@/lib/ai/productShotSchemas";
 
 export type { ShotSizePreset };
@@ -199,12 +255,16 @@ export type ProductShotFidelityMode = "exact-card";
 
 export type ProductShotSettings = {
   scenePreset: ProductShotScenePreset;
+  sceneCustomDescription: string;
   shotSizePreset: ShotSizePreset;
+  imageQuality: FalModelResolution;
 };
 
 export const DEFAULT_PRODUCT_SHOT_SETTINGS: ProductShotSettings = {
   scenePreset: "marketplace-clean",
+  sceneCustomDescription: "",
   shotSizePreset: "square",
+  imageQuality: "1K",
 };
 
 export type ResultReviewStatus =

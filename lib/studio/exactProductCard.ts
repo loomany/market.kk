@@ -1,3 +1,4 @@
+import type { FalModelResolution } from "@/lib/ai/modelOutputSizes";
 import type { ShotSizePreset } from "@/lib/ai/productShotSchemas";
 import type { ProductShotScenePreset } from "@/components/studio/types";
 import { shotSizePresetToDimensions } from "@/lib/ai/productShotSchemas";
@@ -6,10 +7,17 @@ import { prepareCutoutCanvas } from "@/lib/studio/cutoutImage";
 export type ExactCardBackground = "white" | "light-gray";
 
 export function scenePresetToExactBackground(
-  preset: ProductShotScenePreset
+  preset: ProductShotScenePreset,
+  customDescription?: string
 ): ExactCardBackground {
   if (preset === "light-gray-studio") {
     return "light-gray";
+  }
+  if (preset === "custom" && customDescription?.trim()) {
+    const text = customDescription.toLowerCase();
+    if (/(сер|gray|grey|светло.?сер)/i.test(text)) {
+      return "light-gray";
+    }
   }
   return "white";
 }
@@ -34,13 +42,17 @@ function loadImage(url: string): Promise<HTMLImageElement> {
 export type ComposeExactProductCardOptions = {
   background: ExactCardBackground;
   shotSizePreset: ShotSizePreset;
+  imageQuality?: FalModelResolution;
 };
 
 export async function composeExactProductCard(
   cutoutUrl: string,
   options: ComposeExactProductCardOptions
 ): Promise<string> {
-  const [width, height] = shotSizePresetToDimensions(options.shotSizePreset);
+  const [width, height] = shotSizePresetToDimensions(
+    options.shotSizePreset,
+    options.imageQuality ?? "1K"
+  );
   const img = await loadImage(cutoutUrl);
   const cutout = prepareCutoutCanvas(img);
   const srcW = cutout.width;
