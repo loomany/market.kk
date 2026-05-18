@@ -73,12 +73,24 @@ export async function POST(request: Request) {
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
   if (admin) {
-    await admin.from("auth_codes").insert({
+    const { error: insertError } = await admin.from("auth_codes").insert({
       phone,
       code_hash: hashCode(phone, code),
       expires_at: expiresAt,
       attempts: 0,
     });
+    if (insertError) {
+      console.error("[auth] auth_codes insert failed", insertError);
+      return NextResponse.json(
+        {
+          ok: false,
+          errorCode: "AUTH_CODE_STORAGE_FAILED",
+          message:
+            "Не удалось сохранить код. Проверьте, что миграция Supabase применена.",
+        },
+        { status: 503 }
+      );
+    }
   } else {
     saveMemoryCode(phone, code);
   }

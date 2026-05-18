@@ -3,12 +3,14 @@
 import { useMemo, useState } from "react";
 import { Clapperboard, Download, ImagePlus, Layers, Trash2, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { VIDEO_MODELS, type VideoModelKey } from "@/lib/ai/videoModels";
 import type { PromptEnhanceResponse } from "@/lib/ai/promptEnhanceSchemas";
 import type { SceneGenerateResponse } from "@/lib/ai/sceneSchemas";
 import type { VideoGenerateResponse } from "@/lib/ai/videoSchemas";
+import type { Locale } from "@/lib/i18n/localeConfig";
 import type { StudioSessionAsset } from "./types";
 
 type ProcessingAction =
@@ -21,6 +23,7 @@ type ProcessingAction =
 type ProcessedAssetsPanelProps = {
   assets: StudioSessionAsset[];
   mockMode: boolean;
+  promptLocale: Locale;
   onDeleteAsset: (id: string) => void;
   onAssetCreated: (asset: StudioSessionAsset) => void;
 };
@@ -55,6 +58,7 @@ function downloadAsset(url: string, filename: string) {
 export function ProcessedAssetsPanel({
   assets,
   mockMode,
+  promptLocale,
   onDeleteAsset,
   onAssetCreated,
 }: ProcessedAssetsPanelProps) {
@@ -83,9 +87,6 @@ export function ProcessedAssetsPanel({
   const selectedAsset =
     assets.find((asset) => asset.id === selectedAssetId) ?? assets[0];
   const selectedModel = VIDEO_MODELS[modelKey];
-  const estimatedCost = selectedModel.pricePerSecondUsd
-    ? Number((selectedModel.pricePerSecondUsd * durationSeconds).toFixed(4))
-    : undefined;
   const appliedPrompt = enhancedPrompt ?? prompt;
   const canGenerate = Boolean(selectedAsset && appliedPrompt.trim().length >= 4);
 
@@ -109,7 +110,7 @@ export function ProcessedAssetsPanel({
           userPrompt: prompt,
           sourceImageDescription: selectedAsset?.label,
           targetPlatform: activeAction === "reels" ? "reels" : "marketplace",
-          language: "ru",
+          language: promptLocale,
         }),
       });
       const data = (await res.json()) as PromptEnhanceResponse;
@@ -151,6 +152,7 @@ export function ProcessedAssetsPanel({
             durationSeconds,
             aspectRatio: activeAction === "reels" ? "9:16" : aspectRatio,
             motionPreset,
+            promptLocale,
           }),
         });
         const data = (await res.json()) as VideoGenerateResponse;
@@ -188,6 +190,7 @@ export function ProcessedAssetsPanel({
           mode: sceneMode,
           aspectRatio,
           outputFormat: "png",
+          promptLocale,
         }),
       });
       const data = (await res.json()) as SceneGenerateResponse;
@@ -272,7 +275,6 @@ export function ProcessedAssetsPanel({
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <Badge variant="outline">{asset.label ?? asset.type}</Badge>
-                {asset.provider && <Badge variant="violet">{asset.provider}</Badge>}
               </div>
               <p className="mt-2 text-xs leading-5 text-slate-500">
                 {new Date(asset.createdAt).toLocaleString("ru-RU")}
@@ -398,14 +400,16 @@ export function ProcessedAssetsPanel({
                 setEnhancedPrompt(null);
               }}
               rows={4}
+              disabled={generationLoading || enhanceLoading}
               placeholder="Например: модель плавно поворачивается, камера медленно приближается, ткань слегка движется"
-              className="w-full rounded-[18px] border border-border bg-white px-3 py-3 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
+              className="w-full rounded-[18px] border border-border bg-white px-3 py-3 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-600"
             />
             <Button
               variant="outline"
               size="sm"
               className="w-full sm:w-auto"
               loading={enhanceLoading}
+              disabled={generationLoading || enhanceLoading}
               onClick={handleEnhancePrompt}
             >
               <Wand2 className="h-4 w-4" />
@@ -446,7 +450,7 @@ export function ProcessedAssetsPanel({
                   setAspectRatio(nextModel.aspectRatioOptions[0] ?? "9:16");
                 }}
                 options={Object.entries(VIDEO_MODELS).map(([id, model]) => ({
-                  id,
+                  value: id,
                   label: model.label,
                 }))}
               />
@@ -455,7 +459,7 @@ export function ProcessedAssetsPanel({
                 value={quality}
                 onChange={(value) => setQuality(value as typeof quality)}
                 options={selectedModel.qualityOptions.map((option) => ({
-                  id: option.id,
+                  value: option.id,
                   label: option.label,
                 }))}
               />
@@ -464,7 +468,7 @@ export function ProcessedAssetsPanel({
                 value={String(durationSeconds)}
                 onChange={(value) => setDurationSeconds(Number(value))}
                 options={durationOptions.map((value) => ({
-                  id: String(value),
+                  value: String(value),
                   label: `${value} sec`,
                 }))}
               />
@@ -474,7 +478,7 @@ export function ProcessedAssetsPanel({
                 onChange={(value) => setAspectRatio(value as typeof aspectRatio)}
                 disabled={activeAction === "reels"}
                 options={selectedModel.aspectRatioOptions.map((value) => ({
-                  id: value,
+                  value,
                   label: value === "9:16" ? "9:16 Reels / Stories" : value,
                 }))}
               />
@@ -485,23 +489,12 @@ export function ProcessedAssetsPanel({
                   setMotionPreset(value as typeof motionPreset)
                 }
                 options={motionPresets.map((preset) => ({
-                  id: preset.id,
+                  value: preset.id,
                   label: preset.label,
                 }))}
               />
             </div>
           )}
-
-          <div className="rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
-            {mockMode
-              ? "Сейчас демо-режим: видео и сцены создаются как mock, списаний нет."
-              : "Реальный AI-режим может списывать деньги. Стоимость должна быть подтверждена перед запуском."}
-            <br />
-            Примерная стоимость:{" "}
-            {typeof estimatedCost === "number"
-              ? `$${estimatedCost.toFixed(2)}`
-              : "нужна проверка pricing"}
-          </div>
 
           {error && (
             <p className="rounded-[16px] border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -528,37 +521,5 @@ export function ProcessedAssetsPanel({
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-function Select({
-  label,
-  value,
-  options,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: { id: string; label: string }[];
-  disabled?: boolean;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="space-y-1.5 text-sm font-semibold text-slate-950">
-      <span>{label}</span>
-      <select
-        value={value}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-[16px] border border-border bg-white px-3 py-2.5 text-sm font-normal outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100 disabled:bg-slate-50 disabled:text-slate-400"
-      >
-        {options.map((option) => (
-          <option key={option.id} value={option.id}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
   );
 }

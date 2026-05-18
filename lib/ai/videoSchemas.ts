@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { promptLocaleSchema } from "@/lib/ai/promptLocaleSchema";
 
 export const videoGenerateRequestSchema = z.object({
   sourceImageUrl: z.string().min(1),
@@ -16,6 +17,7 @@ export const videoGenerateRequestSchema = z.object({
       "product-fidelity",
     ])
     .default("subtle-motion"),
+  promptLocale: promptLocaleSchema.optional(),
 });
 
 export type VideoGenerateRequest = z.infer<typeof videoGenerateRequestSchema>;

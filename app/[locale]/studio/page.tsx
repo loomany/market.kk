@@ -40,6 +40,7 @@ export default async function LocaleStudioPage({ params }: PageProps) {
     <StudioShell
       mockMode={aiSafety.mockMode}
       paidAiRunsAllowed={aiSafety.paidAiRunsAllowed}
+      locale={locale}
     />
   );
 }

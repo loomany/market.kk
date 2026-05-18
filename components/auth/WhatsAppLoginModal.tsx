@@ -1,17 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { usePathname } from "next/navigation";
 import { LogOut, MessageCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import {
+  PhoneCountryInput,
+  validatePhoneCountryInput,
+} from "@/components/auth/PhoneCountryInput";
+import { assertLocale } from "@/lib/i18n/localeConfig";
+import { resolveDefaultCountryId } from "@/lib/auth/phoneCountries";
 
 type User = { id: string; phone: string } | null;
 
 export function WhatsAppLoginModal() {
+  const pathname = usePathname();
+  const defaultCountryId = useMemo(() => {
+    const segment = pathname.split("/").filter(Boolean)[0];
+    return resolveDefaultCountryId(assertLocale(segment) ?? null);
+  }, [pathname]);
+
+  useEffect(() => {
+    setPhoneCountryId(defaultCountryId);
+  }, [defaultCountryId]);
+
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<"phone" | "code">("phone");
   const [phone, setPhone] = useState("");
+  const [phoneCountryId, setPhoneCountryId] = useState(defaultCountryId);
   const [code, setCode] = useState("");
   const [user, setUser] = useState<User>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -26,6 +44,12 @@ export function WhatsAppLoginModal() {
   }, []);
 
   const sendCode = async () => {
+    const validation = validatePhoneCountryInput(phone, phoneCountryId);
+    if (!validation.ok) {
+      setMessage(validation.message);
+      return;
+    }
+
     setLoading(true);
     setMessage(null);
     try {
@@ -34,15 +58,23 @@ export function WhatsAppLoginModal() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone }),
       });
-      const data = (await res.json()) as { ok: boolean; message?: string };
-      if (!data.ok) {
-        setMessage(data.message ?? "Не удалось отправить код.");
+      const data = (await res.json().catch(() => null)) as {
+        ok?: boolean;
+        message?: string;
+      } | null;
+      if (!res.ok || !data?.ok) {
+        setMessage(
+          data?.message ??
+            (res.status === 404
+              ? "Сервис отправки кода недоступен. Перезапустите dev-сервер."
+              : "Не удалось отправить код.")
+        );
         return;
       }
       setMessage(data.message ?? "Код отправлен.");
       setStep("code");
     } catch {
-      setMessage("Не удалось отправить код.");
+      setMessage("Не удалось отправить код. Проверьте соединение.");
     } finally {
       setLoading(false);
     }
@@ -122,17 +154,16 @@ export function WhatsAppLoginModal() {
           </div>
 
           <div className="mt-5 space-y-3">
-            <label className="space-y-1.5 text-sm font-semibold text-slate-950">
-              <span>WhatsApp номер</span>
-              <input
+            {step === "phone" ? (
+              <PhoneCountryInput
                 value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-                placeholder="+7 700 000 00 00"
-                className="w-full rounded-[16px] border border-border px-3 py-3 text-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
+                onChange={setPhone}
+                defaultCountryId={defaultCountryId}
+                countryId={phoneCountryId}
+                onCountryChange={setPhoneCountryId}
+                disabled={loading}
               />
-            </label>
-
-            {step === "code" && (
+            ) : (
               <label className="space-y-1.5 text-sm font-semibold text-slate-950">
                 <span>Код из WhatsApp</span>
                 <input

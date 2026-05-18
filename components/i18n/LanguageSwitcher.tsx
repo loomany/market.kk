@@ -1,0 +1,74 @@
+"use client";
+
+import { Languages } from "lucide-react";
+import { Select } from "@/components/ui/Select";
+import { supportedLocales, type Locale } from "@/lib/i18n/localeConfig";
+import { cn } from "@/lib/utils";
+
+function localeAbbrev(code: Locale) {
+  return code.toUpperCase();
+}
+
+type LanguageSwitcherProps = {
+  locale: Locale;
+  variant?: "select" | "pills";
+  abbreviated?: boolean;
+  className?: string;
+};
+
+export function LanguageSwitcher({
+  locale,
+  variant = "select",
+  abbreviated = variant === "select",
+  className,
+}: LanguageSwitcherProps) {
+  const optionLabel = (code: Locale) =>
+    abbreviated
+      ? localeAbbrev(code)
+      : supportedLocales.find((l) => l.code === code)!.nativeLabel;
+
+  if (variant === "pills") {
+    return (
+      <div className={className}>
+        <div className="flex flex-wrap gap-2">
+          {supportedLocales.map((item) => (
+            <a
+              key={item.code}
+              href={`/${item.code}`}
+              className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                item.code === locale
+                  ? "border-teal-300 bg-teal-50 text-teal-900"
+                  : "border-border text-slate-600 hover:border-teal-200 hover:text-teal-800"
+              }`}
+            >
+              {optionLabel(item.code)}
+            </a>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("inline-flex items-center gap-1.5", className)}>
+      <Languages className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
+      <span className="sr-only">Language</span>
+      <Select
+        className="w-auto"
+        value={locale}
+        size="sm"
+        align="end"
+        triggerClassName="min-w-[4.75rem] font-semibold uppercase tracking-wide text-slate-700"
+        menuClassName="z-[60] min-w-[11rem]"
+        options={supportedLocales.map((item) => ({
+          value: item.code,
+          label: `${localeAbbrev(item.code)} · ${item.nativeLabel}`,
+        }))}
+        formatTriggerLabel={(option) => localeAbbrev(option.value as Locale)}
+        onChange={(code) => {
+          window.location.href = `/${code}`;
+        }}
+      />
+    </div>
+  );
+}

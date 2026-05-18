@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   CircleDollarSign,
   ImageIcon,
-  Languages,
   Play,
   ShieldCheck,
   Shirt,
@@ -15,7 +14,6 @@ import {
   Wand2,
 } from "lucide-react";
 import type { Locale } from "@/lib/i18n/localeConfig";
-import { supportedLocales } from "@/lib/i18n/localeConfig";
 import { getLandingCopy } from "@/lib/i18n/translations";
 import {
   MOCK_MODEL_IMAGE,
@@ -26,6 +24,8 @@ import { platformPages } from "@/data/seo/platforms";
 import { useCasePages } from "@/data/seo/useCases";
 import { getPublishedBlogArticles } from "@/lib/blog/blogResolve";
 import { getLocalizedPath } from "@/lib/i18n/routeSlugs";
+import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
+import { SaasFooter } from "@/components/landing/SaasFooter";
 
 const platformNames = [
   "Kaspi",
@@ -76,15 +76,18 @@ export function SaasLanding({ locale }: { locale: Locale }) {
               {copy.nav.studio}
             </Link>
           </nav>
-          <Link
-            href="/studio"
-            prefetch={false}
-            className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-sm font-semibold text-white shadow-lg shadow-teal-900/15 transition-colors hover:bg-teal-800 sm:px-4"
-          >
-            <span className="hidden sm:inline">{copy.nav.openStudio}</span>
-            <span className="sm:hidden">{copy.nav.studio}</span>
-            <ArrowRight className="h-4 w-4" />
-          </Link>
+          <div className="flex shrink-0 items-center gap-2">
+            <LanguageSwitcher locale={locale} />
+            <Link
+              href="/studio"
+              prefetch={false}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-sm font-semibold text-white shadow-lg shadow-teal-900/15 transition-colors hover:bg-teal-800 sm:px-4"
+            >
+              <span className="hidden sm:inline">{copy.nav.openStudio}</span>
+              <span className="sm:hidden">{copy.nav.studio}</span>
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -308,71 +311,30 @@ export function SaasLanding({ locale }: { locale: Locale }) {
         </section>
       </main>
 
-      <footer className="border-t border-border bg-white px-4 py-10 sm:px-6 lg:px-8">
-        <div className="mx-auto grid max-w-7xl gap-8 md:grid-cols-[1.2fr_2fr]">
-          <div>
-            <p className="text-lg font-bold tracking-tight text-slate-950">
-              Vitrina <span className="text-teal-700">AI</span>
-            </p>
-            <p className="mt-3 max-w-md text-sm leading-6 text-slate-600">
-              AI-студия товарных фото и видео для маркетплейсов. Независимый инструмент для подготовки и проверки визуала.
-            </p>
-          </div>
-          <div className="grid gap-6 sm:grid-cols-3 lg:grid-cols-5">
-            <FooterGroup
-              title={locale === "ru" ? "Продукт" : "Product"}
-              links={[
-                { label: copy.nav.openStudio, href: "/studio" },
-                { label: copy.nav.features, href: `/${locale}/features` },
-                {
-                  label: locale === "ru" ? "Кратко для AI" : "AI summary",
-                  href: `/${locale}/ai-summary`,
-                },
-              ]}
-            />
-            <FooterGroup
-              title={locale === "ru" ? "Для кого" : "Use cases"}
-              links={featuredUseCases.slice(0, 4).map((page) => ({
-                label: page.content[locale].h1,
-                href: `/${locale}/use-cases/${page.content[locale].slug}`,
-              }))}
-            />
-            <FooterGroup
-              title={locale === "ru" ? "Площадки" : "Platforms"}
-              links={featuredPlatforms.slice(0, 4).map((page) => ({
-                label: page.name,
-                href: `/${locale}/platforms/${page.content[locale].slug}`,
-              }))}
-            />
-            <FooterGroup
-              title={locale === "ru" ? "Материалы" : "Resources"}
-              links={[
-                { label: copy.nav.blog, href: `/${locale}/blog` },
-                { label: "llms.txt", href: "/llms.txt" },
-                { label: locale === "ru" ? "Приватность" : "Privacy", href: `/${locale}/privacy` },
-                { label: locale === "ru" ? "Условия" : "Terms", href: `/${locale}/terms` },
-              ]}
-            />
-            <div>
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
-                <Languages className="h-4 w-4" />
-                {locale === "ru" ? "Языки" : "Languages"}
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {supportedLocales.slice(0, 10).map((item) => (
-                  <Link
-                    key={item.code}
-                    href={`/${item.code}`}
-                    className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-slate-600 hover:border-teal-200 hover:text-teal-800"
-                  >
-                    {item.nativeLabel}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <SaasFooter
+        locale={locale}
+        copy={copy}
+        productLinks={[
+          { label: copy.nav.openStudio, href: "/studio" },
+          { label: copy.nav.features, href: `/${locale}/features` },
+          {
+            label: locale === "ru" ? "Кратко для AI" : "AI summary",
+            href: `/${locale}/ai-summary`,
+          },
+        ]}
+        useCaseLinks={featuredUseCases.slice(0, 4).map((page) => ({
+          label: page.content[locale].h1,
+          href: `/${locale}/use-cases/${page.content[locale].slug}`,
+        }))}
+        platformLinks={featuredPlatforms.slice(0, 4).map((page) => ({
+          label: page.name,
+          href: `/${locale}/platforms/${page.content[locale].slug}`,
+        }))}
+        resourceLinks={[
+          { label: copy.nav.blog, href: `/${locale}/blog` },
+          { label: "llms.txt", href: "/llms.txt" },
+        ]}
+      />
     </>
   );
 }
@@ -388,32 +350,6 @@ function SeoLinkGroup({
     <div className="rounded-lg border border-border bg-white p-5 shadow-sm">
       <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
       <div className="mt-4 grid gap-2">
-        {links.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            prefetch={link.href === "/studio" ? false : undefined}
-            className="text-sm leading-6 text-slate-600 hover:text-teal-800"
-          >
-            {link.label}
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function FooterGroup({
-  title,
-  links,
-}: {
-  title: string;
-  links: Array<{ label: string; href: string }>;
-}) {
-  return (
-    <div>
-      <h2 className="text-sm font-semibold text-slate-950">{title}</h2>
-      <div className="mt-3 grid gap-2">
         {links.map((link) => (
           <Link
             key={link.href}

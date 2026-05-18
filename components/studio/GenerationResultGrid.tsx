@@ -18,6 +18,8 @@ type GenerationResultGridProps = {
   showRegenerate?: boolean;
   regenerateLoading?: boolean;
   isProductShotMode?: boolean;
+  /** Inside StudioPanelCard — no extra outer frame */
+  embedded?: boolean;
   onStartOver: () => void;
   onRegenerate?: () => void;
 };
@@ -198,6 +200,7 @@ export function GenerationResultGrid({
   showRegenerate = true,
   regenerateLoading,
   isProductShotMode = false,
+  embedded = false,
   onStartOver,
   onRegenerate,
 }: GenerationResultGridProps) {
@@ -228,12 +231,22 @@ export function GenerationResultGrid({
 
   if (results.length === 0) {
     return (
-      <div className="flex min-h-[320px] items-center justify-center rounded-[24px] border border-dashed border-border bg-slate-50 p-6 text-center">
+      <div
+        className={cn(
+          "flex items-center justify-center text-center",
+          embedded ? "min-h-[260px] p-2" : "min-h-[320px] rounded-[24px] border border-border bg-slate-50 p-6"
+        )}
+      >
         <div className="max-w-sm">
-          <p className="text-base font-semibold text-slate-950">
+          <p
+            className={cn(
+              "font-semibold text-slate-950",
+              embedded ? "text-sm" : "text-base"
+            )}
+          >
             Здесь появятся готовые варианты
           </p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
+          <p className="mt-2 text-sm leading-6 text-slate-500">
             Загрузите товар, выберите режим и нажмите кнопку генерации.
           </p>
         </div>

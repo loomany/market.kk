@@ -9,6 +9,8 @@ import {
 } from "@/lib/ai/paidAiGuard";
 import { getVideoModel } from "@/lib/ai/videoModels";
 import { videoGenerateRequestSchema } from "@/lib/ai/videoSchemas";
+import { defaultLocale } from "@/lib/i18n/localeConfig";
+import { translatePromptToEnglish } from "@/lib/ai/promptTranslate";
 
 export const runtime = "nodejs";
 
@@ -41,6 +43,24 @@ export async function POST(request: Request) {
   }
 
   const data = parsed.data;
+  const promptLocale = data.promptLocale ?? defaultLocale;
+
+  let generationData = data;
+  try {
+    const generationPrompt = await translatePromptToEnglish(
+      data.prompt,
+      promptLocale,
+      "/api/ai/video/generate"
+    );
+    generationData = { ...data, prompt: generationPrompt };
+  } catch (error) {
+    if (isPaidAiGuardError(error)) {
+      return NextResponse.json(paidAiGuardResponse(error), {
+        status: error.status,
+      });
+    }
+    throw error;
+  }
   const model = getVideoModel(data.modelKey);
   const estimatedCost = estimateVideoOrThrow(data.modelKey, data.durationSeconds);
 
@@ -113,7 +133,7 @@ export async function POST(request: Request) {
       estimatedCostUsd: estimatedCost,
     });
     const result = await fal.subscribe(model.id, {
-      input: model.inputMapper(data),
+      input: model.inputMapper(generationData),
       logs: true,
       onQueueUpdate(update) {
         if (update.status === "IN_PROGRESS") {

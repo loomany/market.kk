@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { promptLocaleSchema } from "@/lib/ai/promptLocaleSchema";
 
 export const sceneGenerateRequestSchema = z.object({
   sourceImageUrl: z.string().min(1),
@@ -6,6 +7,7 @@ export const sceneGenerateRequestSchema = z.object({
   mode: z.enum(["exact-background", "creative-scene"]),
   aspectRatio: z.enum(["1:1", "4:5", "9:16", "16:9"]).default("1:1"),
   outputFormat: z.enum(["png", "jpeg", "webp"]).default("png"),
+  promptLocale: promptLocaleSchema.optional(),
 });
 
 export type SceneGenerateRequest = z.infer<typeof sceneGenerateRequestSchema>;

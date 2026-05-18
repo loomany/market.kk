@@ -1,5 +1,6 @@
 "use client";
 
+import { Select } from "@/components/ui/Select";
 import {
   GARMENT_PHOTO_TYPES,
   PRODUCT_CATEGORIES,
@@ -18,38 +19,6 @@ type GarmentSettingsPanelProps = {
   onQualityModeChange: (v: QualityMode) => void;
   lingerieMode?: boolean;
 };
-
-function SelectField<T extends string>({
-  label,
-  helper,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  helper?: string;
-  value: T;
-  options: { id: T; label: string }[];
-  onChange: (v: T) => void;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <label className="text-sm font-semibold text-slate-950">{label}</label>
-      {helper && <p className="text-xs leading-5 text-slate-500">{helper}</p>}
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value as T)}
-        className="w-full rounded-[16px] border border-border bg-white px-3 py-2.5 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
-      >
-        {options.map((opt) => (
-          <option key={opt.id} value={opt.id}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
 
 export function GarmentSettingsPanel(props: GarmentSettingsPanelProps) {
   return (
@@ -72,7 +41,7 @@ export function GarmentSettingsPanel(props: GarmentSettingsPanelProps) {
         </div>
       )}
 
-      <SelectField
+      <Select
         label="Тип товара"
         helper={
           props.lingerieMode
@@ -80,10 +49,13 @@ export function GarmentSettingsPanel(props: GarmentSettingsPanelProps) {
             : "Помогает AI понять, какую часть одежды переносить на модель."
         }
         value={props.productCategory}
-        options={PRODUCT_CATEGORIES}
+        options={PRODUCT_CATEGORIES.map((opt) => ({
+          value: opt.id,
+          label: opt.label,
+        }))}
         onChange={props.onProductCategoryChange}
       />
-      <SelectField
+      <Select
         label="Тип исходного фото"
         helper={
           props.lingerieMode
@@ -91,14 +63,19 @@ export function GarmentSettingsPanel(props: GarmentSettingsPanelProps) {
             : "Укажите, сфотографирована одежда отдельно или уже на человеке."
         }
         value={props.garmentPhotoType}
-        options={GARMENT_PHOTO_TYPES}
+        options={GARMENT_PHOTO_TYPES.map((opt) => ({
+          value: opt.id,
+          label: opt.label,
+        }))}
         onChange={props.onGarmentPhotoTypeChange}
       />
-      <SelectField
+      <Select
         label="Качество"
         helper="Максимальное качество может ждать дольше."
         value={props.qualityMode}
-        options={QUALITY_MODES.filter((mode) => mode.id !== "performance")}
+        options={QUALITY_MODES.filter((mode) => mode.id !== "performance").map(
+          (opt) => ({ value: opt.id, label: opt.label })
+        )}
         onChange={props.onQualityModeChange}
       />
     </div>

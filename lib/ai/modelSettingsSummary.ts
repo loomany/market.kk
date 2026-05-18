@@ -1,0 +1,107 @@
+import { MODEL_BODY_TYPES, type ModelGenerationSettings } from "@/components/studio/types";
+import { isAdultModelAge } from "@/lib/ai/modelAge";
+import { MODEL_PARAM_CUSTOM } from "@/lib/ai/modelCustomParams";
+import {
+  formatModelOutputSizeLabel,
+  isModelOutputSizeComplete,
+  type ModelOutputSizeSelection,
+} from "@/lib/ai/modelOutputSizes";
+
+const GENDER_LABELS: Record<ModelGenerationSettings["gender"], string> = {
+  female: "женская модель",
+  male: "мужская модель",
+};
+
+const BACKGROUND_LABELS: Record<ModelGenerationSettings["background"], string> = {
+  white: "белый фон",
+  "light-gray": "светло-серый фон",
+  studio: "студийный фон",
+};
+
+const POSE_LABELS: Record<ModelGenerationSettings["pose"], string> = {
+  front: "прямо к камере",
+  "slight-angle": "лёгкий поворот",
+  [MODEL_PARAM_CUSTOM]: "свой вариант",
+};
+
+const CROP_LABELS: Record<ModelGenerationSettings["crop"], string> = {
+  "full-body": "в полный рост",
+  "upper-body": "по пояс",
+  [MODEL_PARAM_CUSTOM]: "свой вариант",
+};
+
+const CONTEXT_LABELS: Record<
+  ModelGenerationSettings["categoryContext"],
+  string
+> = {
+  clothing: "одежда",
+  lingerie: "бельё / купальники",
+  jewelry: "украшения",
+  general: "универсально",
+};
+
+function bodyTypeSummary(settings: ModelGenerationSettings): string {
+  if (settings.bodyType === MODEL_PARAM_CUSTOM) {
+    return settings.bodyTypeCustom.trim() || "свой вариант (уточните)";
+  }
+  const item = MODEL_BODY_TYPES.find((entry) => entry.id === settings.bodyType);
+  return item?.label.toLowerCase() ?? settings.bodyType;
+}
+
+function poseSummary(settings: ModelGenerationSettings): string {
+  if (settings.pose === MODEL_PARAM_CUSTOM && settings.poseCustom.trim()) {
+    return settings.poseCustom.trim();
+  }
+  return POSE_LABELS[settings.pose];
+}
+
+function cropSummary(settings: ModelGenerationSettings): string {
+  if (settings.crop === MODEL_PARAM_CUSTOM && settings.cropCustom.trim()) {
+    return settings.cropCustom.trim();
+  }
+  return CROP_LABELS[settings.crop];
+}
+
+function ageSummary(age: number): string {
+  if (isAdultModelAge(age)) {
+    return `возраст ${age} лет`;
+  }
+  if (age < 13) {
+    return `детская модель, ${age} лет`;
+  }
+  return `подростковая модель, ${age} лет`;
+}
+
+/** Human-readable Russian summary of shooting parameters for the UI */
+export function buildModelSettingsSummaryRu(
+  settings: ModelGenerationSettings,
+  outputSize: Partial<ModelOutputSizeSelection>,
+  extraDescription?: string
+): string {
+  const parts = [
+    GENDER_LABELS[settings.gender],
+    ageSummary(settings.modelAge),
+    `тип фигуры: ${bodyTypeSummary(settings)}`,
+    `поза: ${poseSummary(settings)}`,
+    BACKGROUND_LABELS[settings.background],
+    `кадр: ${cropSummary(settings)}`,
+    `сценарий: ${CONTEXT_LABELS[settings.categoryContext]}`,
+  ];
+
+  if (isModelOutputSizeComplete(outputSize)) {
+    parts.push(`размер кадра: ${formatModelOutputSizeLabel(outputSize)}`);
+  } else if (outputSize.aspectRatio || outputSize.resolution) {
+    const sizeBits = [outputSize.aspectRatio, outputSize.resolution]
+      .filter(Boolean)
+      .join(" · ");
+    parts.push(`размер кадра: ${sizeBits} (выберите оба параметра)`);
+  }
+
+  let text = parts.join(", ");
+
+  if (extraDescription?.trim()) {
+    text += `\n\nДополнение: ${extraDescription.trim()}`;
+  }
+
+  return text;
+}

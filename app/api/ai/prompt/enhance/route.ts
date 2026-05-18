@@ -5,6 +5,11 @@ import {
   isPaidAiGuardError,
   paidAiGuardResponse,
 } from "@/lib/ai/paidAiGuard";
+import {
+  getPromptLanguageName,
+  isEnglishPromptLocale,
+} from "@/lib/ai/promptLocale";
+import type { Locale } from "@/lib/i18n/locales";
 
 export const runtime = "nodejs";
 
@@ -19,26 +24,45 @@ function buildMockEnhancedPrompt(input: {
   context: string;
   userPrompt: string;
   targetPlatform: string;
+  language: Locale;
 }) {
   const base = input.userPrompt.trim();
-  const fidelity =
+  const fidelityEn =
     "Preserve the exact product identity: color, shape, pattern, texture, edges, fit, and materials. No text, no watermark, no logos, no fake claims.";
+  const fidelityRu =
+    "Сохранить точную идентичность товара: цвет, форму, принт, текстуру, края, посадку и материалы. Без текста, водяных знаков, логотипов и ложных обещаний.";
+
+  const displayFidelity = isEnglishPromptLocale(input.language)
+    ? fidelityEn
+    : fidelityRu;
 
   if (input.context === "video") {
-    return `${base}. Slow premium ecommerce motion, stable camera, gentle natural movement, product remains unchanged, ${fidelity}`;
+    const en = `${base}. Slow premium ecommerce motion, stable camera, gentle natural movement, product remains unchanged, ${fidelityEn}`;
+    const ru = `${base}. Медленное премиальное движение для e-commerce, стабильная камера, мягкое натуральное движение, товар не меняется, ${fidelityRu}`;
+    return isEnglishPromptLocale(input.language) ? en : ru;
   }
 
   if (input.context === "model-description") {
-    return `${base}. Adult commercial catalog model, neutral pose, relaxed arms not covering the product area, clean studio lighting, non-explicit, not sexualized, ${fidelity}`;
+    const en = `${base}. Adult commercial catalog model, neutral pose, relaxed arms not covering the product area, clean studio lighting, non-explicit, not sexualized, ${fidelityEn}`;
+    const ru = `${base}. Взрослая модель для коммерческого каталога, нейтральная поза, руки не закрывают зону одежды, чистый студийный свет, без откровенности, ${fidelityRu}`;
+    return isEnglishPromptLocale(input.language) ? en : ru;
   }
 
-  return `${base}. Clean premium marketplace composition, natural light, accurate product proportions, ${fidelity}`;
+  const en = `${base}. Clean premium marketplace composition, natural light, accurate product proportions, ${fidelityEn}`;
+  const ru = `${base}. Чистая премиальная композиция для маркетплейса, естественный свет, точные пропорции товара, ${fidelityRu}`;
+  return isEnglishPromptLocale(input.language) ? en : ru;
+}
+
+function buildMockGenerationPrompt(displayPrompt: string, language: Locale) {
+  if (isEnglishPromptLocale(language)) return displayPrompt;
+  return `${displayPrompt} (English generation draft: preserve product identity, commercial catalog, no text or watermark.)`;
 }
 
 function safeJsonParse(text: string) {
   try {
     return JSON.parse(text) as {
       enhancedPrompt?: string;
+      generationPrompt?: string;
       negativePrompt?: string;
       safetyNotes?: string;
       suggestions?: string[];
@@ -97,20 +121,29 @@ export async function POST(request: Request) {
 
   const data = parsed.data;
   const model = process.env.OPENAI_PROMPT_MODEL ?? "gpt-5.5";
+  const displayLanguage = getPromptLanguageName(data.language);
 
   if (isMockMode()) {
+    const enhancedPrompt = buildMockEnhancedPrompt(data);
     return NextResponse.json({
       ok: true,
       originalPrompt: data.userPrompt,
-      enhancedPrompt: buildMockEnhancedPrompt(data),
+      enhancedPrompt,
+      generationPrompt: buildMockGenerationPrompt(enhancedPrompt, data.language),
       negativePrompt:
         "wrong product, changed color, changed pattern, distorted shape, extra text, watermark, logo, low quality",
-      safetyNotes:
-        "Демо-усиление. Перед real generation проверьте, что prompt не добавил новых деталей товара.",
-      suggestions: [
-        "Проверьте цвет и форму товара после генерации.",
-        "Для маркетплейса избегайте текста, логотипов и обещаний на изображении.",
-      ],
+      safetyNotes: isEnglishPromptLocale(data.language)
+        ? "Demo enhancement. Verify the prompt did not add new product details before real generation."
+        : "Демо-усиление. Перед real generation проверьте, что промт не добавил новых деталей товара.",
+      suggestions: isEnglishPromptLocale(data.language)
+        ? [
+            "Check product color and shape after generation.",
+            "For marketplaces avoid text, logos, and claims on the image.",
+          ]
+        : [
+            "Проверьте цвет и форму товара после генерации.",
+            "Для маркетплейса избегайте текста, логотипов и обещаний на изображении.",
+          ],
       provider: "mock",
       model: "mock-prompt-enhancer",
     });
@@ -152,7 +185,7 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         model,
         instructions:
-          "You improve prompts for ecommerce product photo/video generation. Do not invent product details. Preserve product identity. Return only compact JSON with enhancedPrompt, negativePrompt, safetyNotes, suggestions.",
+          "You improve prompts for ecommerce product photo/video generation. Do not invent product details. Preserve product identity. Return only compact JSON. enhancedPrompt must be in the user's display language. generationPrompt and negativePrompt must be English with the same meaning as enhancedPrompt.",
         input: [
           {
             role: "user",
@@ -164,13 +197,17 @@ export async function POST(request: Request) {
                   userPrompt: data.userPrompt,
                   sourceImageDescription: data.sourceImageDescription,
                   targetPlatform: data.targetPlatform,
-                  language: data.language,
+                  displayLanguage,
+                  languageLocale: data.language,
                   rules: [
                     "Do not invent product details.",
                     "For clothing model: adult only, non-explicit, commercial catalog style.",
                     "For marketplace: no fake claims, no logos, no text, no watermark.",
                     "For video: describe motion, camera, duration, product fidelity.",
-                    "Return Russian explanation and English generation prompt when useful.",
+                    `enhancedPrompt: write ONLY in ${displayLanguage}. This is what the user reads and edits.`,
+                    "generationPrompt: same instructions in English for Fal/image/video models. No extra details.",
+                    "negativePrompt: English only.",
+                    `safetyNotes and suggestions: ${displayLanguage} only.`,
                   ],
                 }),
               },
@@ -187,6 +224,7 @@ export async function POST(request: Request) {
               additionalProperties: false,
               properties: {
                 enhancedPrompt: { type: "string" },
+                generationPrompt: { type: "string" },
                 negativePrompt: { type: "string" },
                 safetyNotes: { type: "string" },
                 suggestions: {
@@ -196,6 +234,7 @@ export async function POST(request: Request) {
               },
               required: [
                 "enhancedPrompt",
+                "generationPrompt",
                 "negativePrompt",
                 "safetyNotes",
                 "suggestions",
@@ -225,10 +264,14 @@ export async function POST(request: Request) {
       throw new Error("OpenAI response did not include enhancedPrompt");
     }
 
+    const generationPrompt =
+      parsedOutput.generationPrompt?.trim() || parsedOutput.enhancedPrompt;
+
     return NextResponse.json({
       ok: true,
       originalPrompt: data.userPrompt,
       enhancedPrompt: parsedOutput.enhancedPrompt,
+      generationPrompt,
       negativePrompt: parsedOutput.negativePrompt,
       safetyNotes: parsedOutput.safetyNotes,
       suggestions: parsedOutput.suggestions ?? [],

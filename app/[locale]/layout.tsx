@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import "../globals.css";
 import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
 import { JsonLdScript } from "@/components/seo/JsonLd";
@@ -17,14 +17,10 @@ import {
 } from "@/lib/i18n/localeConfig";
 import { siteDescription, siteName, siteUrl } from "@/lib/seo/site";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin", "cyrillic"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  display: "swap",
 });
 
 type LocaleLayoutProps = {
@@ -81,7 +77,7 @@ export default async function LocaleLayout({
     <html
       lang={getHtmlLanguage(locale)}
       dir={getTextDirection(locale)}
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${inter.variable} h-full font-sans antialiased`}
     >
       <body className="min-h-full flex flex-col text-slate-900">
         <AnalyticsProvider />

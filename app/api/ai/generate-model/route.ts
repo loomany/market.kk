@@ -6,6 +6,8 @@ import {
 import { generateModelRequestSchema } from "@/lib/ai/modelGenerationSchemas";
 import { buildModelGenerationPrompt } from "@/lib/ai/modelPrompts";
 import { MOCK_MODEL_IMAGE } from "@/lib/ai/mockResults";
+import { defaultLocale } from "@/lib/i18n/localeConfig";
+import { translatePromptToEnglish } from "@/lib/ai/promptTranslate";
 import {
   isPaidAiGuardError,
   paidAiGuardResponse,
@@ -49,7 +51,35 @@ export async function POST(request: Request) {
   }
 
   const data = parsed.data;
-  const prompt = buildModelGenerationPrompt(data);
+  const promptLocale = data.promptLocale ?? defaultLocale;
+
+  let generationInput = data;
+  try {
+    const textFields = [
+      "customDescription",
+      "bodyTypeCustom",
+      "poseCustom",
+      "cropCustom",
+    ] as const;
+
+    for (const field of textFields) {
+      const value = data[field]?.trim();
+      if (!value) continue;
+      generationInput = {
+        ...generationInput,
+        [field]: await translatePromptToEnglish(value, promptLocale, ROUTE_ID),
+      };
+    }
+  } catch (error) {
+    if (isPaidAiGuardError(error)) {
+      return NextResponse.json(paidAiGuardResponse(error), {
+        status: error.status,
+      });
+    }
+    throw error;
+  }
+
+  const prompt = buildModelGenerationPrompt(generationInput);
   const promptPreview = prompt.slice(0, 300);
 
   if (isMockMode()) {

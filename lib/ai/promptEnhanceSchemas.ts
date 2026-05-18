@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { promptLocaleSchema } from "@/lib/ai/promptLocaleSchema";
 
 export const promptEnhanceRequestSchema = z.object({
   context: z.enum([
@@ -13,7 +14,8 @@ export const promptEnhanceRequestSchema = z.object({
   targetPlatform: z
     .enum(["marketplace", "instagram", "reels", "catalog"])
     .default("marketplace"),
-  language: z.enum(["ru"]).default("ru"),
+  /** Site UI locale — enhancedPrompt is written in this language */
+  language: promptLocaleSchema.default("ru"),
 });
 
 export type PromptEnhanceRequest = z.infer<
@@ -23,7 +25,10 @@ export type PromptEnhanceRequest = z.infer<
 export type PromptEnhanceSuccessResponse = {
   ok: true;
   originalPrompt: string;
+  /** Text shown in the UI (site language); user may edit before generate */
   enhancedPrompt: string;
+  /** English version for image/video models (reference; generate re-translates final text) */
+  generationPrompt: string;
   negativePrompt?: string;
   safetyNotes?: string;
   suggestions: string[];

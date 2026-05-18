@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import "../globals.css";
 import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
 import { JsonLdScript } from "@/components/seo/JsonLd";
@@ -10,14 +10,10 @@ import {
 } from "@/lib/seo/jsonLd";
 import { siteUrl } from "@/lib/seo/site";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin", "cyrillic"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  display: "swap",
 });
 
 const configuredAppName = process.env.NEXT_PUBLIC_APP_NAME;
@@ -44,7 +40,7 @@ export default function RootLayout({
   return (
     <html
       lang="ru"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${inter.variable} h-full font-sans antialiased`}
     >
       <body className="min-h-full flex flex-col text-slate-900">
         <AnalyticsProvider />

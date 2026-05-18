@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import type { Locale } from "@/lib/i18n/localeConfig";
 import {
   AlertTriangle,
   ArrowLeft,
   Camera,
-  ShieldCheck,
   Sparkles,
   Wand2,
 } from "lucide-react";
@@ -15,6 +15,16 @@ import type { GenerateModelResponse } from "@/lib/ai/modelGenerationSchemas";
 import type { PromptEnhanceResponse } from "@/lib/ai/promptEnhanceSchemas";
 import type { RemoveBackgroundResponse } from "@/lib/ai/backgroundRemovalSchemas";
 import { mapCategoryForTryOn, type TryOnResponse } from "@/lib/ai/falSchemas";
+import {
+  minorRestrictedChoice,
+  minorRestrictionMessage,
+} from "@/lib/ai/modelAge";
+import {
+  FAL_MODEL_RESOLUTIONS,
+  isModelOutputSizeComplete,
+  type ModelOutputSizeSelection,
+} from "@/lib/ai/modelOutputSizes";
+import { validateModelCustomParams } from "@/lib/ai/modelGenerationValidation";
 import { validateImageFileClient } from "@/lib/ai/clientImageValidation";
 import { fitCutoutToShotSize, refineCutoutWithUserMask } from "@/lib/studio/cutoutImage";
 import { shotSizePresetToDimensions } from "@/lib/ai/productShotSchemas";
@@ -42,17 +52,18 @@ import { GarmentSettingsPanel } from "./GarmentSettingsPanel";
 import { ProductShotSettingsPanel } from "./ProductShotSettingsPanel";
 import { StudioModeSelector } from "./StudioModeSelector";
 import { GenerationResultGrid } from "./GenerationResultGrid";
+import { PreviewCard } from "./PreviewCard";
+import { StudioPanelCard } from "./StudioPanelCard";
 import type { ProductMaskApplyResult } from "./ProductMaskEditor";
 import { ProductSelectionPanel } from "./ProductSelectionPanel";
 import { StudioWorkflowStep } from "./StudioWorkflowStep";
 import { ProcessedAssetsPanel } from "./ProcessedAssetsPanel";
+import { useStudioLocale } from "./useStudioLocale";
 import {
   DEFAULT_MODEL_GENERATION_SETTINGS,
   DEFAULT_PRODUCT_SHOT_SETTINGS,
-  presetToModelSettings,
   type GarmentPhotoType,
   type ModelGenerationSettings,
-  type ModelPreset,
   type ProductCategory,
   type ProductShotSettings,
   type QualityMode,
@@ -171,10 +182,13 @@ function useObjectUrlPreview() {
 export function StudioShell({
   mockMode,
   paidAiRunsAllowed,
+  locale: localeProp,
 }: {
   mockMode: boolean;
   paidAiRunsAllowed: boolean;
+  locale?: Locale;
 }) {
+  const promptLocale = useStudioLocale(localeProp);
   const productPreview = useObjectUrlPreview();
   const modelPreview = useObjectUrlPreview();
 
@@ -190,7 +204,6 @@ export function StudioShell({
   const [garmentPhotoType, setGarmentPhotoType] =
     useState<GarmentPhotoType>("auto");
   const [qualityMode, setQualityMode] = useState<QualityMode>("balanced");
-  const [modelPreset, setModelPreset] = useState<ModelPreset>("female-studio");
   const [modelSettings, setModelSettings] = useState<ModelGenerationSettings>(
     DEFAULT_MODEL_GENERATION_SETTINGS
   );
@@ -206,6 +219,9 @@ export function StudioShell({
   const [modelGenerateError, setModelGenerateError] = useState<string | null>(
     null
   );
+  const [modelOutputSize, setModelOutputSize] = useState<
+    Partial<ModelOutputSizeSelection>
+  >({});
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<StudioResultImage[]>([]);
   const [sessionAssets, setSessionAssets] = useState<StudioSessionAsset[]>([]);
@@ -399,14 +415,6 @@ export function StudioShell({
     (generatedModelUrl && !modelFile ? generatedModelUrl : null) ??
     (mockMode ? MOCK_MODEL_IMAGE : null);
 
-  const handlePresetChange = useCallback((preset: ModelPreset) => {
-    setModelPreset(preset);
-    setModelSettings((prev) => ({
-      ...prev,
-      ...presetToModelSettings(preset),
-    }));
-  }, []);
-
   const handleModelSettingsChange = useCallback(
     (settings: ModelGenerationSettings) => {
       setModelSettings(settings);
@@ -423,6 +431,28 @@ export function StudioShell({
     setModelGenerating(true);
     setModelGenerateError(null);
 
+    const minorRestriction = minorRestrictedChoice(modelSettings);
+    if (minorRestriction) {
+      setModelGenerateError(minorRestrictionMessage(minorRestriction));
+      setModelGenerating(false);
+      return;
+    }
+
+    if (!isModelOutputSizeComplete(modelOutputSize)) {
+      setModelGenerateError(
+        "Выберите соотношение сторон и разрешение изображения."
+      );
+      setModelGenerating(false);
+      return;
+    }
+
+    const customParamsError = validateModelCustomParams(modelSettings);
+    if (customParamsError) {
+      setModelGenerateError(customParamsError);
+      setModelGenerating(false);
+      return;
+    }
+
     try {
       const res = await fetch("/api/ai/generate-model", {
         method: "POST",
@@ -430,17 +460,21 @@ export function StudioShell({
         body: JSON.stringify({
           gender: modelSettings.gender,
           bodyType: modelSettings.bodyType,
-          ageGroup: "adult",
+          bodyTypeCustom: modelSettings.bodyTypeCustom.trim() || undefined,
+          modelAge: modelSettings.modelAge,
           pose: modelSettings.pose,
+          poseCustom: modelSettings.poseCustom.trim() || undefined,
           crop: modelSettings.crop,
+          cropCustom: modelSettings.cropCustom.trim() || undefined,
           background: modelSettings.background,
           categoryContext: modelSettings.categoryContext,
-          aspectRatio: "3:4",
+          aspectRatio: modelOutputSize.aspectRatio,
           outputFormat: "png",
-          resolution: "1K",
+          resolution: modelOutputSize.resolution,
           numImages: 1,
           seed: useSeed,
           customDescription: modelDescription || undefined,
+          promptLocale,
         }),
       });
 
@@ -485,7 +519,7 @@ export function StudioShell({
           context: "model-description",
           userPrompt: modelDescription,
           targetPlatform: "marketplace",
-          language: "ru",
+          language: promptLocale,
         }),
       });
       const data = (await res.json()) as PromptEnhanceResponse;
@@ -719,21 +753,6 @@ export function StudioShell({
     : "Создать карточку";
 
   const PrimaryIcon = isClothingMode ? Wand2 : Camera;
-  const safetyBadgeVariant = mockMode
-    ? "success"
-    : paidAiRunsAllowed
-      ? "danger"
-      : "warning";
-  const safetyBadgeLabel = mockMode
-    ? "Демо-режим"
-    : paidAiRunsAllowed
-      ? "Платные генерации разрешены"
-      : "Реальный AI-режим";
-  const safetyStatusText = mockMode
-    ? "Списаний нет."
-    : paidAiRunsAllowed
-      ? "Платные генерации разрешены. Проверяйте стоимость перед запуском."
-      : "Реальный режим настроен, но платные генерации заблокированы.";
 
   return (
     <div className="min-h-screen">
@@ -754,18 +773,11 @@ export function StudioShell({
       </header>
 
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-8 lg:px-8">
-        <section className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
-          <div>
+        <section>
             <Badge variant="violet" className="mb-4">
               <Sparkles className="h-3.5 w-3.5" />
               Vitrina AI Studio
             </Badge>
-            <div className="mb-4 flex flex-wrap items-center gap-2">
-              <Badge variant={safetyBadgeVariant}>{safetyBadgeLabel}</Badge>
-              <span className="text-xs leading-5 text-slate-500">
-                {safetyStatusText}
-              </span>
-            </div>
             <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
               Студия товарных фото
             </h1>
@@ -774,19 +786,6 @@ export function StudioShell({
               товарная карточка и проработка готовых изображений для видео,
               фона и Reels.
             </p>
-          </div>
-
-          <div className="rounded-[24px] border border-teal-100 bg-teal-50/70 p-4 text-sm leading-6 text-teal-950">
-            <div className="flex items-start gap-3">
-              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-teal-700" />
-              <p>
-                В анонимном режиме файлы остаются только в этой сессии. После
-                входа через WhatsApp можно сохранять историю в Supabase. В
-                реальном AI-режиме изображения отправляются на серверные
-                AI-сервисы, а перед платными генерациями нужна оценка стоимости.
-              </p>
-            </div>
-          </div>
         </section>
 
         <StudioModeSelector value={studioMode} onChange={setStudioMode} />
@@ -796,6 +795,7 @@ export function StudioShell({
           <ProcessedAssetsPanel
             assets={sessionAssets}
             mockMode={mockMode}
+            promptLocale={promptLocale}
             onDeleteAsset={deleteSessionAsset}
             onAssetCreated={addSingleAssetToSession}
           />
@@ -867,8 +867,6 @@ export function StudioShell({
                           label="AI-модель"
                         >
                           <ModelPresetSelector
-                            value={modelPreset}
-                            onChange={handlePresetChange}
                             settings={modelSettings}
                             onSettingsChange={handleModelSettingsChange}
                             onGenerate={() => void handleGenerateModel()}
@@ -884,6 +882,21 @@ export function StudioShell({
                               generatedModelUrl && !modelFile
                                 ? generatedModelUrl
                                 : null
+                            }
+                            outputSize={modelOutputSize}
+                            onOutputSizeChange={(patch) =>
+                              setModelOutputSize((prev) => {
+                                const next = { ...prev, ...patch };
+                                if (
+                                  next.resolution &&
+                                  !FAL_MODEL_RESOLUTIONS.includes(
+                                    next.resolution
+                                  )
+                                ) {
+                                  delete next.resolution;
+                                }
+                                return next;
+                              })
                             }
                           />
                         </StudioWorkflowStep>
@@ -948,62 +961,60 @@ export function StudioShell({
             </Card>
           </aside>
 
-          <section className="space-y-6">
-            {isClothingMode ? (
-              <div className="grid gap-4 sm:grid-cols-2">
+          <section className="min-h-full">
+            <div className="sticky top-6 z-10 space-y-4 -mx-1 bg-white/95 px-1 pb-2 pt-0 backdrop-blur-sm supports-backdrop-filter:bg-white/85">
+              {isClothingMode ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <PreviewCard
+                    title="Товар"
+                    url={effectiveProductPreviewUrl}
+                    empty="Загрузите фото товара"
+                  />
+                  <PreviewCard
+                    title="AI-модель"
+                    url={effectiveModelPreview}
+                    empty="Сгенерируйте или загрузите модель"
+                    badge={
+                      generatedModelUrl && !modelFile ? "AI-модель" : undefined
+                    }
+                  />
+                </div>
+              ) : (
                 <PreviewCard
                   title="Товар"
-                  url={
-                    effectiveProductPreviewUrl
-                  }
-                  empty="Загрузите фото товара"
+                  url={effectiveProductPreviewUrl}
+                  empty="Загрузите фото"
                 />
-                <PreviewCard
-                  title="AI-модель"
-                  url={effectiveModelPreview}
-                  empty="Сгенерируйте или загрузите модель"
-                  badge={
-                    generatedModelUrl && !modelFile ? "AI-модель" : undefined
-                  }
-                />
-              </div>
-            ) : (
-              <PreviewCard
-                title="Товар"
-                url={effectiveProductPreviewUrl}
-                empty="Загрузите фото"
-              />
-            )}
-
-            <Card>
-            <CardHeader>
-              <CardTitle>Результаты</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {error && (
-                <div
-                  role="alert"
-                  className="rounded-[18px] border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-800"
-                >
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span>{error}</span>
-                  </div>
-                </div>
               )}
-              <GenerationResultGrid
-                results={results}
-                loading={loading}
-                showRegenerate={
-                  !isProductShotMode && results.length > 0
-                }
-                regenerateLoading={loading}
-                isProductShotMode={isProductShotMode}
-                onStartOver={handleStartOver}
-                onRegenerate={handleRegenerate}
-              />
-            </CardContent>
-            </Card>
+
+              <StudioPanelCard title="Результаты">
+                {error ? (
+                  <div
+                    role="alert"
+                    className="border-b border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-800"
+                  >
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>{error}</span>
+                    </div>
+                  </div>
+                ) : null}
+                <div className="p-4">
+                  <GenerationResultGrid
+                    results={results}
+                    loading={loading}
+                    showRegenerate={
+                      !isProductShotMode && results.length > 0
+                    }
+                    regenerateLoading={loading}
+                    isProductShotMode={isProductShotMode}
+                    onStartOver={handleStartOver}
+                    onRegenerate={handleRegenerate}
+                    embedded
+                  />
+                </div>
+              </StudioPanelCard>
+            </div>
           </section>
         </div>
         )}
@@ -1039,39 +1050,3 @@ function ModeStepper({ mode }: { mode: StudioMode }) {
   );
 }
 
-function PreviewCard({
-  title,
-  url,
-  empty,
-  badge,
-}: {
-  title: string;
-  url: string | null;
-  empty: string;
-  badge?: string;
-}) {
-  return (
-    <Card className="shadow-lg">
-      <CardContent className="p-4">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <p className="text-sm font-semibold text-slate-950">{title}</p>
-          {badge && <Badge variant="violet">{badge}</Badge>}
-        </div>
-        <div className="overflow-hidden rounded-[18px] border border-border bg-slate-50">
-          {url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={url}
-              alt={`Предпросмотр: ${title}`}
-              className="max-h-[460px] min-h-[220px] w-full object-contain"
-            />
-          ) : (
-            <div className="flex min-h-[260px] items-center justify-center p-4 text-center text-sm leading-6 text-slate-500">
-              {empty}
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}

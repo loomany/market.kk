@@ -15,7 +15,20 @@ const memoryCodes = new Map<string, StoredAuthCode>();
 const sendBuckets = new Map<string, { count: number; resetAt: number; lastSentAt: number }>();
 
 export function normalizePhone(phone: string) {
-  return phone.replace(/[^\d+]/g, "").replace(/^8/, "+7");
+  const trimmed = phone.trim().replace(/[^\d+]/g, "");
+  if (!trimmed) return "";
+
+  if (trimmed.startsWith("+")) return trimmed;
+
+  if (trimmed.startsWith("8") && trimmed.length === 11) {
+    return `+7${trimmed.slice(1)}`;
+  }
+
+  if (trimmed.startsWith("7") && trimmed.length === 11) {
+    return `+${trimmed}`;
+  }
+
+  return `+${trimmed.replace(/^\+/, "")}`;
 }
 
 export function createSixDigitCode() {
@@ -99,6 +112,21 @@ export function consumeMemoryCode(phone: string, code: string) {
   return { ok: true as const };
 }
 
+/** Green API host for this instance (e.g. https://7107.api.greenapi.com). */
+export function getGreenApiBaseUrl(instanceId: string) {
+  const fromEnv = process.env.GREEN_API_URL?.trim();
+  if (fromEnv) {
+    return fromEnv.replace(/\/+$/, "");
+  }
+
+  const prefix = instanceId.slice(0, 4);
+  if (/^\d{4}$/.test(prefix)) {
+    return `https://${prefix}.api.greenapi.com`;
+  }
+
+  return "https://api.green-api.com";
+}
+
 export async function sendWhatsAppCode(phone: string, code: string) {
   const instanceId = process.env.GREEN_API_INSTANCE_ID;
   const token = process.env.GREEN_API_TOKEN;
@@ -112,9 +140,10 @@ export async function sendWhatsAppCode(phone: string, code: string) {
     route: "/api/auth/whatsapp/send-code",
   });
 
+  const baseUrl = getGreenApiBaseUrl(instanceId);
   const chatId = `${phone.replace(/\D/g, "")}@c.us`;
   const res = await fetch(
-    `https://api.green-api.com/waInstance${instanceId}/sendMessage/${token}`,
+    `${baseUrl}/waInstance${instanceId}/sendMessage/${token}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -126,6 +155,12 @@ export async function sendWhatsAppCode(phone: string, code: string) {
   );
 
   if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    console.error("[green-api] sendMessage failed", {
+      status: res.status,
+      baseUrl,
+      detail: detail.slice(0, 500),
+    });
     return { ok: false, delivery: "green-api" as const };
   }
 

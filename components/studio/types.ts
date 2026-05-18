@@ -1,4 +1,6 @@
 import type { ProductShotChecklistState as ProductShotChecklistStateType } from "@/lib/ai/productShotChecklist";
+import { DEFAULT_MODEL_AGE } from "@/lib/ai/modelAge";
+import { MODEL_PARAM_CUSTOM } from "@/lib/ai/modelCustomParams";
 
 export type ProductCategory =
   | "auto"
@@ -10,39 +12,6 @@ export type ProductCategory =
 export type GarmentPhotoType = "auto" | "model" | "flat-lay";
 
 export type QualityMode = "performance" | "balanced" | "quality";
-
-export type ModelPreset =
-  | "female-studio"
-  | "male-studio"
-  | "plus-size-female"
-  | "neutral-mannequin";
-
-export const MODEL_PRESETS: {
-  id: ModelPreset;
-  label: string;
-  description: string;
-}[] = [
-  {
-    id: "female-studio",
-    label: "Женская студийная модель",
-    description: "Нейтральная поза, подходит для платьев, топов и комплектов.",
-  },
-  {
-    id: "male-studio",
-    label: "Мужская студийная модель",
-    description: "Спокойная поза для футболок, рубашек, костюмов и верхней одежды.",
-  },
-  {
-    id: "plus-size-female",
-    label: "Женская plus-size модель",
-    description: "Взрослая модель plus-size для каталожной съёмки.",
-  },
-  {
-    id: "neutral-mannequin",
-    label: "Нейтральный манекен",
-    description: "Когда нужна карточка без узнаваемого лица модели.",
-  },
-];
 
 export const PRODUCT_CATEGORIES: { id: ProductCategory; label: string }[] = [
   { id: "auto", label: "Авто" },
@@ -65,9 +34,62 @@ export const QUALITY_MODES: { id: QualityMode; label: string }[] = [
 ];
 
 export type ModelGender = "female" | "male";
-export type ModelBodyType = "standard" | "plus-size" | "slim";
-export type ModelPose = "front" | "slight-angle";
-export type ModelCrop = "full-body" | "upper-body";
+
+export const MODEL_BODY_TYPES = [
+  {
+    id: MODEL_PARAM_CUSTOM,
+    label: "Свой вариант",
+    hint: "Опишите силуэт своими словами",
+  },
+  {
+    id: "standard",
+    label: "Стандартная",
+    hint: "Средние пропорции для маркетплейса",
+  },
+  {
+    id: "plus-size",
+    label: "Plus-size",
+    hint: "Полные формы, каталожная посадка",
+  },
+  {
+    id: "slim",
+    label: "Стройная",
+    hint: "Узкий силуэт, лёгкая фигура",
+  },
+  {
+    id: "athletic",
+    label: "Спортивная (фитнес)",
+    hint: "Подтянутое тело, рельеф без перебора",
+  },
+  {
+    id: "swimwear",
+    label: "Бикини / купальники",
+    hint: "Тонус и пляжный каталог, без откровенности",
+  },
+  {
+    id: "curvy",
+    label: "Пышная фигура",
+    hint: "Выраженная талия и бёдра, «песочные часы»",
+  },
+  {
+    id: "petite",
+    label: "Миниатюрная",
+    hint: "Невысокая, изящный маленький силуэт",
+  },
+  {
+    id: "tall",
+    label: "Высокая модель",
+    hint: "Длинные ноги, подиумная подача",
+  },
+] as const;
+
+export type ModelBodyType = (typeof MODEL_BODY_TYPES)[number]["id"];
+
+export const MODEL_BODY_TYPE_IDS = MODEL_BODY_TYPES.map(
+  (item) => item.id
+) as [ModelBodyType, ...ModelBodyType[]];
+export type ModelPose = "front" | "slight-angle" | typeof MODEL_PARAM_CUSTOM;
+export type ModelCrop = "full-body" | "upper-body" | typeof MODEL_PARAM_CUSTOM;
 export type ModelBackground = "white" | "light-gray" | "studio";
 export type ModelCategoryContext =
   | "general"
@@ -78,8 +100,12 @@ export type ModelCategoryContext =
 export type ModelGenerationSettings = {
   gender: ModelGender;
   bodyType: ModelBodyType;
+  bodyTypeCustom: string;
+  modelAge: number;
   pose: ModelPose;
+  poseCustom: string;
   crop: ModelCrop;
+  cropCustom: string;
   background: ModelBackground;
   categoryContext: ModelCategoryContext;
 };
@@ -87,8 +113,12 @@ export type ModelGenerationSettings = {
 export const DEFAULT_MODEL_GENERATION_SETTINGS: ModelGenerationSettings = {
   gender: "female",
   bodyType: "standard",
+  bodyTypeCustom: "",
+  modelAge: DEFAULT_MODEL_AGE,
   pose: "front",
+  poseCustom: "",
   crop: "full-body",
+  cropCustom: "",
   background: "white",
   categoryContext: "clothing",
 };
@@ -217,18 +247,3 @@ export type StudioResultImage = {
 };
 
 export type LastGenerationMode = StudioMode;
-
-export function presetToModelSettings(
-  preset: ModelPreset
-): Partial<ModelGenerationSettings> {
-  switch (preset) {
-    case "male-studio":
-      return { gender: "male", bodyType: "standard" };
-    case "plus-size-female":
-      return { gender: "female", bodyType: "plus-size" };
-    case "neutral-mannequin":
-      return { gender: "female", bodyType: "standard", pose: "front" };
-    default:
-      return { gender: "female", bodyType: "standard" };
-  }
-}
