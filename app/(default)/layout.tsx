@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+import "../globals.css";
+import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
+import { JsonLdScript } from "@/components/seo/JsonLd";
+import {
+  organizationJsonLd,
+  softwareApplicationJsonLd,
+  websiteJsonLd,
+} from "@/lib/seo/jsonLd";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,6 +26,9 @@ const appName =
     : "Vitrina AI Studio";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL || "https://vitrina-ai-studio.com"
+  ),
   title: {
     default: appName,
     template: `%s | ${appName}`,
@@ -37,7 +47,13 @@ export default function RootLayout({
       lang="ru"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col text-slate-900">{children}</body>
+      <body className="min-h-full flex flex-col text-slate-900">
+        <AnalyticsProvider />
+        <JsonLdScript
+          data={[organizationJsonLd(), websiteJsonLd(), softwareApplicationJsonLd()]}
+        />
+        {children}
+      </body>
     </html>
   );
 }
