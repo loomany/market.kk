@@ -1,15 +1,20 @@
 # Vitrina AI Studio
 
-AI-студия для создания товарных фото для маркетплейсов.
+AI-студия для создания товарных фото и коротких видео для маркетплейсов.
 
 ## Features
 
-- одежда на AI-модели;
-- генерация AI-модели;
-- product shot для бижутерии и аксессуаров;
-- удаление фона;
-- чеклист качества;
+- одежда, бельё и комплекты на AI-модели;
+- генерация взрослой AI-модели для коммерческой каталожной съёмки;
+- точная товарная карточка без перерисовки товара;
+- ручное выделение товара для точной карточки;
+- проработка готовых изображений: фон, сцена, Reels / Stories, видео;
+- удаление фона как внутренний инструмент, не отдельный верхний режим;
+- усиление промта через server-side OpenAI route;
+- чеклист качества перед скачиванием;
 - accept / reject / regenerate;
+- WhatsApp-вход через Green API;
+- Supabase architecture для профилей, истории, файлов и jobs;
 - demo mode без списаний.
 
 ## Tech Stack
@@ -18,22 +23,42 @@ AI-студия для создания товарных фото для мар�
 - TypeScript
 - Tailwind CSS
 - Fal AI
+- OpenAI Responses API
+- Supabase SSR client / admin client
 - Zod
-- No Supabase/Auth/Payments in MVP
+- Green API for WhatsApp code delivery
+- No Payments in this stage
 
 ## Environment
 
-Скопируйте `.env.example` в `.env.local`:
+Скопируйте `.env.example` в `.env.local` и заполните только нужные ключи.
 
 ```env
 AI_MOCK_MODE=1
 FAL_KEY=
+OPENAI_API_KEY=
+OPENAI_PROMPT_MODEL=gpt-5.5
+ALLOW_PAID_AI_RUNS=false
+MAX_AI_TEST_SPEND_USD=5
+
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+
+GREEN_API_INSTANCE_ID=
+GREEN_API_TOKEN=
+WHATSAPP_AUTH_CODE_TTL_MINUTES=10
+APP_SESSION_SECRET=
+
 NEXT_PUBLIC_APP_NAME="Vitrina AI Studio"
 ```
 
-`AI_MOCK_MODE=1` — демо-режим без списаний. API routes возвращают демо-изображения, `FAL_KEY` не нужен.
+`AI_MOCK_MODE=1` — демо-режим без списаний.
 
-`AI_MOCK_MODE=0` + `FAL_KEY` — реальный AI-режим через Fal. Это платно, поэтому real paid calls нельзя запускать без отдельного approve.
+`AI_MOCK_MODE=0` + `FAL_KEY` — реальный AI-режим через Fal. Это платно. Не запускайте real paid calls без явного approval и включённого budget guard.
+
+`ALLOW_PAID_AI_RUNS=false` — безопасное значение по умолчанию. Video/scene real calls должны быть заблокированы, пока не утверждён бюджет.
 
 ## How To Run Locally
 
@@ -48,31 +73,68 @@ npm run dev
 - `http://localhost:3000` — landing;
 - `http://localhost:3000/studio` — студия.
 
-Для production-проверки:
+Production-проверка:
 
 ```bash
 npm run build
-npm run start
+npm run lint
 ```
 
 ## API Routes
+
+Existing AI routes:
 
 - `POST /api/ai/tryon`
 - `POST /api/ai/generate-model`
 - `POST /api/ai/product-shot`
 - `POST /api/ai/remove-background`
+- `POST /api/ai/pricing`
 
-## MVP Limitations
+Stage 2 routes:
 
-- нет Auth;
-- нет Payments;
-- нет Supabase;
-- нет истории генераций;
-- нет batch upload;
-- нет server-side export resize;
-- standalone удаление фона в UI работает по URL;
-- real paid calls не запускались без approve.
+- `POST /api/ai/prompt/enhance`
+- `POST /api/ai/video/generate`
+- `POST /api/ai/scene/generate`
+- `GET /api/auth/me`
+- `POST /api/auth/whatsapp/send-code`
+- `POST /api/auth/whatsapp/verify-code`
+- `POST /api/auth/logout`
+- `GET /api/studio/assets`
+- `POST /api/studio/assets`
+- `DELETE /api/studio/assets`
 
-## Notes
+## Supabase
 
-Vitrina AI Studio — универсальный SaaS-инструмент для продавцов маркетплейсов, интернет-магазинов и каталогов. Kaspi может быть одним из примеров площадки, но не является брендом продукта.
+Migration:
+
+- `supabase/migrations/202605180001_stage2_saas.sql`
+
+Tables:
+
+- `profiles`
+- `studio_projects`
+- `studio_assets`
+- `generation_jobs`
+- `auth_codes`
+
+Storage buckets:
+
+- `user-uploads`
+- `generated-assets`
+
+RLS policies are included. Service role is used only server-side.
+
+## Current Limitations
+
+- Payments are not implemented.
+- Video and creative scene real calls are budget-guarded and should not run without approval.
+- WhatsApp auth is app-level code flow; production hardening still needs persistent rate limits and full session revocation strategy.
+- Supabase Storage upload from generated remote URLs is planned; current implementation saves metadata/history and keeps anonymous mode session-only.
+- No batch upload.
+- No server-side export resize pipeline.
+
+## Safety Notes
+
+- Do not commit `.env.local`.
+- Do not print `FAL_KEY`, `OPENAI_API_KEY`, `GREEN_API_TOKEN`, or `SUPABASE_SERVICE_ROLE_KEY`.
+- Kaspi is only an example marketplace. The product brand is Vitrina AI Studio.
