@@ -21,6 +21,10 @@ type ModelPresetSelectorProps = {
   settings: ModelGenerationSettings;
   onSettingsChange: (settings: ModelGenerationSettings) => void;
   onGenerate: () => void;
+  modelDescription: string;
+  onModelDescriptionChange: (value: string) => void;
+  onEnhanceModelDescription: () => void;
+  enhancingDescription?: boolean;
   generating?: boolean;
   generateError?: string | null;
   generatedPreviewUrl?: string | null;
@@ -110,6 +114,10 @@ export function ModelPresetSelector({
   settings,
   onSettingsChange,
   onGenerate,
+  modelDescription,
+  onModelDescriptionChange,
+  onEnhanceModelDescription,
+  enhancingDescription,
   generating,
   generateError,
   generatedPreviewUrl,
@@ -229,6 +237,29 @@ export function ModelPresetSelector({
           талию и бёдра.
         </p>
       ) : null}
+
+      <div className="space-y-2">
+        <label className="text-sm font-semibold text-slate-950">
+          Опишите модель
+        </label>
+        <textarea
+          value={modelDescription}
+          onChange={(event) => onModelDescriptionChange(event.target.value)}
+          rows={3}
+          placeholder="Например: взрослая plus-size модель, уверенная поза, смотрит в камеру, светлая студия, руки не закрывают одежду"
+          className="w-full rounded-[16px] border border-border bg-white px-3 py-3 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-full sm:w-auto"
+          loading={enhancingDescription}
+          onClick={onEnhanceModelDescription}
+        >
+          Усилить промт
+        </Button>
+      </div>
 
       <Button
         type="button"

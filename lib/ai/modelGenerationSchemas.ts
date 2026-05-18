@@ -15,6 +15,7 @@ export const generateModelRequestSchema = z.object({
   resolution: z.enum(["0.5K", "1K", "2K"]).default("1K"),
   numImages: z.number().int().min(1).max(4).default(1),
   seed: z.number().int().optional(),
+  customDescription: z.string().trim().max(1000).optional(),
 });
 
 export type GenerateModelRequest = z.infer<typeof generateModelRequestSchema>;

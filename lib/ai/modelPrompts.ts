@@ -50,6 +50,12 @@ export function buildModelGenerationPrompt(
     );
   }
 
+  if (input.customDescription) {
+    parts.push(
+      `User model direction: ${input.customDescription}. Keep this direction commercial, adult-only, non-explicit, and suitable for marketplace catalog imagery.`
+    );
+  }
+
   parts.push(
     "Model should face the camera clearly, body posture suitable for virtual clothing try-on, hands not covering torso, no oversized clothing, no complex props, no sunglasses."
   );
