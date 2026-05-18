@@ -40,3 +40,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local tooling / dev logs
+.agents/
+skills-lock.json
+reports/dev-server-*.log
