@@ -6,8 +6,15 @@ import {
 import { generateModelRequestSchema } from "@/lib/ai/modelGenerationSchemas";
 import { buildModelGenerationPrompt } from "@/lib/ai/modelPrompts";
 import { MOCK_MODEL_IMAGE } from "@/lib/ai/mockResults";
+import {
+  isPaidAiGuardError,
+  paidAiGuardResponse,
+} from "@/lib/ai/paidAiGuard";
 
 export const runtime = "nodejs";
+
+const ROUTE_ID = "/api/ai/generate-model";
+const ESTIMATED_MODEL_GENERATION_COST_USD = 0.04;
 
 function isMockMode() {
   return process.env.AI_MOCK_MODE !== "0";
@@ -57,7 +64,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const fal = getFalClientOrThrow();
+    const fal = getFalClientOrThrow({
+      provider: "fal",
+      route: ROUTE_ID,
+      estimatedCostUsd: ESTIMATED_MODEL_GENERATION_COST_USD,
+    });
     const result = await fal.subscribe(MODEL_GENERATION_MODEL, {
       input: {
         prompt,
@@ -97,6 +108,12 @@ export async function POST(request: Request) {
       promptPreview,
     });
   } catch (error) {
+    if (isPaidAiGuardError(error)) {
+      return NextResponse.json(paidAiGuardResponse(error), {
+        status: error.status,
+      });
+    }
+
     const message =
       error instanceof Error ? error.message : "Unknown error";
 

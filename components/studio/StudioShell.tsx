@@ -168,7 +168,13 @@ function useObjectUrlPreview() {
   return { setFromFile, setFromHttpUrl };
 }
 
-export function StudioShell({ mockMode }: { mockMode: boolean }) {
+export function StudioShell({
+  mockMode,
+  paidAiRunsAllowed,
+}: {
+  mockMode: boolean;
+  paidAiRunsAllowed: boolean;
+}) {
   const productPreview = useObjectUrlPreview();
   const modelPreview = useObjectUrlPreview();
 
@@ -713,6 +719,22 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
     : "Создать карточку";
 
   const PrimaryIcon = isClothingMode ? Wand2 : Camera;
+  const safetyBadgeVariant = mockMode
+    ? "success"
+    : paidAiRunsAllowed
+      ? "danger"
+      : "warning";
+  const safetyBadgeLabel = mockMode
+    ? "Демо-режим"
+    : paidAiRunsAllowed
+      ? "Платные генерации разрешены"
+      : "Реальный AI-режим";
+  const safetyStatusText = mockMode
+    ? "Списаний нет."
+    : paidAiRunsAllowed
+      ? "Платные генерации разрешены. Проверяйте стоимость перед запуском."
+      : "Реальный режим настроен, но платные генерации заблокированы.";
+
   return (
     <div className="min-h-screen">
       <header className="border-b border-border/70 bg-white/85 backdrop-blur-xl">
@@ -739,13 +761,9 @@ export function StudioShell({ mockMode }: { mockMode: boolean }) {
               Vitrina AI Studio
             </Badge>
             <div className="mb-4 flex flex-wrap items-center gap-2">
-              <Badge variant={mockMode ? "success" : "warning"}>
-                {mockMode ? "Демо-режим" : "Реальный AI-режим"}
-              </Badge>
+              <Badge variant={safetyBadgeVariant}>{safetyBadgeLabel}</Badge>
               <span className="text-xs leading-5 text-slate-500">
-                {mockMode
-                  ? "Можно проверять интерфейс без списаний."
-                  : "Fal и другие AI-сервисы могут списывать деньги за генерацию."}
+                {safetyStatusText}
               </span>
             </div>
             <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">

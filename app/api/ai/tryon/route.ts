@@ -10,8 +10,20 @@ import {
 } from "@/lib/ai/falSchemas";
 import { uploadImageToFalStorage } from "@/lib/ai/falUpload";
 import { getMockTryOnResults } from "@/lib/ai/mockResults";
+import {
+  assertPaidAiAllowed,
+  isPaidAiGuardError,
+  paidAiGuardResponse,
+  type PaidAiGuardInput,
+} from "@/lib/ai/paidAiGuard";
 
 export const runtime = "nodejs";
+
+const ROUTE_ID = "/api/ai/tryon";
+
+function estimateTryOnCostUsd(numSamples: number) {
+  return Number((0.08 * Math.max(1, numSamples)).toFixed(2));
+}
 
 function isMockMode() {
   return process.env.AI_MOCK_MODE !== "0";
@@ -37,7 +49,8 @@ function mockResponse(
 
 async function resolveImageUrls(
   payload: TryOnFormPayload,
-  mockMode: boolean
+  mockMode: boolean,
+  guard: PaidAiGuardInput
 ): Promise<{ productImageUrl: string; modelImageUrl: string }> {
   let productImageUrl = payload.productImageUrl;
   let modelImageUrl = payload.modelImageUrl;
@@ -49,7 +62,8 @@ async function resolveImageUrls(
       try {
         productImageUrl = await uploadImageToFalStorage(
           payload.productImageFile,
-          "Product image"
+          "Product image",
+          guard
         );
       } catch (uploadError) {
         console.error(
@@ -68,7 +82,8 @@ async function resolveImageUrls(
       try {
         modelImageUrl = await uploadImageToFalStorage(
           payload.modelImageFile,
-          "Model image"
+          "Model image",
+          guard
         );
       } catch (uploadError) {
         console.error(
@@ -96,7 +111,11 @@ async function runTryOn(
   }
 
   try {
-    const fal = getFalClientOrThrow();
+    const fal = getFalClientOrThrow({
+      provider: "fal",
+      route: ROUTE_ID,
+      estimatedCostUsd: estimateTryOnCostUsd(data.numSamples),
+    });
     const result = await fal.subscribe(FASHN_TRYON_MODEL, {
       input: {
         model_image: data.modelImageUrl,
@@ -142,6 +161,12 @@ async function runTryOn(
 }
 
 function handleTryOnError(error: unknown) {
+  if (isPaidAiGuardError(error)) {
+    return NextResponse.json(paidAiGuardResponse(error), {
+      status: error.status,
+    });
+  }
+
   const message = error instanceof Error ? error.message : "Unknown error";
 
   if (message.includes("FAL_KEY")) {
@@ -202,11 +227,21 @@ function handleTryOnError(error: unknown) {
 
 async function processFormPayload(payload: TryOnFormPayload) {
   const mockMode = isMockMode();
+  const guard: PaidAiGuardInput = {
+    provider: "fal",
+    route: ROUTE_ID,
+    estimatedCostUsd: estimateTryOnCostUsd(payload.numSamples),
+  };
 
   try {
+    if (!mockMode) {
+      assertPaidAiAllowed(guard);
+    }
+
     const { productImageUrl, modelImageUrl } = await resolveImageUrls(
       payload,
-      mockMode
+      mockMode,
+      guard
     );
 
     const params = {

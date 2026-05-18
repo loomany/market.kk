@@ -70,3 +70,45 @@ Expected occurrences are in `.env.example`, server-side routes/libs, and reports
 - Video pricing estimates must be confirmed through Fal pricing API before any paid batch.
 - In-memory WhatsApp rate limiting is not production-grade.
 - Supabase migrations were created but not applied in a live project during this task.
+
+## Safety Hotfix Update — 2026-05-18
+
+Status: incident resolved for guarded routes.
+
+Added:
+
+- Global server-side guard: `lib/ai/paidAiGuard.ts`.
+- Safe mode endpoint: `GET /api/system/ai-mode`.
+- Isolated smoke command: `npm run smoke:ai:mock`.
+- Studio safety indicator for demo, real-blocked, and paid-allowed states.
+
+Protected routes:
+
+- `POST /api/ai/generate-model`
+- `POST /api/ai/tryon`
+- `POST /api/ai/product-shot`
+- `POST /api/ai/remove-background`
+- `POST /api/ai/video/generate`
+- `POST /api/ai/scene/generate`
+- `POST /api/ai/prompt/enhance`
+- `POST /api/auth/whatsapp/send-code`
+
+Verification:
+
+- `npm run smoke:ai:mock`: passed.
+- `npm run lint`: passed.
+- `npm run build`: passed.
+
+Guard checks:
+
+- Mock mode returns mock/no-cost responses.
+- Real mode with `ALLOW_PAID_AI_RUNS=false` returns `PAID_AI_RUNS_DISABLED`.
+- Real mode with `ALLOW_PAID_AI_RUNS=true` and `MAX_AI_TEST_SPEND_USD=0` returns `BUDGET_EXCEEDED`.
+- Pricing route remains available as a non-generation estimate.
+
+Security:
+
+- No real Fal/OpenAI/Green API calls were run after the hotfix.
+- No keys were printed.
+- `.env.local` was not changed or committed.
+- Supabase migration was reviewed statically only; no destructive SQL was run.

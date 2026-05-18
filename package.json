@@ -7,7 +7,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "smoke:ai:mock": "node --experimental-strip-types scripts/smoke/mock-ai-routes.ts"
   },
   "dependencies": {
     "@fal-ai/client": "^1.10.1",

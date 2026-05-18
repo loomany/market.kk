@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
-import { canSpendEstimated, estimateSceneCostUsd } from "@/lib/ai/pricing";
+import { estimateSceneCostUsd } from "@/lib/ai/pricing";
 import { MOCK_BACKGROUND_REMOVED_IMAGE, MOCK_PRODUCT_SHOT_IMAGES } from "@/lib/ai/mockResults";
+import {
+  assertPaidAiAllowed,
+  isPaidAiGuardError,
+  paidAiGuardResponse,
+} from "@/lib/ai/paidAiGuard";
 import { sceneGenerateRequestSchema } from "@/lib/ai/sceneSchemas";
 
 export const runtime = "nodejs";
@@ -55,17 +60,19 @@ export async function POST(request: Request) {
     });
   }
 
-  if (!canSpendEstimated(estimatedCost)) {
-    return NextResponse.json(
-      {
-        ok: false,
-        errorCode: "FAL_VIDEO_PRICING_UNKNOWN",
-        message:
-          "Real scene generation заблокирован бюджетным guard. Включите paid runs только после approval.",
-        estimatedCost,
-      },
-      { status: 402 }
-    );
+  try {
+    assertPaidAiAllowed({
+      provider: "fal",
+      route: "/api/ai/scene/generate",
+      estimatedCostUsd: estimatedCost,
+    });
+  } catch (error) {
+    if (isPaidAiGuardError(error)) {
+      return NextResponse.json(paidAiGuardResponse(error), {
+        status: error.status,
+      });
+    }
+    throw error;
   }
 
   return NextResponse.json(

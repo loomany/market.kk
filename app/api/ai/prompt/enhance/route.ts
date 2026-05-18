@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
 import { promptEnhanceRequestSchema } from "@/lib/ai/promptEnhanceSchemas";
+import {
+  assertPaidAiAllowed,
+  isPaidAiGuardError,
+  paidAiGuardResponse,
+} from "@/lib/ai/paidAiGuard";
 
 export const runtime = "nodejs";
+
+const ROUTE_ID = "/api/ai/prompt/enhance";
+const ESTIMATED_PROMPT_ENHANCE_COST_USD = 0.01;
 
 function isMockMode() {
   return process.env.AI_MOCK_MODE !== "0";
@@ -90,7 +98,7 @@ export async function POST(request: Request) {
   const data = parsed.data;
   const model = process.env.OPENAI_PROMPT_MODEL ?? "gpt-5.5";
 
-  if (isMockMode() || !process.env.OPENAI_API_KEY) {
+  if (isMockMode()) {
     return NextResponse.json({
       ok: true,
       originalPrompt: data.userPrompt,
@@ -106,6 +114,32 @@ export async function POST(request: Request) {
       provider: "mock",
       model: "mock-prompt-enhancer",
     });
+  }
+
+  try {
+    assertPaidAiAllowed({
+      provider: "openai",
+      route: ROUTE_ID,
+      estimatedCostUsd: ESTIMATED_PROMPT_ENHANCE_COST_USD,
+    });
+  } catch (error) {
+    if (isPaidAiGuardError(error)) {
+      return NextResponse.json(paidAiGuardResponse(error), {
+        status: error.status,
+      });
+    }
+    throw error;
+  }
+
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json(
+      {
+        ok: false,
+        errorCode: "OPENAI_API_KEY_MISSING",
+        message: "OpenAI API key is not configured. Use demo mode or add OPENAI_API_KEY server-side.",
+      },
+      { status: 500 }
+    );
   }
 
   try {

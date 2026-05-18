@@ -1,4 +1,5 @@
 import { StudioShell } from "@/components/studio/StudioShell";
+import { getAiSafetyState } from "@/lib/ai/paidAiGuard";
 
 export const metadata = {
   title: "Студия",
@@ -6,5 +7,12 @@ export const metadata = {
 };
 
 export default function StudioPage() {
-  return <StudioShell mockMode={process.env.AI_MOCK_MODE !== "0"} />;
+  const aiSafety = getAiSafetyState();
+
+  return (
+    <StudioShell
+      mockMode={aiSafety.mockMode}
+      paidAiRunsAllowed={aiSafety.paidAiRunsAllowed}
+    />
+  );
 }

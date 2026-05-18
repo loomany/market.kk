@@ -1,5 +1,6 @@
 import "server-only";
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
+import { assertPaidAiAllowed } from "@/lib/ai/paidAiGuard";
 
 export type StoredAuthCode = {
   phone: string;
@@ -105,6 +106,11 @@ export async function sendWhatsAppCode(phone: string, code: string) {
   if (!instanceId || !token || process.env.AI_MOCK_MODE !== "0") {
     return { ok: true, delivery: "mock" as const };
   }
+
+  assertPaidAiAllowed({
+    provider: "green-api",
+    route: "/api/auth/whatsapp/send-code",
+  });
 
   const chatId = `${phone.replace(/\D/g, "")}@c.us`;
   const res = await fetch(

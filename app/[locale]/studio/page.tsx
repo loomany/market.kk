@@ -4,6 +4,7 @@ import { StudioShell } from "@/components/studio/StudioShell";
 import { assertLocale, type Locale } from "@/lib/i18n/localeConfig";
 import { createNoindexMetadata } from "@/lib/seo/metadata";
 import { supportedLocaleCodes } from "@/lib/i18n/localeConfig";
+import { getAiSafetyState } from "@/lib/ai/paidAiGuard";
 
 type PageProps = {
   params: Promise<{ locale: string }>;
@@ -33,5 +34,12 @@ export default async function LocaleStudioPage({ params }: PageProps) {
   const locale = assertLocale(rawLocale);
   if (!locale) notFound();
 
-  return <StudioShell mockMode={process.env.AI_MOCK_MODE !== "0"} />;
+  const aiSafety = getAiSafetyState();
+
+  return (
+    <StudioShell
+      mockMode={aiSafety.mockMode}
+      paidAiRunsAllowed={aiSafety.paidAiRunsAllowed}
+    />
+  );
 }

@@ -9,8 +9,17 @@ import {
 } from "@/lib/ai/backgroundRemovalSchemas";
 import { uploadImageToFalStorage } from "@/lib/ai/falUpload";
 import { MOCK_BACKGROUND_REMOVED_IMAGE } from "@/lib/ai/mockResults";
+import {
+  assertPaidAiAllowed,
+  isPaidAiGuardError,
+  paidAiGuardResponse,
+  type PaidAiGuardInput,
+} from "@/lib/ai/paidAiGuard";
 
 export const runtime = "nodejs";
+
+const ROUTE_ID = "/api/ai/remove-background";
+const ESTIMATED_BACKGROUND_REMOVE_COST_USD = 0.03;
 
 function isMockMode() {
   return process.env.AI_MOCK_MODE !== "0";
@@ -19,7 +28,8 @@ function isMockMode() {
 async function resolveImageUrl(
   imageUrl: string | undefined,
   imageFile: File | null,
-  mockMode: boolean
+  mockMode: boolean,
+  guard: PaidAiGuardInput
 ): Promise<string> {
   let resolved = imageUrl;
 
@@ -27,7 +37,7 @@ async function resolveImageUrl(
     if (mockMode) {
       resolved = resolved ?? "https://mock.local/product";
     } else {
-      resolved = await uploadImageToFalStorage(imageFile, "Product image");
+      resolved = await uploadImageToFalStorage(imageFile, "Product image", guard);
     }
   }
 
@@ -50,7 +60,11 @@ async function runRemoveBackground(imageUrl: string, syncMode: boolean) {
   }
 
   try {
-    const fal = getFalClientOrThrow();
+    const fal = getFalClientOrThrow({
+      provider: "fal",
+      route: ROUTE_ID,
+      estimatedCostUsd: ESTIMATED_BACKGROUND_REMOVE_COST_USD,
+    });
     const result = await fal.subscribe(BACKGROUND_REMOVE_MODEL, {
       input: {
         image_url: imageUrl,
@@ -90,6 +104,12 @@ async function runRemoveBackground(imageUrl: string, syncMode: boolean) {
       requestId: result.requestId,
     });
   } catch (error) {
+    if (isPaidAiGuardError(error)) {
+      return NextResponse.json(paidAiGuardResponse(error), {
+        status: error.status,
+      });
+    }
+
     const message =
       error instanceof Error ? error.message : "Unknown error";
 
@@ -139,13 +159,28 @@ export async function POST(request: Request) {
     try {
       const payload = buildRemoveBackgroundFormPayload(formData);
       const mockMode = isMockMode();
+      const guard: PaidAiGuardInput = {
+        provider: "fal",
+        route: ROUTE_ID,
+        estimatedCostUsd: ESTIMATED_BACKGROUND_REMOVE_COST_USD,
+      };
+      if (!mockMode) {
+        assertPaidAiAllowed(guard);
+      }
       const imageUrl = await resolveImageUrl(
         payload.imageUrl,
         payload.imageFile,
-        mockMode
+        mockMode,
+        guard
       );
       return runRemoveBackground(imageUrl, payload.syncMode);
     } catch (error) {
+      if (isPaidAiGuardError(error)) {
+        return NextResponse.json(paidAiGuardResponse(error), {
+          status: error.status,
+        });
+      }
+
       const message =
         error instanceof Error ? error.message : "Invalid form data";
       return NextResponse.json(

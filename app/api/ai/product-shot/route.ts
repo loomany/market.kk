@@ -5,13 +5,48 @@ import {
   type ProductShotFormPayload,
   type ProductShotRequest,
 } from "@/lib/ai/productShotSchemas";
+import { MOCK_PRODUCT_SHOT_IMAGES } from "@/lib/ai/mockResults";
+import {
+  assertPaidAiAllowed,
+  isMockMode,
+  isPaidAiGuardError,
+  paidAiGuardResponse,
+} from "@/lib/ai/paidAiGuard";
 
 export const runtime = "nodejs";
 
-async function runProductShot(
-  _data: ProductShotRequest,
-  _productImageUrl?: string
-) {
+const ROUTE_ID = "/api/ai/product-shot";
+const ESTIMATED_PRODUCT_SHOT_COST_USD = 0.08;
+
+async function runProductShot(data: ProductShotRequest, productImageUrl?: string) {
+  if (isMockMode()) {
+    return NextResponse.json({
+      ok: true,
+      provider: "mock",
+      model: "mock-product-shot",
+      images: MOCK_PRODUCT_SHOT_IMAGES.slice(0, data.numResults).map((image) => ({
+        url: image.url,
+      })),
+      requestId: "mock-product-shot-request",
+      sceneDescription: productImageUrl ? "Demo product card" : undefined,
+    });
+  }
+
+  try {
+    assertPaidAiAllowed({
+      provider: "fal",
+      route: ROUTE_ID,
+      estimatedCostUsd: ESTIMATED_PRODUCT_SHOT_COST_USD,
+    });
+  } catch (error) {
+    if (isPaidAiGuardError(error)) {
+      return NextResponse.json(paidAiGuardResponse(error), {
+        status: error.status,
+      });
+    }
+    throw error;
+  }
+
   return NextResponse.json(
     {
       ok: false,

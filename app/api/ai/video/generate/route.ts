@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { fal } from "@fal-ai/client";
 import { getFalClientOrThrow } from "@/lib/ai/falClient";
-import { canSpendEstimated, estimateVideoOrThrow } from "@/lib/ai/pricing";
+import { estimateVideoOrThrow } from "@/lib/ai/pricing";
+import {
+  assertPaidAiAllowed,
+  isPaidAiGuardError,
+  paidAiGuardResponse,
+} from "@/lib/ai/paidAiGuard";
 import { getVideoModel } from "@/lib/ai/videoModels";
 import { videoGenerateRequestSchema } from "@/lib/ai/videoSchemas";
 
@@ -48,7 +53,7 @@ export async function POST(request: Request) {
       {
         ok: false,
         errorCode: "VALIDATION_ERROR",
-        message: "Р­С‚Р° РІРёРґРµРѕ-РјРѕРґРµР»СЊ РЅРµ РїРѕРґРґРµСЂР¶РёРІР°РµС‚ РІС‹Р±СЂР°РЅРЅС‹Рµ РЅР°СЃС‚СЂРѕР№РєРё.",
+        message: "Эта видео-модель не поддерживает выбранные настройки.",
         estimatedCost,
       },
       { status: 400 }
@@ -73,6 +78,21 @@ export async function POST(request: Request) {
     });
   }
 
+  try {
+    assertPaidAiAllowed({
+      provider: "fal",
+      route: "/api/ai/video/generate",
+      estimatedCostUsd: estimatedCost,
+    });
+  } catch (error) {
+    if (isPaidAiGuardError(error)) {
+      return NextResponse.json(paidAiGuardResponse(error), {
+        status: error.status,
+      });
+    }
+    throw error;
+  }
+
   if (!model.realSchemaVerified) {
     return NextResponse.json(
       {
@@ -86,21 +106,12 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!canSpendEstimated(estimatedCost)) {
-    return NextResponse.json(
-      {
-        ok: false,
-        errorCode: "FAL_VIDEO_PRICING_UNKNOWN",
-        message:
-          "Real video generation заблокирован бюджетным guard. Включите ALLOW_PAID_AI_RUNS и MAX_AI_TEST_SPEND_USD после approval.",
-        estimatedCost,
-      },
-      { status: 402 }
-    );
-  }
-
   try {
-    getFalClientOrThrow();
+    getFalClientOrThrow({
+      provider: "fal",
+      route: "/api/ai/video/generate",
+      estimatedCostUsd: estimatedCost,
+    });
     const result = await fal.subscribe(model.id, {
       input: model.inputMapper(data),
       logs: true,
@@ -134,6 +145,12 @@ export async function POST(request: Request) {
       estimatedCost,
     });
   } catch (error) {
+    if (isPaidAiGuardError(error)) {
+      return NextResponse.json(paidAiGuardResponse(error), {
+        status: error.status,
+      });
+    }
+
     const message = error instanceof Error ? error.message : "Unknown error";
 
     if (message.includes("FAL_KEY")) {

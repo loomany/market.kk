@@ -8,6 +8,12 @@ import {
   saveMemoryCode,
   sendWhatsAppCode,
 } from "@/lib/auth/whatsapp";
+import {
+  assertPaidAiAllowed,
+  isMockMode,
+  isPaidAiGuardError,
+  paidAiGuardResponse,
+} from "@/lib/ai/paidAiGuard";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -36,10 +42,30 @@ export async function POST(request: Request) {
       {
         ok: false,
         errorCode: "RATE_LIMITED",
-        message: `РџРѕРґРѕР¶РґРёС‚Рµ ${rateLimit.retryAfterSeconds} СЃРµРє. Рё РїРѕРїСЂРѕР±СѓР№С‚Рµ РµС‰С‘ СЂР°Р·.`,
+        message: `Подождите ${rateLimit.retryAfterSeconds} сек. и попробуйте ещё раз.`,
       },
       { status: 429 }
     );
+  }
+
+  if (
+    !isMockMode() &&
+    process.env.GREEN_API_INSTANCE_ID &&
+    process.env.GREEN_API_TOKEN
+  ) {
+    try {
+      assertPaidAiAllowed({
+        provider: "green-api",
+        route: "/api/auth/whatsapp/send-code",
+      });
+    } catch (error) {
+      if (isPaidAiGuardError(error)) {
+        return NextResponse.json(paidAiGuardResponse(error), {
+          status: error.status,
+        });
+      }
+      throw error;
+    }
   }
 
   const code = createSixDigitCode();
@@ -57,7 +83,17 @@ export async function POST(request: Request) {
     saveMemoryCode(phone, code);
   }
 
-  const sent = await sendWhatsAppCode(phone, code);
+  let sent: Awaited<ReturnType<typeof sendWhatsAppCode>>;
+  try {
+    sent = await sendWhatsAppCode(phone, code);
+  } catch (error) {
+    if (isPaidAiGuardError(error)) {
+      return NextResponse.json(paidAiGuardResponse(error), {
+        status: error.status,
+      });
+    }
+    throw error;
+  }
   if (!sent.ok) {
     return NextResponse.json(
       {
