@@ -98,7 +98,7 @@ export const MODEL_ANGLE_PRESETS: {
   },
   {
     id: "seated-lifestyle",
-    label: "Сидя",
+    label: "Сидя, в кадре",
     hint: "Дополнительное lifestyle-фото",
     prompt:
       "seated lifestyle editorial pose on minimal studio stool or block, relaxed asymmetric posture with knees angled naturally, torso slightly turned toward camera, calm confident expression, modern premium fashion catalog mood, garment clearly visible",
@@ -107,8 +107,11 @@ export const MODEL_ANGLE_PRESETS: {
 
 export type ResolvedModelAngle = {
   key: string;
+  /** Короткая подпись для UI (итоговый промт, карточки). */
   label: string;
   prompt: string;
+  /** Полное описание позы с vision — только для генерации модели. */
+  descriptionRu?: string;
 };
 
 export type ModelAngleSelectionInput = {
@@ -131,25 +134,13 @@ export function resolveSelectedModelAngles(
   input: ModelAngleSelectionInput
 ): ResolvedModelAngle[] {
   const resolved: ResolvedModelAngle[] = [];
-  const shotIds = expandShotPresetIds(input.anglePresets);
-
-  for (const presetId of shotIds) {
-    const preset = MODEL_ANGLE_PRESETS.find((item) => item.id === presetId);
-    if (!preset || preset.isBundle) continue;
-    resolved.push({
-      key: `preset:${preset.id}`,
-      label: preset.label,
-      prompt: preset.prompt,
-    });
-  }
 
   for (const custom of input.customAngles) {
-    if (!custom.saved) continue;
     const text = custom.text.trim();
     if (!text) continue;
     resolved.push({
       key: `custom:${custom.id}`,
-      label: text.length > 48 ? `${text.slice(0, 45)}…` : text,
+      label: text,
       prompt: `${text}, natural editorial camera angle and framing with relaxed believable body language, premium fashion catalog aesthetic`,
     });
   }
@@ -158,11 +149,10 @@ export function resolveSelectedModelAngles(
 }
 
 export function countSelectedModelAngles(input: ModelAngleSelectionInput): number {
-  const shotCount = expandShotPresetIds(input.anglePresets).length;
   const customCount = input.customAngles.filter(
-    (item) => item.saved && item.text.trim().length > 0
+    (item) => item.text.trim().length > 0
   ).length;
-  return Math.min(shotCount + customCount, MAX_MODEL_ANGLES);
+  return Math.min(customCount, MAX_MODEL_ANGLES);
 }
 
 export function normalizeAnglePresetSelection(
@@ -199,10 +189,6 @@ export function normalizeAnglePresetSelection(
 export function validateModelAngles(
   input: ModelAngleSelectionInput
 ): string | null {
-  const angles = resolveSelectedModelAngles(input);
-  if (angles.length === 0) {
-    return "Выберите вариант фото, подберите позу по фото товара или сохраните свой вариант галочкой.";
-  }
   if (countSelectedModelAngles(input) > MAX_MODEL_ANGLES) {
     return `Можно выбрать не больше ${MAX_MODEL_ANGLES} ракурсов.`;
   }
@@ -218,12 +204,8 @@ export function modelAnglesSummaryRu(
   input: ModelAngleSelectionInput
 ): string {
   const angles = resolveSelectedModelAngles(input);
-  if (angles.length === 0) return "ракурсы не выбраны";
-  const labels = angles.map((item) => item.label);
-  if (input.anglePresets.includes(FULL_CARD_ANGLE_PRESET_ID)) {
-    return `полный набор (${labels.length}): ${labels.join(", ")}`;
-  }
-  return labels.join("; ");
+  if (angles.length === 0) return "не указана (стандартная)";
+  return angles.map((item) => item.label).join("; ");
 }
 
 export function createEmptyCustomAngle(): ModelCustomAngle {
@@ -237,6 +219,4 @@ export function createEmptyCustomAngle(): ModelCustomAngle {
   };
 }
 
-export const DEFAULT_MODEL_ANGLE_PRESETS: ModelAnglePresetId[] = [
-  "hero-full-front",
-];
+export const DEFAULT_MODEL_ANGLE_PRESETS: ModelAnglePresetId[] = [];

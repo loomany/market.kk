@@ -13,24 +13,10 @@ const GENDER_LABELS: Record<ModelGenerationSettings["gender"], string> = {
   male: "мужская модель",
 };
 
-const BACKGROUND_LABELS: Record<ModelGenerationSettings["background"], string> = {
-  white: "белый фон",
-  "light-gray": "светло-серый фон",
-  studio: "студийный фон",
-};
-
 const CROP_LABELS: Record<ModelGenerationSettings["crop"], string> = {
   "full-body": "в полный рост",
   "upper-body": "по пояс",
   [MODEL_PARAM_CUSTOM]: "свой вариант",
-};
-
-const LIGHTING_LABELS: Record<
-  Exclude<ModelGenerationSettings["lighting"], typeof MODEL_PARAM_CUSTOM>,
-  string
-> = {
-  studio: "студийное",
-  "sunny-outdoor": "солнечное уличное",
 };
 
 const CONTEXT_LABELS: Record<
@@ -58,13 +44,6 @@ function cropSummary(settings: ModelGenerationSettings): string {
   return CROP_LABELS[settings.crop];
 }
 
-function lightingSummary(settings: ModelGenerationSettings): string {
-  if (settings.lighting === MODEL_PARAM_CUSTOM) {
-    return settings.lightingCustom.trim() || "свой вариант (уточните)";
-  }
-  return LIGHTING_LABELS[settings.lighting];
-}
-
 function ageSummary(age: number): string {
   if (isAdultModelAge(age)) {
     return `возраст ${age} лет`;
@@ -78,18 +57,21 @@ function ageSummary(age: number): string {
 /** Base prompt from shooting parameters only (read-only in UI). */
 export function buildModelBaseSettingsSummaryRu(
   settings: ModelGenerationSettings,
-  outputSize: Partial<ModelOutputSizeSelection>
+  outputSize: Partial<ModelOutputSizeSelection>,
+  options?: { productPoseLabel?: string }
 ): string {
+  const poseSummary =
+    options?.productPoseLabel?.trim() ||
+    modelAnglesSummaryRu(settings);
+
   const parts = [
     GENDER_LABELS[settings.gender],
     ...(settings.modelNationality.trim()
       ? [`национальность: ${settings.modelNationality.trim()}`]
       : []),
-    `ракурсы: ${modelAnglesSummaryRu(settings)}`,
+    `поза: ${poseSummary}`,
     ageSummary(settings.modelAge),
-    `освещение: ${lightingSummary(settings)}`,
     `тип фигуры: ${bodyTypeSummary(settings)}`,
-    BACKGROUND_LABELS[settings.background],
     `кадр: ${cropSummary(settings)}`,
     `сценарий: ${CONTEXT_LABELS[settings.categoryContext]}`,
   ];

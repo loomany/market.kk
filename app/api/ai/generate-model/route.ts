@@ -4,19 +4,14 @@ import { getFalClientOrThrow } from "@/lib/ai/falClient";
 
 import { generateModelRequestSchema } from "@/lib/ai/modelGenerationSchemas";
 
-import {
-
-  buildModelAngleEditPrompt,
-
-  buildModelGenerationPrompt,
-
-} from "@/lib/ai/modelPrompts";
+import { composeModelGenerationPrompt } from "@/lib/ai/composeModelGenerationPrompt";
+import { buildModelAngleEditPrompt } from "@/lib/ai/modelPrompts";
 
 import { MOCK_MODEL_IMAGE } from "@/lib/ai/mockResults";
 
 import { defaultLocale } from "@/lib/i18n/localeConfig";
 
-import { translatePromptToEnglish } from "@/lib/ai/promptTranslate";
+import { translateModelGenerationTextFields } from "@/lib/ai/translateModelGenerationFields";
 
 import {
 
@@ -121,75 +116,58 @@ export async function POST(request: Request) {
 
 
 
+  const referenceImageUrl = data.referenceImageUrl?.trim();
+  const useAngleEdit = Boolean(referenceImageUrl);
+
   let generationInput = data;
 
-  try {
-
-    const textFields = [
-
-      "customDescription",
-
-      "modelNationality",
-
-      "bodyTypeCustom",
-
-      "poseCustom",
-
-      "cropCustom",
-
-      "lightingCustom",
-
-      "cameraAnglePrompt",
-
-    ] as const;
-
-
-
-    for (const field of textFields) {
-
-      const value = data[field]?.trim();
-
-      if (!value) continue;
-
-      generationInput = {
-
-        ...generationInput,
-
-        [field]: await translatePromptToEnglish(value, promptLocale, ROUTE_ID),
-
-      };
-
+  if (useAngleEdit) {
+    try {
+      generationInput = await translateModelGenerationTextFields(
+        data,
+        promptLocale,
+        ROUTE_ID
+      );
+    } catch (error) {
+      if (isPaidAiGuardError(error)) {
+        return NextResponse.json(paidAiGuardResponse(error), {
+          status: error.status,
+        });
+      }
+      throw error;
     }
-
-  } catch (error) {
-
-    if (isPaidAiGuardError(error)) {
-
-      return NextResponse.json(paidAiGuardResponse(error), {
-
-        status: error.status,
-
-      });
-
-    }
-
-    throw error;
-
   }
-
-
-
-  const referenceImageUrl = data.referenceImageUrl?.trim();
-
-  const useAngleEdit = Boolean(referenceImageUrl);
 
   const neutralBaseForTryOn = shouldUseNeutralBaseModelGeneration(generationInput);
 
-  const prompt = useAngleEdit
+  let prompt: string;
+  let promptComposer: "openai" | "template" = "template";
+  let openAiPromptModel: string | undefined;
+  let generationPromptForFal: string | undefined;
 
-    ? buildModelAngleEditPrompt(generationInput)
-
-    : buildModelGenerationPrompt(generationInput, { neutralBaseForTryOn });
+  if (useAngleEdit) {
+    prompt = buildModelAngleEditPrompt(generationInput);
+  } else {
+    try {
+      const composed = await composeModelGenerationPrompt({
+        request: generationInput,
+        promptLocale,
+        productPoseDescriptionRu: data.productPoseDescriptionRu,
+        neutralBaseForTryOn,
+      });
+      prompt = composed.prompt;
+      promptComposer = composed.source;
+      openAiPromptModel = composed.promptModel;
+      generationPromptForFal = composed.prompt;
+    } catch (error) {
+      if (isPaidAiGuardError(error)) {
+        return NextResponse.json(paidAiGuardResponse(error), {
+          status: error.status,
+        });
+      }
+      throw error;
+    }
+  }
 
   const promptPreview = prompt.slice(0, 300);
 
@@ -210,7 +188,7 @@ export async function POST(request: Request) {
       requestId: "mock-model-request",
 
       promptPreview,
-
+      promptComposer,
     });
 
   }
@@ -238,6 +216,8 @@ export async function POST(request: Request) {
       generationInput,
 
       referenceImageUrl,
+
+      generationPrompt: generationPromptForFal,
 
     });
 
@@ -272,6 +252,10 @@ export async function POST(request: Request) {
       requestId: result.requestId,
 
       promptPreview,
+
+      promptComposer,
+
+      openAiPromptModel,
 
       usedAngleEditFallback,
 

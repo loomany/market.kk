@@ -1,13 +1,36 @@
 import type { GenerateModelRequest } from "@/lib/ai/modelGenerationSchemas";
 
 /**
- * Для сценария «бельё» модель генерируем в нейтральном bodysuit (не кружево с карточки).
- * Ракурсы 2+ — через nano-banana edit (то же лицо). Финальный товар — только FASHN try-on.
+ * Нейтральный bodysuit отключён: для белья модель снова в каталожном комплекте (как раньше).
+ * Конкретный товар с карточки — только на шаге FASHN-примерки.
  */
 export function shouldUseNeutralBaseModelGeneration(
-  input: Pick<GenerateModelRequest, "categoryContext">
+  _input: Pick<GenerateModelRequest, "categoryContext">
 ): boolean {
-  return input.categoryContext === "lingerie";
+  return false;
+}
+
+/** Крой низа для базовой модели — FASHN копирует силуэт с model_image. */
+export function lingerieBottomCutGuidance(): string {
+  return (
+    "Bottom must be classic bikini brief or mid-rise cheeky brief with leg openings at the hip, natural waistline — " +
+    "not boyshorts, not high-waist shorts, not biker shorts, not long leg line to mid-thigh"
+  );
+}
+
+export function lingerieModelPoseGuidance(): string {
+  return (
+    "Standing neutral studio pose with relaxed posture — avoid seated pose that stretches the bottom into a boy-short silhouette"
+  );
+}
+
+/** Студийный комплект для генерации (не SKU с фото товара). */
+export function lingerieCatalogOutfitGuidance(): string {
+  return (
+    "Wearing a simple matching lingerie set (bra and brief) in one cohesive catalog color such as black or soft nude, " +
+    `${lingerieBottomCutGuidance()}, ${lingerieModelPoseGuidance()} — generic studio lingerie for try-on base, ` +
+    "not the customer's marketplace lace pattern or product colors"
+  );
 }
 
 export function neutralBaseOutfitGuidance(): string {

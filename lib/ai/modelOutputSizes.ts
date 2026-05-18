@@ -21,6 +21,12 @@ export type ModelOutputSizeSelection = {
   resolution: FalModelResolution;
 };
 
+/** Default studio model output: WB/Ozon portrait + balanced resolution */
+export const DEFAULT_MODEL_OUTPUT_SIZE: ModelOutputSizeSelection = {
+  aspectRatio: "3:4",
+  resolution: "1K",
+};
+
 export const FAL_MODEL_ASPECT_RATIO_OPTIONS: {
   id: FalModelAspectRatio;
   label: string;

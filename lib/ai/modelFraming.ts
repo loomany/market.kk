@@ -24,7 +24,7 @@ export function mandatoryFramingGuidance(
 
   if (input.crop === "upper-body") {
     return (
-      "Mandatory framing: from top of head through upper thighs, complete face forehead and hair visible, hips in frame, do not crop forehead or top of head."
+      "Mandatory framing (highest priority): waist-up / torso-to-upper-thigh catalog crop with the full head, full face, forehead, hair, shoulders, chest, waist and hips visible; do not crop forehead, eyes, top of head, chin, hands, waist, hips, or garment areas; not headless, not mouth-only portrait, not tight face crop."
     );
   }
 

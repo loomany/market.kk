@@ -18,9 +18,6 @@ import {
 } from "./PreviewCard";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
-import { TryOnCostEstimate } from "./TryOnCostEstimate";
-import { TryOnResultMeta } from "./TryOnResultMeta";
-
 type GenerationResultGridProps = {
   results: StudioResultImage[];
   loading?: boolean;
@@ -32,10 +29,6 @@ type GenerationResultGridProps = {
   productPreviewUrl?: string | null;
   productPreviewItems?: PreviewCarouselItem[];
   onStartOver: () => void;
-  onRegenerateTryOn?: () => void;
-  onRegenerateModel?: () => void;
-  mockMode?: boolean;
-  paidAiRunsAllowed?: boolean;
 };
 
 function ResultCompareGrid({ children }: { children: ReactNode }) {
@@ -277,51 +270,6 @@ function ResultAlerts({
   );
 }
 
-function ClothingTryOnResultActions({
-  onRegenerateTryOn,
-  onRegenerateModel,
-  mockMode,
-  paidAiRunsAllowed,
-}: {
-  onRegenerateTryOn?: () => void;
-  onRegenerateModel?: () => void;
-  mockMode?: boolean;
-  paidAiRunsAllowed?: boolean;
-}) {
-  return (
-    <div className="space-y-2 border-t border-border/70 p-4">
-      {onRegenerateTryOn ? (
-        <>
-          <TryOnCostEstimate
-            mockMode={Boolean(mockMode)}
-            paidAiRunsAllowed={Boolean(paidAiRunsAllowed)}
-            tryOnOnly
-          />
-          <Button
-            variant="secondary"
-            size="sm"
-            className="w-full"
-            onClick={onRegenerateTryOn}
-          >
-            <RotateCcw className="h-4 w-4" />
-            Перегенерировать примерку
-          </Button>
-        </>
-      ) : null}
-      {onRegenerateModel ? (
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full"
-          onClick={onRegenerateModel}
-        >
-          Сгенерировать другую модель
-        </Button>
-      ) : null}
-    </div>
-  );
-}
-
 export function GenerationResultGrid({
   results,
   loading,
@@ -332,16 +280,14 @@ export function GenerationResultGrid({
   productPreviewUrl = null,
   productPreviewItems = [],
   onStartOver,
-  onRegenerateTryOn,
-  onRegenerateModel,
-  mockMode = false,
-  paidAiRunsAllowed = false,
 }: GenerationResultGridProps) {
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
 
   const markImageFailed = (imageKey: string) => {
     setFailedImages((prev) => ({ ...prev, [imageKey]: true }));
   };
+
+  const clothingEmbedded = embedded && isClothingTryOnMode;
 
   const loadingBanner = (
     <div className="mb-4 rounded-[22px] border border-teal-100 bg-teal-50/70 px-4 py-3 text-sm leading-6 text-teal-950">
@@ -356,6 +302,15 @@ export function GenerationResultGrid({
   );
 
   if (loading) {
+    if (clothingEmbedded) {
+      return (
+        <div>
+          {loadingBanner}
+          <ResultCompareSkeleton />
+        </div>
+      );
+    }
+
     if (embedded) {
       return (
         <div>
@@ -382,6 +337,10 @@ export function GenerationResultGrid({
   }
 
   if (results.length === 0) {
+    if (clothingEmbedded) {
+      return null;
+    }
+
     if (embedded) {
       return (
         <ResultCompareGrid>
@@ -432,14 +391,6 @@ export function GenerationResultGrid({
               onDownload={() => downloadPng(result.url, `${result.id}.png`)}
               onStartOver={onStartOver}
             />
-            {isClothingTryOnMode ? (
-              <ClothingTryOnResultActions
-                onRegenerateTryOn={onRegenerateTryOn}
-                onRegenerateModel={onRegenerateModel}
-                mockMode={mockMode}
-                paidAiRunsAllowed={paidAiRunsAllowed}
-              />
-            ) : null}
           </>
         );
         const resultImageContent = (
@@ -533,6 +484,24 @@ export function GenerationResultGrid({
           );
         }
 
+        if (clothingEmbedded) {
+          return (
+            <div key={result.id} className="space-y-3">
+              <ResultAlerts
+                result={result}
+                isClothingTryOnMode={isClothingTryOnMode}
+              />
+              <PreviewCard
+                title={resultTitle}
+                url={null}
+                empty=""
+                content={resultImageContent}
+                footer={resultActions}
+              />
+            </div>
+          );
+        }
+
         if (embedded) {
           return (
             <div key={result.id} className="space-y-4">
@@ -550,14 +519,7 @@ export function GenerationResultGrid({
                   url={null}
                   empty=""
                   content={resultImageContent}
-                  footer={
-                    <>
-                      {isClothingTryOnMode ? (
-                        <TryOnResultMeta result={result} />
-                      ) : null}
-                      {resultActions}
-                    </>
-                  }
+                  footer={resultActions}
                 />
               </ResultCompareGrid>
             </div>
@@ -680,10 +642,6 @@ export function GenerationResultGrid({
               </div>
             </div>
 
-            {isClothingTryOnMode && !showExactCardRow ? (
-              <TryOnResultMeta result={result} />
-            ) : null}
-
             {!showExactCardRow && (
               <div className="space-y-3 border-t border-border/70 p-4">
                 <Button
@@ -705,15 +663,6 @@ export function GenerationResultGrid({
                   <RotateCcw className="h-4 w-4" />
                   Начать сначала
                 </Button>
-
-                {isClothingTryOnMode ? (
-                  <ClothingTryOnResultActions
-                    onRegenerateTryOn={onRegenerateTryOn}
-                    onRegenerateModel={onRegenerateModel}
-                    mockMode={mockMode}
-                    paidAiRunsAllowed={paidAiRunsAllowed}
-                  />
-                ) : null}
               </div>
             )}
           </article>

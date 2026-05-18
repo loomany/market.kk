@@ -78,8 +78,10 @@ export async function runFalModelGeneration(input: {
   fal: FalClient;
   generationInput: GenerateModelRequest;
   referenceImageUrl?: string;
+  /** Pre-composed text-to-image prompt (e.g. from GPT 5.5); edit path still uses angle template */
+  generationPrompt?: string;
 }): Promise<RunFalModelGenerationResult> {
-  const { fal, generationInput, referenceImageUrl } = input;
+  const { fal, generationInput, referenceImageUrl, generationPrompt } = input;
   const hasReference = Boolean(referenceImageUrl?.trim());
   const useAngleEdit = hasReference;
 
@@ -124,10 +126,12 @@ export async function runFalModelGeneration(input: {
     }
   }
 
-  const generatePrompt = buildModelGenerationPrompt(generationInput, {
-    followUpAngle: hasReference,
-    neutralBaseForTryOn: shouldUseNeutralBaseModelGeneration(generationInput),
-  });
+  const generatePrompt =
+    generationPrompt?.trim() ||
+    buildModelGenerationPrompt(generationInput, {
+      followUpAngle: hasReference,
+      neutralBaseForTryOn: shouldUseNeutralBaseModelGeneration(generationInput),
+    });
   const generateInput = buildFalInput(generatePrompt, generationInput);
   const result = await subscribeOnce(
     fal,

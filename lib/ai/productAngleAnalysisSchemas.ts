@@ -1,8 +1,16 @@
 import { z } from "zod";
-import { MODEL_CAMERA_ANGLE_PROMPT_MAX } from "@/lib/ai/modelCustomParams";
+import {
+  MODEL_CAMERA_ANGLE_PROMPT_MAX,
+  PRODUCT_POSE_DESCRIPTION_RU_MAX,
+} from "@/lib/ai/modelCustomParams";
 
 export const productAngleAnalysisItemSchema = z.object({
-  label: z.string().trim().min(1).max(80),
+  summaryLabel: z.string().trim().min(4).max(80),
+  descriptionRu: z
+    .string()
+    .trim()
+    .min(20)
+    .max(PRODUCT_POSE_DESCRIPTION_RU_MAX),
   cameraPrompt: z
     .string()
     .trim()

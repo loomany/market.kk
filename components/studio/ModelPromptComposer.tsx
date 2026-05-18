@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, ChevronUp, Plus, Sparkles } from "lucide-react";
+import { Check, ChevronUp, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buildModelCombinedPromptRu } from "@/lib/ai/modelSettingsSummary";
 import { Button } from "@/components/ui/Button";
+import { SaasMicButton } from "@/components/ui/SaasMicButton";
+import type { Locale } from "@/lib/i18n/locales";
+import { speechRecognitionLang } from "@/lib/voice/speechRecognitionLocale";
 
 const DESCRIPTION_MAX = 1000;
 
@@ -12,18 +15,16 @@ type ModelPromptComposerProps = {
   basePrompt: string;
   description: string;
   onDescriptionChange: (value: string) => void;
-  onEnhanceDescription: (draft: string) => Promise<string | null>;
-  enhancing?: boolean;
   disabled?: boolean;
+  dictationLocale?: Locale;
 };
 
 export function ModelPromptComposer({
   basePrompt,
   description,
   onDescriptionChange,
-  onEnhanceDescription,
-  enhancing = false,
   disabled = false,
+  dictationLocale = "ru",
 }: ModelPromptComposerProps) {
   const hasSavedDescription = Boolean(description.trim());
   const [additionOpen, setAdditionOpen] = useState(false);
@@ -38,8 +39,7 @@ export function ModelPromptComposer({
   }, [description]);
 
   const trimmedDraft = draft.trim();
-  const canConfirm =
-    trimmedDraft.length > 0 && !disabled && !enhancing;
+  const canConfirm = trimmedDraft.length > 0 && !disabled;
   const isConfirmed =
     canConfirm &&
     trimmedDraft === lastConfirmed &&
@@ -69,15 +69,6 @@ export function ModelPromptComposer({
     setAdditionOpen(false);
   };
 
-  const handleEnhance = async () => {
-    if (!trimmedDraft) return;
-    const enhanced = await onEnhanceDescription(trimmedDraft);
-    if (enhanced) {
-      setDraft(enhanced);
-      setLastConfirmed(null);
-    }
-  };
-
   const handleClearAddition = () => {
     setDraft("");
     onDescriptionChange("");
@@ -85,15 +76,26 @@ export function ModelPromptComposer({
     setAdditionOpen(false);
   };
 
+  const appendDictation = (spoken: string) => {
+    const chunk = spoken.trim();
+    if (!chunk) return;
+    setDraft((prev) => {
+      const base = prev.trim();
+      const next = base ? `${base} ${chunk}` : chunk;
+      return next.slice(0, DESCRIPTION_MAX);
+    });
+    setLastConfirmed(null);
+  };
+
   return (
     <div className="space-y-3">
       <div className="space-y-0.5 px-0.5">
         <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-          Итоговый промт
+          Итоговый промт (превью)
         </span>
         <p className="text-xs leading-5 text-slate-500">
-          База из параметров выше. Добавьте своё описание
-          (локация, настроение, детали) — оно дополнит промт для генерации.
+          Краткое превью на русском. Можете описать детали своими словами — при
+          генерации промт проходит ИИ-улучшение и перевод для модели.
         </p>
       </div>
 
@@ -119,7 +121,7 @@ export function ModelPromptComposer({
           variant="outline"
           size="sm"
           className="w-full gap-2"
-          disabled={disabled || enhancing}
+          disabled={disabled}
           onClick={() => setAdditionOpen(true)}
         >
           <Plus className="h-4 w-4" aria-hidden />
@@ -133,15 +135,16 @@ export function ModelPromptComposer({
                 Ваше дополнение
               </span>
               <p className="text-xs leading-5 text-slate-500">
-                Локация, свет, настроение — не меняет возраст, тип фигуры и
-                позу из базы.
+                Опишите фон, свет или настроение своими словами — не меняет
+                возраст, тип фигуры и позу из базы. При генерации текст пройдёт
+                ИИ-улучшение.
               </p>
             </div>
             <button
               type="button"
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
               aria-label="Свернуть"
-              disabled={disabled || enhancing}
+              disabled={disabled}
               onClick={() => setAdditionOpen(false)}
             >
               <ChevronUp className="h-4 w-4" aria-hidden />
@@ -165,7 +168,7 @@ export function ModelPromptComposer({
             onChange={(event) => setDraft(event.target.value)}
             rows={4}
             maxLength={DESCRIPTION_MAX}
-            disabled={disabled || enhancing}
+            disabled={disabled}
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"
@@ -174,7 +177,7 @@ export function ModelPromptComposer({
             data-lpignore="true"
             data-bwignore
             aria-autocomplete="none"
-            placeholder="Например: светлая студия, уверенная поза, смотрит в камеру, руки не закрывают одежду"
+            placeholder="Например: белый фон Wildberries, мягкая тень за моделью, уверенная поза, руки по бокам"
             className={cn(
               "min-h-[112px] w-full resize-y rounded-[12px] border bg-white px-3 py-2.5 text-sm leading-6 text-slate-900 outline-none transition",
               "hover:border-slate-300 focus:border-teal-400 focus:ring-2 focus:ring-teal-100",
@@ -196,23 +199,16 @@ export function ModelPromptComposer({
             </p>
           ) : (
             <p className="px-0.5 text-xs text-slate-500">
-              Опишите детали своими словами, затем подтвердите галочкой
+              Опишите текстом или микрофоном, затем подтвердите галочкой
             </p>
           )}
 
-          <div className="relative z-20 mt-1 flex items-center gap-2 pt-1">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="min-w-0 flex-1 gap-1.5"
-              loading={enhancing}
-              disabled={disabled || enhancing || !trimmedDraft}
-              onClick={() => void handleEnhance()}
-            >
-              <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Усилить дополнение
-            </Button>
+          <div className="relative z-20 mt-1 flex items-center justify-end gap-2 pt-1">
+            <SaasMicButton
+              lang={speechRecognitionLang(dictationLocale)}
+              disabled={disabled}
+              onTranscript={appendDictation}
+            />
             <button
               type="button"
               disabled={!canConfirm}
@@ -242,7 +238,7 @@ export function ModelPromptComposer({
                 variant="ghost"
                 size="sm"
                 className="shrink-0 px-2"
-                disabled={disabled || enhancing}
+                disabled={disabled}
                 onClick={handleClearAddition}
               >
                 Убрать
@@ -270,7 +266,7 @@ export function ModelPromptComposer({
             <button
               type="button"
               className="shrink-0 text-xs font-semibold text-teal-700 transition hover:text-teal-900"
-              disabled={disabled || enhancing}
+              disabled={disabled}
               onClick={() => setAdditionOpen(true)}
             >
               Изменить

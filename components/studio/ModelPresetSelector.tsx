@@ -28,16 +28,16 @@ import {
 import { buildModelBaseSettingsSummaryRu } from "@/lib/ai/modelSettingsSummary";
 import { ModelAnglesField } from "@/components/studio/ModelAnglesField";
 import type { ResolvedModelAngle } from "@/lib/ai/modelAngles";
+import { productPoseLabelForUi } from "@/lib/ai/productPoseSummary";
 import { ModelPromptComposer } from "@/components/studio/ModelPromptComposer";
 import { ModelReadyCard } from "@/components/studio/ModelReadyCard";
+import type { Locale } from "@/lib/i18n/locales";
 import {
   MODEL_BODY_TYPES,
-  type ModelBackground,
   type ModelCategoryContext,
   type ModelCrop,
   type ModelGender,
   type ModelGenerationSettings,
-  type ModelLighting,
 } from "./types";
 
 type ModelPresetSelectorProps = {
@@ -46,8 +46,6 @@ type ModelPresetSelectorProps = {
   onGenerate: () => void;
   modelDescription: string;
   onModelDescriptionChange: (value: string) => void;
-  onEnhanceModelDescription: (draft: string) => Promise<string | null>;
-  enhancingDescription?: boolean;
   generating?: boolean;
   generateError?: string | null;
   generateNotice?: string | null;
@@ -64,6 +62,7 @@ type ModelPresetSelectorProps = {
   analyzingProductAngles?: boolean;
   onApplyAnglesFromProducts?: () => void;
   onClearProductSampleAngles?: () => void;
+  dictationLocale?: Locale;
 };
 
 function SettingField({
@@ -304,46 +303,6 @@ const CROP_OPTIONS: { id: ModelCrop; label: string; hint: string }[] = [
   },
 ];
 
-const BACKGROUND_OPTIONS: {
-  id: ModelBackground;
-  label: string;
-  hint: string;
-}[] = [
-  {
-    id: "white",
-    label: "Белый",
-    hint: "Стандарт Wildberries и Ozon, максимально нейтрально",
-  },
-  {
-    id: "light-gray",
-    label: "Светло-серый",
-    hint: "Мягче белого, меньше бликов на светлой одежде",
-  },
-  {
-    id: "studio",
-    label: "Студийный",
-    hint: "Лёгкая глубина и тени, чуть «дороже» каталог",
-  },
-];
-
-const LIGHTING_OPTIONS: { id: ModelLighting; label: string; hint: string }[] = [
-  {
-    id: MODEL_PARAM_CUSTOM,
-    label: MODEL_CUSTOM_SELECT_OPTION.label,
-    hint: MODEL_CUSTOM_SELECT_OPTION.hint,
-  },
-  {
-    id: "studio",
-    label: "Студийное",
-    hint: "Ровный свет софтбоксов — стандарт каталога маркетплейсов",
-  },
-  {
-    id: "sunny-outdoor",
-    label: "Солнечное уличное",
-    hint: "Яркий дневной свет на улице, живые тени",
-  },
-];
-
 const CONTEXT_OPTIONS: {
   id: ModelCategoryContext;
   label: string;
@@ -384,8 +343,6 @@ export function ModelPresetSelector({
   onGenerate,
   modelDescription,
   onModelDescriptionChange,
-  onEnhanceModelDescription,
-  enhancingDescription,
   generating,
   generateError,
   generateNotice,
@@ -402,6 +359,7 @@ export function ModelPresetSelector({
   analyzingProductAngles = false,
   onApplyAnglesFromProducts,
   onClearProductSampleAngles,
+  dictationLocale = "ru",
 }: ModelPresetSelectorProps) {
   const patch = (partial: Partial<ModelGenerationSettings>) =>
     onSettingsChange(
@@ -420,19 +378,14 @@ export function ModelPresetSelector({
     settings.crop === MODEL_PARAM_CUSTOM
       ? settings.cropCustom.trim() || MODEL_CUSTOM_SELECT_OPTION.hint
       : isLingerieScenario
-        ? "Для белья — полный рост или по пояс с видимыми бёдрами."
+        ? "Для белья — по пояс, стоя; низ как брифы, не шорты. Полный рост — только если нужен весь комплект в кадре."
         : hintForOption(CROP_OPTIONS, settings.crop);
-
-  const lightingDescription =
-    settings.lighting === MODEL_PARAM_CUSTOM
-      ? settings.lightingCustom.trim() || MODEL_CUSTOM_SELECT_OPTION.hint
-      : hintForOption(LIGHTING_OPTIONS, settings.lighting);
 
   const ageDescription = isMinor
     ? "До 18 лет недоступны сценарий «Бельё / купальники» и тип «Бикини / купальники»."
     : "Влияет на лицо и пропорции: 21 — молодая 20+, 30 — зрелее. Для детской одежды укажите возраст ребёнка.";
 
-  const isPromptLocked = Boolean(generating || enhancingDescription);
+  const isPromptLocked = Boolean(generating);
   const outputSizeReady = isModelOutputSizeComplete(outputSize);
 
   const aspectRatioDescription = outputSize.aspectRatio
@@ -444,8 +397,14 @@ export function ModelPresetSelector({
     : "Качество изображения.";
 
   const basePrompt = useMemo(
-    () => buildModelBaseSettingsSummaryRu(settings, outputSize),
-    [settings, outputSize]
+    () =>
+      buildModelBaseSettingsSummaryRu(settings, outputSize, {
+        productPoseLabel:
+          useProductSampleAngles && productSampleAngles?.[0]
+            ? productPoseLabelForUi(productSampleAngles[0])
+            : undefined,
+      }),
+    [settings, outputSize, useProductSampleAngles, productSampleAngles]
   );
 
   return (
@@ -459,6 +418,14 @@ export function ModelPresetSelector({
           лет.
         </p>
       </header>
+
+      {isLingerieScenario ? (
+        <p className="rounded-[14px] border border-teal-100 bg-teal-50/80 px-3 py-2.5 text-xs leading-5 text-teal-950">
+          На этом шаге модель в студийном белье (общий комплект, не ваш SKU с
+          карточки). Ваш товар с фото слева накладывается на шаге «Примерка».
+          Поза с товара — только положение тела.
+        </p>
+      ) : null}
 
       <div className="space-y-4">
         <span className="block px-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
@@ -505,13 +472,6 @@ export function ModelPresetSelector({
             onChange={(bodyType) => patch({ bodyType })}
             onCustomTextChange={(bodyTypeCustom) => patch({ bodyTypeCustom })}
           />
-          <SelectField
-            label="Фон"
-            description={hintForOption(BACKGROUND_OPTIONS, settings.background)}
-            value={settings.background}
-            options={BACKGROUND_OPTIONS}
-            onChange={(background) => patch({ background })}
-          />
           <SelectWithCustomField
             label="Кадр для примерки"
             description={cropDescription}
@@ -547,25 +507,6 @@ export function ModelPresetSelector({
               className="min-h-[42px] w-full rounded-[12px] border border-border bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-sm outline-none transition hover:border-slate-300 focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
             />
           </SettingField>
-          <SelectWithCustomField
-            label="Освещение"
-            description={lightingDescription}
-            placeholder="Выберите освещение"
-            value={settings.lighting}
-            customText={settings.lightingCustom}
-            options={LIGHTING_OPTIONS.map((item) => ({
-              id: item.id,
-              label: item.label,
-              shortHint:
-                item.id === MODEL_PARAM_CUSTOM
-                  ? MODEL_CUSTOM_SELECT_OPTION.shortHint
-                  : undefined,
-            }))}
-            customPlaceholder="Например: контровой свет, мягкая вспышка"
-            disabled={isPromptLocked}
-            onChange={(lighting) => patch({ lighting })}
-            onCustomTextChange={(lightingCustom) => patch({ lightingCustom })}
-          />
           <SelectField
             label="Сценарий"
             description={hintForOption(
@@ -587,46 +528,35 @@ export function ModelPresetSelector({
             }
           />
           <SettingField
-            label="Варианты фото"
+            label="Поза модели"
             description={
               useProductSampleAngles && productSampleAngles
-                ? "Поза модели подобрана по фото товара. За один запуск создаётся один результат."
-                : "Выберите, какое фото нужно для карточки товара. Сейчас создаётся один вариант за запуск."
+                ? "Поза подобрана по фото товара — учтём в итоговом промте."
+                : "Подберите позу с фото товара или опишите вручную — необязательно."
             }
           >
             <ModelAnglesField
-              anglePresets={settings.anglePresets}
               customAngles={settings.customAngles}
               disabled={isPromptLocked}
               productPhotoCount={productPhotoCount}
               useProductSampleAngles={useProductSampleAngles}
               productSampleAngles={productSampleAngles}
               analyzingProductAngles={analyzingProductAngles}
-              onApplyAnglesFromProducts={onApplyAnglesFromProducts}
-              onClearProductSampleAngles={onClearProductSampleAngles}
-              onPresetsChange={(anglePresets) => patch({ anglePresets })}
+              onApplyFromProduct={onApplyAnglesFromProducts}
+              onClearProductPose={onClearProductSampleAngles}
               onCustomAnglesChange={(customAngles) => patch({ customAngles })}
             />
           </SettingField>
         </div>
       </div>
 
-      {isLingerieScenario ? (
-        <p className="rounded-[12px] border border-amber-200/80 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">
-          Для белья: взрослая модель, нейтральная поза, руки не закрывают грудь,
-          талию и бёдра. Рекомендуемые варианты: «Главное фото», «Детали
-          изделия», «Полуоборот», «Сзади».
-        </p>
-      ) : null}
-
       <div className="border-t border-border/50 pt-5">
         <ModelPromptComposer
           basePrompt={basePrompt}
           description={modelDescription}
           onDescriptionChange={onModelDescriptionChange}
-          onEnhanceDescription={onEnhanceModelDescription}
-          enhancing={enhancingDescription}
           disabled={isPromptLocked}
+          dictationLocale={dictationLocale}
         />
       </div>
 

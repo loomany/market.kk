@@ -12,6 +12,7 @@ export function buildGenerateModelRequestBody(input: {
   seed: number;
   angle?: ResolvedModelAngle;
   referenceImageUrl?: string | null;
+  productPoseDescriptionRu?: string;
 }): GenerateModelRequest {
   const {
     settings,
@@ -21,6 +22,7 @@ export function buildGenerateModelRequestBody(input: {
     seed,
     angle,
     referenceImageUrl,
+    productPoseDescriptionRu,
   } = input;
 
   return {
@@ -44,6 +46,7 @@ export function buildGenerateModelRequestBody(input: {
     seed,
     customDescription: modelDescription?.trim() || undefined,
     cameraAnglePrompt: angle?.prompt,
+    productPoseDescriptionRu: productPoseDescriptionRu?.trim() || undefined,
     referenceImageUrl: referenceImageUrl ?? undefined,
     promptLocale,
   };

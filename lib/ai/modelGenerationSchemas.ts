@@ -15,6 +15,7 @@ import {
   MODEL_CAMERA_ANGLE_PROMPT_MAX,
   MODEL_CUSTOM_TEXT_MAX,
   MODEL_PARAM_CUSTOM,
+  PRODUCT_POSE_DESCRIPTION_RU_MAX,
 } from "@/lib/ai/modelCustomParams";
 import { MODEL_LIGHTING_PRESET_IDS } from "@/lib/ai/modelLighting";
 
@@ -57,6 +58,12 @@ export const generateModelRequestSchema = z
     .string()
     .trim()
     .max(MODEL_CAMERA_ANGLE_PROMPT_MAX)
+    .optional(),
+  /** Russian pose label from product photo analysis (for GPT prompt composer) */
+  productPoseDescriptionRu: z
+    .string()
+    .trim()
+    .max(PRODUCT_POSE_DESCRIPTION_RU_MAX)
     .optional(),
   /** Hero image URL — when set, uses image edit to preserve face and outfit */
   referenceImageUrl: z.string().url().max(2048).optional(),
@@ -127,6 +134,9 @@ export type GenerateModelSuccessResponse = {
   requestId: string;
   promptPreview: string;
   description?: string;
+  /** How the Fal prompt was built */
+  promptComposer?: "openai" | "template";
+  openAiPromptModel?: string;
 };
 
 export type GenerateModelErrorResponse = {

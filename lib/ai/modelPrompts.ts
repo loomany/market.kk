@@ -6,6 +6,9 @@ import {
   resolvePoseInstruction,
 } from "@/lib/ai/modelFraming";
 import {
+  lingerieBottomCutGuidance,
+  lingerieCatalogOutfitGuidance,
+  lingerieModelPoseGuidance,
   neutralBaseOutfitGuidance,
   neutralBaseOutfitLockForEdit,
   shouldUseNeutralBaseModelGeneration,
@@ -28,9 +31,11 @@ function cropPhrase(input: GenerateModelRequest): string {
     return input.cropCustom.trim();
   }
   if (input.categoryContext === "lingerie" && input.crop === "upper-body") {
-    return "torso-to-thigh crop with visible torso and hips";
+    return "waist-up to upper-thigh catalog crop with full head, full face, torso, waist and hips visible";
   }
-  return input.crop === "full-body" ? "full-length head-to-toe framing" : "upper body";
+  return input.crop === "full-body"
+    ? "full-length head-to-toe framing"
+    : "waist-up catalog framing with full head, full face, torso and waist visible";
 }
 
 function bodyTypeEnforcement(input: GenerateModelRequest): string | null {
@@ -65,26 +70,21 @@ function bodyTypeNegatives(input: GenerateModelRequest): string | null {
   return null;
 }
 
-function backgroundLabel(
-  background: GenerateModelRequest["background"]
-): string {
-  if (background === "light-gray") return "light gray";
-  return background;
+function defaultLightingPhrase(hasUserDirection: boolean): string {
+  if (hasUserDirection) {
+    return "lighting and atmosphere per user model direction below";
+  }
+  return lightingPromptPhrase("studio", undefined);
 }
 
-function backgroundPhrase(
-  background: GenerateModelRequest["background"],
-  lighting: GenerateModelRequest["lighting"]
-): string {
-  if (background === "white" && lighting === "studio") {
-    return (
-      "white seamless studio backdrop with soft natural floor shadow and a gentle shadow silhouette behind the model"
-    );
+function defaultBackdropPhrase(hasUserDirection: boolean): string {
+  if (hasUserDirection) {
+    return "studio backdrop per user model direction below";
   }
-  if (background === "light-gray" && lighting === "studio") {
-    return "light gray seamless studio backdrop with soft natural shadows for depth";
-  }
-  return `clean ${backgroundLabel(background)} studio background`;
+  return (
+    "plain white seamless studio backdrop with soft natural floor shadow — " +
+    "override color, texture, or depth in user model direction if needed"
+  );
 }
 
 function wantsVisibleStudioShadows(text?: string): boolean {
@@ -92,8 +92,8 @@ function wantsVisibleStudioShadows(text?: string): boolean {
   return /тен|shadow/i.test(text);
 }
 
-function studioAtmosphereGuidance(input: GenerateModelRequest): string | null {
-  if (input.lighting !== "studio") return null;
+function studioAtmosphereGuidance(hasUserDirection: boolean): string | null {
+  if (hasUserDirection) return null;
   return (
     "Studio depth: directional soft key light, clearly visible soft natural shadow behind the model on the backdrop, " +
     "subtle contact shadow under feet — believable professional photoshoot, not flat shadowless lighting."
@@ -171,11 +171,16 @@ function safetyNegatives(input: GenerateModelRequest): string {
       input.gender === "female"
         ? `, ${femaleAdultModelBeautyNegatives()}`
         : "";
+    const lingerieExtras =
+      input.categoryContext === "lingerie"
+        ? ", boyshorts, high-waist underwear shorts, biker shorts, long-leg underwear to mid-thigh, seated pose compressing underwear"
+        : "";
     return (
       "Do not generate: child, teen, explicit nudity, sexualized pose, watermark, text, logo, distorted hands, extra limbs, bad anatomy, blurry image, " +
       "visible cellulite, orange-peel skin, lumpy thigh or hip dimpling, rough bumpy skin on legs or arms, " +
       "very pale untanned porcelain skin, bare face without makeup, unkempt unstyled appearance" +
       femaleExtras +
+      lingerieExtras +
       ", " +
       modelAgeNegativePhrase(modelAge) +
       "."
@@ -200,18 +205,20 @@ export function buildModelGenerationPrompt(
   const crop = cropPhrase(input);
   const framing = mandatoryFramingGuidance(input);
   const bodyEnforcement = bodyTypeEnforcement(input);
-  const lighting = lightingPromptPhrase(input.lighting, input.lightingCustom);
   const expression = expressionPhrase(input);
+  const hasUserDirection = Boolean(input.customDescription?.trim());
+  const lighting = defaultLightingPhrase(hasUserDirection);
+  const backdrop = defaultBackdropPhrase(hasUserDirection);
 
   const parts =
     input.categoryContext === "lingerie"
       ? [
           neutralBase
-            ? `Realistic full-body studio photo of a ${ageLabel} ${input.gender} fashion model${nationalityClause(input)} for virtual apparel try-on, ${bodyType}, ${crop}, ${pose}, ${lighting}, ${expression}, ${neutralBaseOutfitGuidance()}, natural editorial posture with subtle weight shift and relaxed asymmetric arms, visible torso and hips, ${backgroundPhrase(input.background, input.lighting)}, believable human presence, no sunglasses, no heavy jewelry, no props, no text, no watermark, no logo, non-explicit, not sexualized.`
-            : `Realistic full-body studio photo of a ${ageLabel} ${input.gender} fashion model${nationalityClause(input)} for premium lingerie catalog try-on, ${bodyType}, ${crop}, ${pose}, ${lighting}, ${expression}, natural editorial posture with subtle weight shift and relaxed asymmetric arms, visible torso and hips, ${backgroundPhrase(input.background, input.lighting)}, believable human presence, no sunglasses, no heavy jewelry, no props, no text, no watermark, no logo, non-explicit, not sexualized, suitable for virtual try-on.`,
+            ? `Realistic full-body studio photo of a ${ageLabel} ${input.gender} fashion model${nationalityClause(input)} for virtual apparel try-on, ${bodyType}, ${crop}, ${pose}, ${lighting}, ${expression}, ${neutralBaseOutfitGuidance()}, natural editorial posture with subtle weight shift and relaxed asymmetric arms, visible torso and hips, ${backdrop}, believable human presence, no sunglasses, no heavy jewelry, no props, no text, no watermark, no logo, non-explicit, not sexualized.`
+            : `Realistic full-body studio photo of a ${ageLabel} ${input.gender} fashion model${nationalityClause(input)} for premium lingerie catalog try-on, ${bodyType}, ${crop}, ${pose}, ${lighting}, ${expression}, ${lingerieCatalogOutfitGuidance()}, natural editorial posture with subtle weight shift and relaxed asymmetric arms, visible torso and hips, ${backdrop}, believable human presence, no sunglasses, no heavy jewelry, no props, no text, no watermark, no logo, non-explicit, not sexualized, suitable for virtual try-on.`,
         ]
       : [
-          `Realistic premium e-commerce studio photo of a ${ageLabel} ${input.gender} fashion model${nationalityClause(input)}, ${bodyType}, ${crop}, ${pose}, ${lighting}, ${expression}, relaxed natural body language, ${backgroundPhrase(input.background, input.lighting)}, modern DTC catalog photography, realistic proportions, high detail, no text, no watermark, no logo.`,
+          `Realistic premium e-commerce studio photo of a ${ageLabel} ${input.gender} fashion model${nationalityClause(input)}, ${bodyType}, ${crop}, ${pose}, ${lighting}, ${expression}, relaxed natural body language, ${backdrop}, modern DTC catalog photography, realistic proportions, high detail, no text, no watermark, no logo.`,
         ];
 
   parts.push(modelAgeAppearanceGuidance(input.modelAge));
@@ -220,7 +227,7 @@ export function buildModelGenerationPrompt(
     parts.push(bodyEnforcement);
   }
 
-  const atmosphere = studioAtmosphereGuidance(input);
+  const atmosphere = studioAtmosphereGuidance(hasUserDirection);
   if (atmosphere) {
     parts.push(atmosphere);
   }
@@ -245,6 +252,8 @@ export function buildModelGenerationPrompt(
       parts.push(
         "One cohesive lingerie or swimwear set in a single color and lace design — this exact outfit defines the model for all catalog angles."
       );
+      parts.push(lingerieBottomCutGuidance());
+      parts.push(lingerieModelPoseGuidance());
     }
     if (options?.followUpAngle) {
       parts.push(
