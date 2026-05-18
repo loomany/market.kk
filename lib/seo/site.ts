@@ -9,7 +9,10 @@ import {
 export const siteName = "Vitrina AI Studio";
 export const siteShortName = "Vitrina AI";
 export const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL || "https://vitrina-ai-studio.com";
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  (process.env.NODE_ENV === "production"
+    ? "https://your-domain.com"
+    : "http://localhost:3000");
 export const siteDescription =
   "AI-студия товарных фото и видео для маркетплейсов, интернет-магазинов, Instagram-витрин и каталогов.";
 

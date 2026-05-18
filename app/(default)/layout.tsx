@@ -8,6 +8,7 @@ import {
   softwareApplicationJsonLd,
   websiteJsonLd,
 } from "@/lib/seo/jsonLd";
+import { siteUrl } from "@/lib/seo/site";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -26,9 +27,7 @@ const appName =
     : "Vitrina AI Studio";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL || "https://vitrina-ai-studio.com"
-  ),
+  metadataBase: new URL(siteUrl),
   title: {
     default: appName,
     template: `%s | ${appName}`,

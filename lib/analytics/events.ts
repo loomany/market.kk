@@ -26,6 +26,17 @@ export type AnalyticsEventName =
 
 export type AnalyticsPayload = Record<string, string | number | boolean | null>;
 
+const blockedPayloadKeyParts = [
+  "prompt",
+  "image",
+  "photo",
+  "file",
+  "url",
+  "token",
+  "secret",
+  "key",
+];
+
 export function trackEvent(
   eventName: AnalyticsEventName,
   payload: AnalyticsPayload = {}
@@ -33,9 +44,16 @@ export function trackEvent(
   if (typeof window === "undefined") return;
 
   const safePayload = Object.fromEntries(
-    Object.entries(payload).filter(([key]) => !key.toLowerCase().includes("prompt"))
+    Object.entries(payload).filter(([key]) => {
+      const normalizedKey = key.toLowerCase();
+      return !blockedPayloadKeyParts.some((part) => normalizedKey.includes(part));
+    })
   );
 
   window.gtag?.("event", eventName, safePayload);
-  window.ym?.(process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID || "", "reachGoal", eventName);
+
+  const metrikaId = process.env.NEXT_PUBLIC_YANDEX_METRIKA_ID;
+  if (metrikaId) {
+    window.ym?.(metrikaId, "reachGoal", eventName);
+  }
 }

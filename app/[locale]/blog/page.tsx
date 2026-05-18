@@ -77,6 +77,20 @@ export default async function BlogPage({ params }: PageProps) {
           ? `Опубликованы только статьи с полезным контентом. ${draftCount} тем остаются в keyword map как draft/noindex до ручной проверки.`
           : `Only useful articles are published. ${draftCount} topics stay in the keyword map as draft/noindex until manual review.`}
       </p>
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+        <Link
+          href="/studio"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-teal-800"
+        >
+          {isRu ? "Открыть студию" : "Open studio"}
+        </Link>
+        <Link
+          href={`/${locale}/features`}
+          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border bg-white px-5 text-sm font-semibold text-slate-900 transition-colors hover:border-teal-200 hover:bg-teal-50"
+        >
+          {isRu ? "Посмотреть возможности" : "See features"}
+        </Link>
+      </div>
       <div className="mt-10 grid gap-4 md:grid-cols-2">
         {articles.map(({ topic, localizedArticle }) => (
           <Link
