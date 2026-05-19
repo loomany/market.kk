@@ -33,8 +33,8 @@ export const PRODUCT_CATEGORIES: { id: ProductCategory; label: string }[] = [
 
 export const GARMENT_PHOTO_TYPES: { id: GarmentPhotoType; label: string }[] = [
   { id: "auto", label: "Авто" },
-  { id: "model", label: "Одежда на человеке" },
-  { id: "flat-lay", label: "Одежда отдельно" },
+  { id: "model", label: "На модели / на человеке" },
+  { id: "flat-lay", label: "Товар отдельно" },
 ];
 
 export const QUALITY_MODES: { id: QualityMode; label: string }[] = [

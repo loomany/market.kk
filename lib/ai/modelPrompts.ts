@@ -270,6 +270,16 @@ export function buildModelGenerationPrompt(
     );
   }
 
+  if (input.shortAiSummaryEn?.trim()) {
+    parts.push(`Product analysis: ${input.shortAiSummaryEn.trim()}`);
+  }
+
+  if (input.productDescriptionRu?.trim()) {
+    parts.push(
+      `Product context from merchant (highest priority): ${input.productDescriptionRu.trim()}`
+    );
+  }
+
   if (!adult) {
     parts.push(
       "Age-appropriate fully clothed children's or teen catalog styling only, modest outfit, no swimwear, no lingerie, no underwear-only look, non-sexualized."

@@ -94,9 +94,9 @@ export const PRODUCT_SHOT_ASPECT_RATIO_OPTIONS = [
 ] as const;
 
 const PRODUCT_SHOT_QUALITY_SCALE: Record<FalModelResolution, number> = {
-  "0.5K": 0.5,
   "1K": 1,
   "2K": 2,
+  "4K": 4,
 };
 
 export function aspectRatioForShotSizePreset(preset: ShotSizePreset): string {

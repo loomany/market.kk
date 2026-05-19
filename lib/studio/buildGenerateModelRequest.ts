@@ -13,6 +13,10 @@ export function buildGenerateModelRequestBody(input: {
   angle?: ResolvedModelAngle;
   referenceImageUrl?: string | null;
   productPoseDescriptionRu?: string;
+  productDescriptionRu?: string;
+  shortAiSummaryEn?: string;
+  productSetType?: GenerateModelRequest["productSetType"];
+  productSourcePresentation?: GenerateModelRequest["productSourcePresentation"];
 }): GenerateModelRequest {
   const {
     settings,
@@ -23,6 +27,10 @@ export function buildGenerateModelRequestBody(input: {
     angle,
     referenceImageUrl,
     productPoseDescriptionRu,
+    productDescriptionRu,
+    shortAiSummaryEn,
+    productSetType,
+    productSourcePresentation,
   } = input;
 
   return {
@@ -47,6 +55,10 @@ export function buildGenerateModelRequestBody(input: {
     customDescription: modelDescription?.trim() || undefined,
     cameraAnglePrompt: angle?.prompt,
     productPoseDescriptionRu: productPoseDescriptionRu?.trim() || undefined,
+    productDescriptionRu: productDescriptionRu?.trim() || undefined,
+    shortAiSummaryEn: shortAiSummaryEn?.trim() || undefined,
+    productSetType,
+    productSourcePresentation,
     referenceImageUrl: referenceImageUrl ?? undefined,
     promptLocale,
   };

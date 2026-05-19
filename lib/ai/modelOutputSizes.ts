@@ -1,4 +1,4 @@
-/** Fal `fal-ai/nano-banana-2` — aspect_ratio + resolution */
+/** Fal `fal-ai/nano-banana-pro` — aspect_ratio + resolution */
 
 export const FAL_MODEL_ASPECT_RATIOS = [
   "3:4",
@@ -12,7 +12,7 @@ export const FAL_MODEL_ASPECT_RATIOS = [
 
 export type FalModelAspectRatio = (typeof FAL_MODEL_ASPECT_RATIOS)[number];
 
-export const FAL_MODEL_RESOLUTIONS = ["0.5K", "1K", "2K"] as const;
+export const FAL_MODEL_RESOLUTIONS = ["1K", "2K", "4K"] as const;
 
 export type FalModelResolution = (typeof FAL_MODEL_RESOLUTIONS)[number];
 
@@ -84,12 +84,6 @@ export const FAL_MODEL_RESOLUTION_OPTIONS: {
   hint: string;
 }[] = [
   {
-    id: "0.5K",
-    label: "0.5K",
-    shortHint: "черновик",
-    hint: "Быстрый черновик, ниже стоимость",
-  },
-  {
     id: "1K",
     label: "1K",
     shortHint: "баланс",
@@ -100,6 +94,12 @@ export const FAL_MODEL_RESOLUTION_OPTIONS: {
     label: "2K",
     shortHint: "для зума",
     hint: "Детализация для зума в карточке",
+  },
+  {
+    id: "4K",
+    label: "4K",
+    shortHint: "максимум",
+    hint: "Максимальная детализация для крупного зума",
   },
 ];
 

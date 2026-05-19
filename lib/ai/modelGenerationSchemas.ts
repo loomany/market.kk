@@ -65,6 +65,27 @@ export const generateModelRequestSchema = z
     .trim()
     .max(PRODUCT_POSE_DESCRIPTION_RU_MAX)
     .optional(),
+  /** Merchant-checked product description (Russian); priority over AI pose text */
+  productDescriptionRu: z
+    .string()
+    .trim()
+    .max(PRODUCT_POSE_DESCRIPTION_RU_MAX)
+    .optional(),
+  shortAiSummaryEn: z.string().trim().max(600).optional(),
+  productSetType: z
+    .enum([
+      "bra_brief_set",
+      "bra_only",
+      "bottoms_only",
+      "dress",
+      "top",
+      "bottom",
+      "unknown",
+    ])
+    .optional(),
+  productSourcePresentation: z
+    .enum(["on-model", "flat-lay", "unknown"])
+    .optional(),
   /** Hero image URL — when set, uses image edit to preserve face and outfit */
   referenceImageUrl: z.string().url().max(2048).optional(),
   /** Locale of customDescription in the UI; server translates to English for Fal */

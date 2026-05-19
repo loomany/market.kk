@@ -113,7 +113,7 @@ function hardRulesFor(
   options?: { neutralBaseForTryOn?: boolean }
 ): string[] {
   const rules = [
-    "Output ONE English paragraph for Fal nano-banana-2 text-to-image — no markdown, no bullet lists.",
+    "Output ONE English paragraph for Fal nano-banana-pro text-to-image — no markdown, no bullet lists.",
     "End with a concise 'Do not generate:' negative list (watermark, text, logo, bad anatomy, extra limbs, blurry).",
     "Commercial e-commerce catalog only — photorealistic, not cartoon.",
     "Never invent product lace, colors, or garment details the user did not specify.",
@@ -128,6 +128,28 @@ function hardRulesFor(
   } else if (request.crop === "upper-body") {
     rules.push(
       "Mandatory waist-up / torso-to-upper-thigh framing: full head, full face, forehead, hair, shoulders, torso, waist and hips visible — never crop eyes, forehead, top of head, chin, hands, waist, hips, or garment areas."
+    );
+  }
+
+  if (request.shortAiSummaryEn?.trim()) {
+    rules.push(
+      `Product analysis summary (high priority): ${request.shortAiSummaryEn.trim()}`
+    );
+  }
+
+  if (request.productDescriptionRu?.trim()) {
+    rules.push(
+      `Merchant product description (highest priority): ${request.productDescriptionRu.trim()}`
+    );
+  }
+
+  if (request.productSetType && request.productSetType !== "unknown") {
+    rules.push(`Product set type: ${request.productSetType}.`);
+  }
+
+  if (request.productSourcePresentation === "on-model") {
+    rules.push(
+      "Source product photo shows garment worn on a body — generate model suitable for try-on transfer."
     );
   }
 
@@ -247,12 +269,13 @@ export async function composeModelGenerationPrompt(
       body: JSON.stringify({
         model,
         instructions: [
-          "You are an expert prompt engineer for photorealistic fashion catalog image models (Fal nano-banana-2).",
+          "You are an expert prompt engineer for photorealistic fashion catalog image models (Fal nano-banana-pro).",
           "Write a single dense English generation prompt that faithfully implements ALL structured settings and hard rules.",
           "You may reorganize and enrich wording for clarity and visual quality, but you must NOT contradict mandatory body type, age, crop/framing, category, or pose instructions.",
           "Treat templateBaseline as a quality reference — improve flow and specificity; do not drop mandatory safety or framing constraints.",
           "User text in settings may be in any language (see promptLocale) — translate faithfully into English inside generationPrompt; do not drop or invent details.",
-          "If productPoseDescriptionRu is provided, translate its meaning into precise English camera/pose language inside the prompt.",
+          "If productDescriptionRu is provided, treat it as the highest-priority garment/product facts (type, colors, presentation) — translate faithfully into English inside generationPrompt.",
+          "If productPoseDescriptionRu is provided, translate its meaning into precise English camera/pose language inside the prompt (secondary to productDescriptionRu).",
           "If customDescription is set, weave it as high-priority atmosphere/lighting/backdrop direction.",
           "Always end with 'Do not generate:' followed by comma-separated negatives.",
         ].join(" "),
@@ -263,10 +286,17 @@ export async function composeModelGenerationPrompt(
               {
                 type: "input_text",
                 text: JSON.stringify({
-                  targetImageModel: "fal-ai/nano-banana-2",
+                  targetImageModel: "fal-ai/nano-banana-pro",
                   promptLocale: input.promptLocale ?? "ru",
                   displayLanguage,
                   settings: buildStructuredSettings(request),
+                  productDescriptionRu:
+                    input.request.productDescriptionRu?.trim() || undefined,
+                  shortAiSummaryEn:
+                    input.request.shortAiSummaryEn?.trim() || undefined,
+                  productSetType: input.request.productSetType,
+                  productSourcePresentation:
+                    input.request.productSourcePresentation,
                   productPoseDescriptionRu:
                     input.productPoseDescriptionRu?.trim() || undefined,
                   followUpAngle: Boolean(input.followUpAngle),

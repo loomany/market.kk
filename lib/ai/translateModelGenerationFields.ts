@@ -13,6 +13,8 @@ const TEXT_FIELDS = [
   "cropCustom",
   "lightingCustom",
   "cameraAnglePrompt",
+  "productDescriptionRu",
+  "productPoseDescriptionRu",
 ] as const satisfies readonly (keyof GenerateModelRequest)[];
 
 /** English text for Fal angle-edit and deterministic template prompts. */

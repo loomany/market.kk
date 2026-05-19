@@ -86,18 +86,18 @@ console.log("Fal multi-angle diagnosis…");
 
 const url1 = await run(
   "1) text-to-image (angle 1)",
-  "fal-ai/nano-banana-2",
+  "fal-ai/nano-banana-pro",
   baseInput
 );
 if (!url1) process.exit(1);
 
-await run("2a) EDIT with ref from angle 1", "fal-ai/nano-banana-2/edit", {
+await run("2a) EDIT with ref from angle 1", "fal-ai/nano-banana-pro/edit", {
   ...baseInput,
   prompt: angle2Prompt,
   image_urls: [url1],
 });
 
-await run("2b) text-to-image fallback (angle 2)", "fal-ai/nano-banana-2", {
+await run("2b) text-to-image fallback (angle 2)", "fal-ai/nano-banana-pro", {
   ...baseInput,
   prompt: angle2GeneratePrompt,
   seed: 42,

@@ -69,6 +69,12 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** nano-banana-2 used 0.5K; nano-banana-pro supports 1K / 2K / 4K only */
+function coerceModelResolution(value: unknown): FalModelResolution | undefined {
+  if (value === "0.5K") return "1K";
+  return readEnum(value, FAL_MODEL_RESOLUTIONS);
+}
+
 function readString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
@@ -176,9 +182,8 @@ export function parseSavedModelSnapshot(
       isObject(raw.outputSize) ? raw.outputSize.aspectRatio : undefined,
       FAL_MODEL_ASPECT_RATIOS
     );
-    const resolution = readEnum(
-      isObject(raw.outputSize) ? raw.outputSize.resolution : undefined,
-      FAL_MODEL_RESOLUTIONS
+    const resolution = coerceModelResolution(
+      isObject(raw.outputSize) ? raw.outputSize.resolution : undefined
     );
 
     return {

@@ -34,7 +34,6 @@ import { ModelReadyCard } from "@/components/studio/ModelReadyCard";
 import type { Locale } from "@/lib/i18n/locales";
 import {
   MODEL_BODY_TYPES,
-  type ModelCategoryContext,
   type ModelCrop,
   type ModelGender,
   type ModelGenerationSettings,
@@ -303,33 +302,6 @@ const CROP_OPTIONS: { id: ModelCrop; label: string; hint: string }[] = [
   },
 ];
 
-const CONTEXT_OPTIONS: {
-  id: ModelCategoryContext;
-  label: string;
-  hint: string;
-}[] = [
-  {
-    id: "clothing",
-    label: "Одежда",
-    hint: "Повседневная и деловая одежда, детская и взрослая",
-  },
-  {
-    id: "lingerie",
-    label: "Бельё / купальники",
-    hint: "Только 18+, нейтральная взрослая каталожная подача",
-  },
-  {
-    id: "jewelry",
-    label: "Украшения",
-    hint: "Видны шея, уши и зона украшения без лишних аксессуаров",
-  },
-  {
-    id: "general",
-    label: "Универсально",
-    hint: "Когда категория неочевидна или смешанный ассортимент",
-  },
-];
-
 function hintForOption<T extends string>(
   options: { id: T; hint: string }[],
   value: T
@@ -507,26 +479,6 @@ export function ModelPresetSelector({
               className="min-h-[42px] w-full rounded-[12px] border border-border bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-sm outline-none transition hover:border-slate-300 focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
             />
           </SettingField>
-          <SelectField
-            label="Сценарий"
-            description={hintForOption(
-              CONTEXT_OPTIONS,
-              settings.categoryContext
-            )}
-            value={settings.categoryContext}
-            options={CONTEXT_OPTIONS.map((item) => ({
-              ...item,
-              disabled: isMinor && item.id === "lingerie",
-            }))}
-            onChange={(categoryContext) =>
-              patch({
-                categoryContext,
-                ...(categoryContext === "lingerie"
-                  ? { crop: "full-body" }
-                  : {}),
-              })
-            }
-          />
           <SettingField
             label="Поза модели"
             description={

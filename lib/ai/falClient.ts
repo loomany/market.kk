@@ -6,9 +6,9 @@ import {
 } from "@/lib/ai/paidAiGuard";
 
 export const FASHN_TRYON_MODEL = "fal-ai/fashn/tryon/v1.6";
-export const MODEL_GENERATION_MODEL = "fal-ai/nano-banana-2";
+export const MODEL_GENERATION_MODEL = "fal-ai/nano-banana-pro";
 /** Same model family — edit keeps face/outfit from reference image */
-export const MODEL_GENERATION_EDIT_MODEL = "fal-ai/nano-banana-2/edit";
+export const MODEL_GENERATION_EDIT_MODEL = "fal-ai/nano-banana-pro/edit";
 export const BACKGROUND_REMOVE_MODEL = "fal-ai/bria/background/remove";
 export const PRODUCT_SHOT_MODEL = "fal-ai/bria/product-shot";
 

@@ -81,19 +81,19 @@ async function run(label, modelId, input) {
 
 console.log("Lingerie prompt length:", lingeriePrompt1.length);
 
-const url1 = await run("1 lingerie t2i", "fal-ai/nano-banana-2", {
+const url1 = await run("1 lingerie t2i", "fal-ai/nano-banana-pro", {
   ...falBase,
   prompt: lingeriePrompt1,
 });
 if (!url1) process.exit(1);
 
-await run("2a edit lingerie ref", "fal-ai/nano-banana-2/edit", {
+await run("2a edit lingerie ref", "fal-ai/nano-banana-pro/edit", {
   ...falBase,
   prompt: editPrompt,
   image_urls: [url1],
 });
 
-await run("2b t2i lingerie angle2", "fal-ai/nano-banana-2", {
+await run("2b t2i lingerie angle2", "fal-ai/nano-banana-pro", {
   ...falBase,
   prompt: lingeriePrompt2,
 });

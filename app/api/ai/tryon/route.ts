@@ -2,12 +2,16 @@ import { NextResponse } from "next/server";
 import { FASHN_TRYON_MODEL, getFalClientOrThrow } from "@/lib/ai/falClient";
 import {
   buildTryOnFormPayload,
+  getProductAnalysisFromPayload,
   tryOnRequestSchema,
   tryOnParamsToRequest,
   type TryOnFormPayload,
   type TryOnInputSource,
   type TryOnRequest,
 } from "@/lib/ai/falSchemas";
+import { effectiveProductDescriptionRu } from "@/lib/ai/productAnalysisPipeline";
+import { runTryOnJudge } from "@/lib/ai/tryOnJudge";
+import { runTryOnRepair } from "@/lib/ai/tryOnRepair";
 import { uploadImageToFalStorage } from "@/lib/ai/falUpload";
 import { getMockTryOnResults } from "@/lib/ai/mockResults";
 import {
@@ -104,20 +108,84 @@ async function resolveImageUrls(
   return { productImageUrl, modelImageUrl };
 }
 
+async function runTryOnQualityPipeline(input: {
+  data: TryOnRequest;
+  images: { url: string; width?: number; height?: number }[];
+  productAnalysis: NonNullable<ReturnType<typeof getProductAnalysisFromPayload>>;
+  userDescriptionRu?: string;
+  userEdited?: boolean;
+  guard: PaidAiGuardInput;
+}): Promise<{
+  images: { url: string; width?: number; height?: number }[];
+  qualityMeta?: {
+    judged: boolean;
+    repaired: boolean;
+    judgeScore?: number;
+    judgeIssues?: string[];
+  };
+}> {
+  if (process.env.TRYON_QUALITY_PIPELINE === "0") {
+    return { images: input.images };
+  }
+
+  let images = input.images;
+  const userDesc = effectiveProductDescriptionRu(
+    input.productAnalysis,
+    input.userDescriptionRu ?? "",
+    input.userEdited ?? false
+  );
+
+  const judge = await runTryOnJudge({
+    productImageUrl: input.data.productImageUrl,
+    resultImageUrl: images[0]!.url,
+    productAnalysis: input.productAnalysis,
+  });
+
+  let repaired = false;
+  if (!judge.pass && judge.score < 0.72) {
+    const repair = await runTryOnRepair({
+      resultImageUrl: images[0]!.url,
+      productAnalysis: input.productAnalysis,
+      userDescriptionRu: userDesc,
+      guard: input.guard,
+    });
+    if (repair?.url) {
+      images = [{ ...images[0]!, url: repair.url }];
+      repaired = true;
+    }
+  }
+
+  return {
+    images,
+    qualityMeta: {
+      judged: true,
+      repaired,
+      judgeScore: judge.score,
+      judgeIssues: judge.issues,
+    },
+  };
+}
+
 async function runTryOn(
   data: TryOnRequest,
-  inputSource?: TryOnInputSource
+  inputSource?: TryOnInputSource,
+  options?: {
+    payload?: TryOnFormPayload;
+    guard?: PaidAiGuardInput;
+  }
 ) {
   if (isMockMode()) {
     return mockResponse(data, inputSource);
   }
 
+  const guard: PaidAiGuardInput = options?.guard ?? {
+    provider: "fal",
+    route: ROUTE_ID,
+    estimatedCostUsd: estimateTryOnCostUsd(data.numSamples),
+  };
+
   try {
-    const fal = getFalClientOrThrow({
-      provider: "fal",
-      route: ROUTE_ID,
-      estimatedCostUsd: estimateTryOnCostUsd(data.numSamples),
-    });
+    const fal = getFalClientOrThrow(guard);
     const result = await fal.subscribe(FASHN_TRYON_MODEL, {
       input: {
         model_image: data.modelImageUrl,
@@ -142,12 +210,38 @@ async function runTryOn(
       },
     });
 
-    const images =
+    let images =
       (
         result.data as {
           images?: { url: string; width?: number; height?: number }[];
         }
       ).images ?? [];
+
+    const productAnalysis = options?.payload
+      ? getProductAnalysisFromPayload(options.payload)
+      : null;
+
+    let qualityMeta:
+      | {
+          judged: boolean;
+          repaired: boolean;
+          judgeScore?: number;
+          judgeIssues?: string[];
+        }
+      | undefined;
+
+    if (productAnalysis && images.length > 0) {
+      const piped = await runTryOnQualityPipeline({
+        data,
+        images,
+        productAnalysis,
+        userDescriptionRu: options?.payload?.userDescriptionRu,
+        userEdited: options?.payload?.userEditedProductDescription,
+        guard,
+      });
+      images = piped.images;
+      qualityMeta = piped.qualityMeta;
+    }
 
     return NextResponse.json({
       ok: true,
@@ -156,6 +250,7 @@ async function runTryOn(
       images,
       requestId: result.requestId,
       ...(inputSource ? { inputSource } : {}),
+      ...(qualityMeta ? { quality: qualityMeta } : {}),
     });
   } catch (error) {
     return handleTryOnError(error);
@@ -263,7 +358,7 @@ async function processFormPayload(payload: TryOnFormPayload) {
       params
     );
 
-    return runTryOn(data, payload.inputSource);
+    return runTryOn(data, payload.inputSource, { payload, guard });
   } catch (error) {
     return handleTryOnError(error);
   }

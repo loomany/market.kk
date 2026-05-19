@@ -42,7 +42,7 @@ export const runtime = "nodejs";
 
 const ROUTE_ID = "/api/ai/generate-model";
 
-const ESTIMATED_MODEL_GENERATION_COST_USD = 0.04;
+const ESTIMATED_MODEL_GENERATION_COST_USD = 0.15;
 
 
 

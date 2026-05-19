@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { validateImageFile } from "@/lib/ai/imageConstraints";
+import { parseProductAnalysisJson } from "@/lib/ai/productDescriptionAnalysisSchemas";
 
 export const tryOnRequestSchema = z.object({
   productImageUrl: z.string().min(1),
@@ -105,6 +106,9 @@ export type TryOnFormPayload = {
   outputFormat: string;
   seed?: number;
   inputSource: TryOnInputSource;
+  productAnalysisJson?: string;
+  userDescriptionRu?: string;
+  userEditedProductDescription?: boolean;
 };
 
 export function buildTryOnFormPayload(formData: FormData): TryOnFormPayload {
@@ -158,7 +162,22 @@ export function buildTryOnFormPayload(formData: FormData): TryOnFormPayload {
       product: productImageFile ? "file" : "url",
       model: modelImageFile ? "file" : "url",
     },
+    productAnalysisJson:
+      normalizeTryOnFormValue(formData.get("productAnalysisJson")) ?? undefined,
+    userDescriptionRu:
+      normalizeTryOnFormValue(formData.get("userDescriptionRu")) ?? undefined,
+    userEditedProductDescription: parseBooleanFormValue(
+      formData.get("userEditedProductDescription"),
+      false
+    ),
   };
+}
+
+export function getProductAnalysisFromPayload(
+  payload: TryOnFormPayload
+) {
+  if (!payload.productAnalysisJson) return null;
+  return parseProductAnalysisJson(payload.productAnalysisJson);
 }
 
 /** FASHN try-on supports auto | tops | bottoms | one-pieces only. */
