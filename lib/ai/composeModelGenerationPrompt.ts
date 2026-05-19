@@ -134,9 +134,15 @@ function hardRulesFor(
   // Try-on safe pose: applies to every flow that ends in FASHN virtual try-on
   // (lingerie / clothing / general). Jewelry models do not go through FASHN
   // and may keep editorial freedom, so we skip the rule there.
+  //
+  // FASHN distorts garment edges when the model's hands cover or hover over
+  // the garment area (we saw the marketplace high-waist brief silhouette
+  // collapse because the base model's hand sat in front of the abdomen
+  // during the previous generation). Hence the explicit positive direction
+  // (hands near outer thighs only) AND the explicit negatives below.
   if (request.categoryContext !== "jewelry") {
     rules.push(
-      "Try-on safe pose: both arms relaxed and held below the shoulder line, hands not above shoulders, hands not behind head or neck, shoulders square to camera, no Vogue pose, no runway raised-arm pose, no dynamic editorial raised-arm pose. Keep chest, waist, hips, straps, and garment zones clear for virtual try-on."
+      "Try-on safe pose: both arms relaxed and held below the shoulder line, arms drop straight down along the outer sides of the body, hands rest near the outer thighs only, hands not above shoulders, hands not behind head or neck, hands not in front of the abdomen, waist, stomach, briefs, hips, bra band, straps, or any garment zone, fingers must not overlap the product area, shoulders square to camera, no Vogue pose, no runway raised-arm pose, no dynamic editorial raised-arm pose, no hand-on-hip pose, no arms akimbo, no hand resting on the waistband or stomach. Keep chest, waist, hips, straps, and garment zones clear for virtual try-on. Full torso, waist, hips, bra band, and brief area must stay fully visible and unobstructed."
     );
   }
 
@@ -203,6 +209,17 @@ function hardRulesFor(
         "Plain seamless neutral bra and brief base for try-on — no lace, no floral pattern, no turquoise or green accents on the base model."
       );
       rules.push(MODEL_GENERATION_NO_GARMENT_COPY_RULE);
+      // Garment fit-aware neutral base: matches only the product silhouette
+      // (cup coverage, strap width, brief waist height, side coverage, leg
+      // opening), never colour / lace / pattern. Server-derived from
+      // `deriveNeutralBaseFitGuidance` in `productAnalysisForModelGeneration`.
+      // Lives strictly *after* MODEL_GENERATION_NO_GARMENT_COPY_RULE so the
+      // no-copy rule keeps priority over silhouette guidance for both the
+      // GPT composer and downstream readers.
+      const fitGuidance = request.neutralBaseFitGuidanceEn?.trim();
+      if (fitGuidance) {
+        rules.push(`Neutral base fit guidance (silhouette only, never design): ${fitGuidance}`);
+      }
     } else {
       rules.push(
         "One cohesive lingerie or swimwear set in a single color and design for catalog consistency."
@@ -226,6 +243,12 @@ function hardRulesFor(
   ) {
     rules.push(
       "Body type is mandatory: visibly plus-size/curvy — not slim straight-size runway proportions."
+    );
+  }
+
+  if (isAdultModelAge(request.modelAge)) {
+    rules.push(
+      "Photorealism is mandatory: natural human skin micro-detail, soft realistic shading, subtle natural asymmetry — not plastic, not waxy, not doll-like, not over-airbrushed."
     );
   }
 

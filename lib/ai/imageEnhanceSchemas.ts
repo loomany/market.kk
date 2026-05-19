@@ -131,6 +131,13 @@ export type ImageEnhanceErrorResponse = {
     | "FAL_KEY_MISSING"
     | "FAL_NO_IMAGE"
     | "FAL_CONTENT_REJECTED"
+    /**
+     * Fal model returned a uniform safety placeholder (audit-confirmed
+     * pattern: solid RGB(0,0,0) 1024×768 PNG, ~10 KB). Treated as a content
+     * rejection, but reported separately so the UI can suggest a different
+     * editor or a less explicit source instead of "try a different prompt".
+     */
+    | "FAL_SAFETY_PLACEHOLDER"
     | "FAL_TIMEOUT"
     | "FAL_GENERIC_ERROR"
     | "UNKNOWN_ERROR";

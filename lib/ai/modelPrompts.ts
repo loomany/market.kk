@@ -127,6 +127,74 @@ function catalogSkinFinishGuidance(): string {
   );
 }
 
+/**
+ * Realism layer: counters the "AI plastic" look that dominates when
+ * the glamorous/luxury beauty wording stacks on top of catalog-skin
+ * retouch wording. Adds positive human-texture signals without any
+ * defect vocabulary (no wrinkles/scars/cellulite/stretch marks/folds).
+ *
+ * Applied for every adult model. Safe for FASHN: realism stays on the
+ * body, never on garment. Word choice (asymmetry "in posture and
+ * features") avoids the try-on-safe-pose regex guards in
+ * `test-tryOnSafePose.ts` (which only forbid `/asymmetric arms/`-class
+ * phrasing).
+ */
+function humanRealismGuidance(): string {
+  return (
+    "Photorealistic human skin and body finish on the model: subtle natural skin grain and micro-detail, " +
+    "soft realistic shading across the face, neck, arms and legs, " +
+    "gentle natural asymmetry in posture and features, " +
+    "believable soft shadows along body contours and under the chin, jawline and collarbone. " +
+    "Not plastic, not waxy, not doll-like, not over-airbrushed, not CGI-smooth — " +
+    "but still clean, premium, ecommerce-safe, no broken skin, no marks, no scars."
+  );
+}
+
+/**
+ * Lingerie + neutral-base realism: gives the body believable shading
+ * around neutral-base garment edges so FASHN has clean depth cues at
+ * the boundary. Explicitly forbids transferring skin micro-detail onto
+ * the garment to avoid Nano Banana baking texture into the neutral
+ * base (which would survive into FASHN and conflict with the marketplace SKU).
+ *
+ * Applies only when `categoryContext === "lingerie"` AND
+ * `neutralBase === true`. Does NOT introduce any pattern/lace/color
+ * vocabulary, so MODEL_GENERATION_NO_GARMENT_COPY_RULE is preserved.
+ */
+function lingerieRealismGuidance(): string {
+  return (
+    "Use a believable adult human body underneath the plain neutral base set: " +
+    "realistic soft shading around the neutral base garment edges, waist and brief edge, " +
+    "with natural shadow where the neutral base meets the body. " +
+    "Skin micro-detail stays on the body only, never on the garment. " +
+    "Keep styling non-explicit, editorial, premium and marketplace-safe."
+  );
+}
+
+/**
+ * Optional soft realism reinforcement for curvy / plus-size body types.
+ * Intentionally minimal — no "folds / dimples / belly rolls / stretch
+ * marks / cellulite" vocabulary (all of which would either age the
+ * model, trigger Fal moderation, or confuse FASHN at the garment edge).
+ * Only positive contour + shading wording, plus a clear "do not
+ * over-smooth" counter to the existing `catalogSkinFinishGuidance`.
+ */
+function curvyRealismGuidance(): string {
+  return (
+    "Keep realistic curvy body finish with natural soft body contours and gentle realistic shading. " +
+    "Do not over-smooth or plastify the body. Result must remain clean, premium and marketplace-safe."
+  );
+}
+
+function isCurvyOrPlusSizeBody(input: GenerateModelRequest): boolean {
+  return (
+    input.bodyType === "plus-size" ||
+    input.bodyType === "size-2xl" ||
+    input.bodyType === "size-xl" ||
+    input.bodyType === "curvy"
+  );
+}
+
 /** Дефолтный каталожный образ для взрослых женских моделей */
 function femaleAdultModelBeautyGuidance(input: GenerateModelRequest): string {
   const years = modelAgeYears(input.modelAge);
@@ -184,7 +252,11 @@ function tryOnPoseNegatives(input: GenerateModelRequest): string {
   if (input.categoryContext === "jewelry") return "";
   return (
     ", arms raised above shoulders, hand behind head, hand on neck, hand in hair, " +
-    "arms above head, raised-arm Vogue pose, runway raised-arm pose, hands crossing garment area"
+    "arms above head, raised-arm Vogue pose, runway raised-arm pose, hands crossing garment area, " +
+    "hand on hip, hand on waist, hand on stomach, hand on abdomen, hand on briefs, " +
+    "hand on bra, hand on bra band, hands in front of abdomen, hands in front of waist, " +
+    "hands in front of torso, arms akimbo, fingers overlapping the product area, " +
+    "hand resting on waistband"
   );
 }
 
@@ -240,8 +312,8 @@ export function buildModelGenerationPrompt(
     input.categoryContext === "lingerie"
       ? [
           neutralBase
-            ? `Realistic full-body studio photo of a ${ageLabel} ${input.gender} fashion model${nationalityClause(input)} for virtual lingerie try-on, ${bodyType}, ${crop}, ${pose}, ${lighting}, ${expression}, ${lingerieNeutralBaseOutfitGuidance()}, natural editorial posture with subtle weight shift, arms relaxed naturally along the body, hands below the shoulder line, both shoulders square to camera, visible torso and hips, ${backdrop}, believable human presence, no sunglasses, no heavy jewelry, no props, no text, no watermark, no logo, non-explicit, not sexualized.`
-            : `Realistic full-body studio photo of a ${ageLabel} ${input.gender} fashion model${nationalityClause(input)} for premium lingerie catalog try-on, ${bodyType}, ${crop}, ${pose}, ${lighting}, ${expression}, ${lingerieCatalogOutfitGuidance()}, natural editorial posture with subtle weight shift, arms relaxed naturally along the body, hands below the shoulder line, both shoulders square to camera, visible torso and hips, ${backdrop}, believable human presence, no sunglasses, no heavy jewelry, no props, no text, no watermark, no logo, non-explicit, not sexualized, suitable for virtual try-on.`,
+            ? `Realistic full-body studio photo of a ${ageLabel} ${input.gender} fashion model${nationalityClause(input)} for virtual lingerie try-on, ${bodyType}, ${crop}, ${pose}, ${lighting}, ${expression}, ${lingerieNeutralBaseOutfitGuidance()}, natural editorial posture with subtle weight shift, arms relaxed naturally along the body and dropped straight down along the outer sides, hands resting near the outer thighs only, hands not in front of the abdomen, waist, hips, briefs, or bra band, hands below the shoulder line, both shoulders square to camera, full torso, waist, hips, bra band, and brief area fully visible, ${backdrop}, believable human presence, no sunglasses, no heavy jewelry, no props, no text, no watermark, no logo, non-explicit, not sexualized.`
+            : `Realistic full-body studio photo of a ${ageLabel} ${input.gender} fashion model${nationalityClause(input)} for premium lingerie catalog try-on, ${bodyType}, ${crop}, ${pose}, ${lighting}, ${expression}, ${lingerieCatalogOutfitGuidance()}, natural editorial posture with subtle weight shift, arms relaxed naturally along the body and dropped straight down along the outer sides, hands resting near the outer thighs only, hands not in front of the abdomen, waist, hips, briefs, or bra band, hands below the shoulder line, both shoulders square to camera, full torso, waist, hips, bra band, and brief area fully visible, ${backdrop}, believable human presence, no sunglasses, no heavy jewelry, no props, no text, no watermark, no logo, non-explicit, not sexualized, suitable for virtual try-on.`,
         ]
       : [
           `Realistic premium e-commerce studio photo of a ${ageLabel} ${input.gender} fashion model${nationalityClause(input)}, ${bodyType}, ${crop}, ${pose}, ${lighting}, ${expression}, relaxed natural body language, ${backdrop}, modern DTC catalog photography, realistic proportions, high detail, no text, no watermark, no logo.`,
@@ -260,6 +332,10 @@ export function buildModelGenerationPrompt(
 
   if (adult) {
     parts.push(catalogSkinFinishGuidance());
+    parts.push(humanRealismGuidance());
+    if (isCurvyOrPlusSizeBody(input)) {
+      parts.push(curvyRealismGuidance());
+    }
     const modelLook = professionalModelLookGuidance(input);
     if (modelLook) {
       parts.push(modelLook);
@@ -272,13 +348,21 @@ export function buildModelGenerationPrompt(
 
   if (input.categoryContext === "lingerie") {
     parts.push(
-      `Model age ${modelAgeYears(input.modelAge)}+ only, natural editorial styling, hands not covering chest, waist, hips, or garment area, no cropped headshot, no portrait-only framing.`
+      `Model age ${modelAgeYears(input.modelAge)}+ only, natural editorial styling, hands resting near the outer thighs only and not covering or hovering over the chest, waist, hips, briefs, bra band, straps, or any garment area, fingers must not overlap the product area, no cropped headshot, no portrait-only framing.`
     );
     if (neutralBase) {
       parts.push(MODEL_GENERATION_NO_GARMENT_COPY_RULE);
+      // Garment fit-aware neutral base — server-derived, lingerie-only,
+      // confidence-gated, silhouette-only. Lives right after the no-copy rule
+      // so that rule keeps priority. See `lib/ai/neutralBaseFitGuidance.ts`.
+      const fitGuidance = input.neutralBaseFitGuidanceEn?.trim();
+      if (fitGuidance) {
+        parts.push(`Neutral base fit guidance (silhouette only, never design): ${fitGuidance}`);
+      }
       parts.push(
         "Identity for all angles: same woman, same plain neutral bra-and-brief base — marketplace lace, colors, and SKU design come only from try-on, not from this generation."
       );
+      parts.push(lingerieRealismGuidance());
     } else {
       parts.push(
         "One cohesive lingerie or swimwear set in a single color and lace design — this exact outfit defines the model for all catalog angles."
@@ -351,12 +435,12 @@ export function buildModelGenerationPrompt(
   if (input.cameraAnglePrompt?.trim()) {
     parts.push(
       isFullBodyCrop(input)
-        ? "Follow the specified body orientation and pose only — do not tighten crop; keep mandatory full head-to-toe framing. Natural editorial posture, hands relaxed below the shoulder line, both shoulders square to camera, hands not blocking garment areas."
-        : "Follow the specified camera angle, body orientation, and framing. Keep posture natural and editorial — subtle weight shift, relaxed shoulders square to camera, hands relaxed below the shoulder line, no raised-arm pose; avoid rigid mannequin stance. Hands must not block garment areas needed for try-on."
+        ? "Follow the specified body orientation and pose only — do not tighten crop; keep mandatory full head-to-toe framing. Natural editorial posture, arms dropped straight down along the outer sides of the body, hands resting near the outer thighs only, hands not in front of the abdomen, waist, hips, briefs, or bra band, hands relaxed below the shoulder line, both shoulders square to camera, hands not blocking garment areas, fingers must not overlap the product area."
+        : "Follow the specified camera angle, body orientation, and framing. Keep posture natural and editorial — subtle weight shift, relaxed shoulders square to camera, arms dropped straight down along the outer sides of the body, hands resting near the outer thighs only, hands not in front of the abdomen, waist, hips, briefs, or bra band, hands relaxed below the shoulder line, no raised-arm pose, no hand-on-hip pose, no arms akimbo; avoid rigid mannequin stance. Hands must not block garment areas needed for try-on; fingers must not overlap the product area."
     );
   } else {
     parts.push(
-      "Model should face the camera clearly with natural relaxed posture suitable for virtual clothing try-on, hands relaxed below the shoulder line, both shoulders square to camera, hands not covering torso, no oversized clothing, no complex props, no sunglasses."
+      "Model should face the camera clearly with natural relaxed posture suitable for virtual clothing try-on, arms dropped straight down along the outer sides of the body, hands resting near the outer thighs only, hands not in front of the abdomen, waist, hips, briefs, or bra band, hands relaxed below the shoulder line, both shoulders square to camera, hands not covering torso, no hand-on-hip pose, no arms akimbo, no oversized clothing, no complex props, no sunglasses."
     );
   }
 

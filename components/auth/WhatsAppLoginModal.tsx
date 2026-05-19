@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
-import { LogOut, MessageCircle, X } from "lucide-react";
+import { LogOut, MessageCircle, User, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import {
   PhoneCountryInput,
@@ -27,6 +27,7 @@ export function WhatsAppLoginModal() {
 
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [step, setStep] = useState<"phone" | "code">("phone");
   const [phone, setPhone] = useState("");
   const [phoneCountryId, setPhoneCountryId] = useState(defaultCountryId);
@@ -113,6 +114,7 @@ export function WhatsAppLoginModal() {
   const logout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
+    setProfileOpen(false);
     window.dispatchEvent(new Event("vitrina-auth-changed"));
   };
 
@@ -197,18 +199,70 @@ export function WhatsAppLoginModal() {
       document.body
     );
 
+  const profileModal =
+    profileOpen &&
+    mounted &&
+    user &&
+    createPortal(
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="profile-title"
+        onClick={() => setProfileOpen(false)}
+      >
+        <div
+          className="w-full max-w-md rounded-[24px] bg-white p-5 shadow-2xl"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2
+                id="profile-title"
+                className="text-lg font-semibold text-slate-950"
+              >
+                Аккаунт
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-slate-600">
+                {user.phone}
+              </p>
+            </div>
+            <button
+              type="button"
+              aria-label="Закрыть"
+              onClick={() => setProfileOpen(false)}
+              className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="mt-5">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => void logout()}
+            >
+              <LogOut className="h-4 w-4" />
+              Выйти
+            </Button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+
   return (
     <>
       {user ? (
-        <div className="flex items-center gap-2">
-          <span className="hidden text-xs font-medium text-slate-500 sm:inline">
-            {user.phone}
-          </span>
-          <Button variant="outline" size="sm" onClick={logout}>
-            <LogOut className="h-4 w-4" />
-            Выйти
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setProfileOpen(true)}
+        >
+          <User className="h-4 w-4" />
+          Аккаунт
+        </Button>
       ) : (
         <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
           <MessageCircle className="h-4 w-4" />
@@ -217,6 +271,7 @@ export function WhatsAppLoginModal() {
       )}
 
       {modal}
+      {profileModal}
     </>
   );
 }

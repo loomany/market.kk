@@ -19,6 +19,7 @@ export function buildGenerateModelRequestBody(input: {
   productSourcePresentation?: GenerateModelRequest["productSourcePresentation"];
   productMustPreserve?: GenerateModelRequest["productMustPreserve"];
   productFitNotes?: GenerateModelRequest["productFitNotes"];
+  neutralBaseFitGuidanceEn?: string;
   sourceModelPromptEn?: string;
   sourceModelSizeClass?: string;
   sourceModelPose?: string;
@@ -43,6 +44,7 @@ export function buildGenerateModelRequestBody(input: {
     productSourcePresentation,
     productMustPreserve,
     productFitNotes,
+    neutralBaseFitGuidanceEn,
     sourceModelPromptEn,
     sourceModelSizeClass,
     sourceModelPose,
@@ -88,6 +90,7 @@ export function buildGenerateModelRequestBody(input: {
     productSourcePresentation,
     productMustPreserve,
     productFitNotes,
+    neutralBaseFitGuidanceEn: neutralBaseFitGuidanceEn?.trim() || undefined,
     referenceImageUrl: referenceImageUrl ?? undefined,
     promptLocale,
   };

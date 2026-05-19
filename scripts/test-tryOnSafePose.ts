@@ -67,6 +67,25 @@ const NEUTRAL_BASE_POSITIVES: ReadonlyArray<readonly [string, RegExp]> = [
   ["no hand behind head/neck/hair", /do not place a hand behind the head, neck, hair, or above the head/i],
   ["no crossed arms in front of bra band", /do not cross arms in front of the bra band or torso/i],
   ["arms relaxed at sides", /arms must stay relaxed at the sides or slightly away from the body/i],
+  // New (hands-near-outer-thighs + minimal-base brief contract):
+  ["arms drop down outer sides", /arms drop straight down along the outer sides of the body/i],
+  ["hands near outer thighs only", /hands rest near the outer thighs only/i],
+  [
+    "hands not in front of garment area",
+    /hands must not be placed in front of the abdomen, waist, stomach, briefs, hips, bra band, straps, or any garment zone/i,
+  ],
+  ["fingers must not overlap product", /fingers must not overlap the product area/i],
+  ["no hand on hip / no arms akimbo", /no hand on hip, no arms akimbo/i],
+  [
+    "minimal low-profile bikini brief",
+    /Brief must be a minimal low-profile classic bikini brief sitting flat against the body/i,
+  ],
+  ["no high-cut side panels", /no high-cut side panels/i],
+  ["no pronounced waistband shape", /no pronounced or thick waistband shape/i],
+  [
+    "base brief must not compete with marketplace",
+    /base brief must not compete with the target marketplace garment silhouette/i,
+  ],
 ];
 
 /** Must appear in `buildModelGenerationPrompt` output for non-jewelry contexts. */
@@ -74,6 +93,12 @@ const FULL_PROMPT_POSITIVES: ReadonlyArray<readonly [string, RegExp]> = [
   // accepts both "hands below the shoulder line" and "hands relaxed below the shoulder line"
   ["hands below the shoulder line", /below the shoulder line/i],
   ["shoulders square to camera", /shoulders square to camera/i],
+  // New explicit hands-position contract:
+  ["hands near outer thighs only", /hands resting near the outer thighs only/i],
+  [
+    "hands not in front of abdomen/waist/hips/briefs/bra band",
+    /hands not in front of the abdomen, waist, hips, briefs, or bra band/i,
+  ],
 ];
 
 /** Must appear in the "Do not generate:" tail for non-jewelry contexts. */
@@ -83,6 +108,17 @@ const FULL_PROMPT_NEGATIVES: ReadonlyArray<readonly [string, RegExp]> = [
   ["raised-arm Vogue pose", /raised-arm Vogue pose/i],
   ["runway raised-arm pose", /runway raised-arm pose/i],
   ["hands crossing garment area", /hands crossing garment area/i],
+  // New hand-position negatives (FASHN was distorting briefs/abdomen edges
+  // when the base model's hand sat over the garment area):
+  ["hand on hip", /\bhand on hip\b/i],
+  ["hand on waist", /\bhand on waist\b/i],
+  ["hand on stomach", /\bhand on stomach\b/i],
+  ["hand on abdomen", /\bhand on abdomen\b/i],
+  ["hands in front of abdomen", /\bhands in front of abdomen\b/i],
+  ["hands in front of torso", /\bhands in front of torso\b/i],
+  ["arms akimbo", /\barms akimbo\b/i],
+  ["fingers overlapping product", /\bfingers overlapping the product area\b/i],
+  ["hand resting on waistband", /\bhand resting on waistband\b/i],
 ];
 
 /** Must NOT appear anywhere in prompts or angle presets. */

@@ -151,7 +151,10 @@ export function buildNanoBananaEnhancePrompt(input: {
   preserveProduct: boolean;
   /**
    * Pre-computed SAFE external preservation block. Empty/undefined →
-   * generic fallback. Should already be sanitized for adult/identity words.
+   * generic safe fallback. Treated as a self-contained, already-safe
+   * sentence: do NOT prefix it with "Preserve the visible product
+   * exactly:" — the block itself starts with "Keep the clothing ..." or
+   * "Preserve the visible product unchanged:" by construction.
    */
   productPreservationBlock?: string | null;
 }): string {
@@ -161,30 +164,31 @@ export function buildNanoBananaEnhancePrompt(input: {
     "Improve realism, lighting, and background without changing the product.";
   const intent = clampPromptLength(rawIntent, NANO_BANANA_MAX_INTENT_LEN);
 
-  const genericPreserveStrict =
-    "Visible fashion product — keep color, pattern, material, shape, edges, proportions, and placement exactly the same.";
+  // Fallback when no Vision analysis was passed (low-confidence /
+  // generic-product / unknown). Matches `genericExternalPreservationBlock`
+  // so the two paths produce identical output and we stay single-source.
+  const safeFallback =
+    "Preserve the visible product unchanged: same color, shape, material, placement, proportions, and overall look. Do not replace, recolor, redesign, or distort the product.";
 
+  // preserveProduct=false → softer "background may change" wording.
   const preserveCreative =
     "Keep the main product recognisable. Background, lighting, and atmosphere may change. Do not replace the product or change its dominant color or pattern.";
 
   const dynamicBlock = (input.productPreservationBlock ?? "").trim();
 
-  const preservation = input.preserveProduct
-    ? dynamicBlock || genericPreserveStrict
+  const preservationSentence = input.preserveProduct
+    ? dynamicBlock || safeFallback
     : preserveCreative;
 
-  const preservationLine = input.preserveProduct
-    ? `Keep the same subject and composition. Preserve the visible product exactly: ${preservation}`
-    : `Keep the same subject. ${preservation}`;
-
-  // ONE user intent, ONE product fidelity line, ONE short negative — by
-  // design (see prompt-spec). Anything more is duplication.
+  // ONE user intent, ONE product fidelity sentence (the safe block itself
+  // ends with "Do not replace, recolor, redesign, or distort the product."
+  // — adding another copy of that line would just trigger the duplicate-
+  // sentence collapser in the sanitizer).
   const assembled = [
     "Edit the source image for premium ecommerce quality.",
     `User intent: ${intent}.`,
-    preservationLine,
+    preservationSentence,
     "Improve only lighting, background, realism, shadows, and cleanup.",
-    "Do not replace, recolor, redesign, or distort the product.",
     "No text, logos, or watermarks.",
   ].join(" ");
 

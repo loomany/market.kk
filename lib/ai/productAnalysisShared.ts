@@ -6,6 +6,7 @@ import type {
   ProductCategory,
 } from "@/components/studio/types";
 import { mapCategoryForTryOn } from "@/lib/ai/falSchemas";
+import { deriveNeutralBaseFitGuidance } from "@/lib/ai/neutralBaseFitGuidance";
 
 export type ProductAnalysisUiOverrides = {
   categoryContext?: ModelCategoryContext;
@@ -103,12 +104,24 @@ export function productAnalysisForModelGeneration(
   sourceModelPose?: string;
   sourceModelCameraAngle?: string;
   sourceModelHandsPosition?: string;
+  neutralBaseFitGuidanceEn?: string;
 } {
   const sourceModel =
     analysis?.sourcePresentation === "on-model" ? analysis.sourceModel : null;
+  const categoryContext = resolveCategoryContext(analysis, overrides);
+
+  // Lingerie-only, confidence-gated, whitelisted English sentence describing
+  // the neutral-base silhouette (cup coverage, strap width, brief waist
+  // height, etc.) without any colour / lace / pattern vocabulary. Helper is
+  // safe to call for every category — it gates internally and returns
+  // applied:false for non-lingerie / low-confidence / missing analysis.
+  const neutralBaseFit = deriveNeutralBaseFitGuidance({
+    analysis,
+    categoryContext,
+  });
 
   return {
-    categoryContext: resolveCategoryContext(analysis, overrides),
+    categoryContext,
     shortAiSummaryEn: analysis
       ? modelSafeProductSummaryEn(analysis)
       : undefined,
@@ -128,6 +141,9 @@ export function productAnalysisForModelGeneration(
       : {}),
     ...(sourceModel?.handsPosition?.trim()
       ? { sourceModelHandsPosition: sourceModel.handsPosition.trim() }
+      : {}),
+    ...(neutralBaseFit.applied
+      ? { neutralBaseFitGuidanceEn: neutralBaseFit.text }
       : {}),
   };
 }

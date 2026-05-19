@@ -43,6 +43,7 @@ export async function fetchGenerateSingleStudioModel(input: {
         shortAiSummaryEn: productGen.shortAiSummaryEn,
         productSetType: productGen.productSetType,
         productSourcePresentation: productGen.productSourcePresentation,
+        neutralBaseFitGuidanceEn: productGen.neutralBaseFitGuidanceEn,
         sourceModelPromptEn: productGen.sourceModelPromptEn,
         sourceModelSizeClass: productGen.sourceModelSizeClass,
         sourceModelPose: productGen.sourceModelPose,

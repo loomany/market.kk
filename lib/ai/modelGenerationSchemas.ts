@@ -88,6 +88,15 @@ export const generateModelRequestSchema = z
     .optional(),
   productMustPreserve: z.array(z.string().trim().max(160)).max(16).optional(),
   productFitNotes: z.array(z.string().trim().max(200)).max(12).optional(),
+  /**
+   * Server-derived English neutral-base fit guidance for lingerie try-on.
+   * Always English (helper output is composed from whitelisted English phrase
+   * constants), never user-typed — so it is intentionally NOT translated by
+   * `translateModelGenerationTextFields`. Pushed into the lingerie + neutral-base
+   * branch of the prompt right after `MODEL_GENERATION_NO_GARMENT_COPY_RULE`.
+   * See `lib/ai/neutralBaseFitGuidance.ts`.
+   */
+  neutralBaseFitGuidanceEn: z.string().trim().max(700).optional(),
   /** On-model reference: body/pose/framing only (from product analysis) */
   sourceModelPromptEn: z.string().trim().max(900).optional(),
   sourceModelSizeClass: z.string().trim().max(40).optional(),

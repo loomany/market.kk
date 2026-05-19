@@ -69,6 +69,14 @@ const SENSITIVE_RULES: readonly SensitiveRule[] = [
   { label: "skin_realism", pattern: /\bskin realism\b/gi, replacement: "realism" },
   { label: "skin_tones", pattern: /\bskin tones?\b/gi, replacement: "tone" },
   { label: "high_cut_leg", pattern: /\bhigh[\s-]cut leg openings?\b/gi, replacement: "garment cut" },
+  // Defence-in-depth for the lingerie/swimwear merchandising vocabulary that
+  // Vision used to leak through (`buildExternalProductPreservationBlock`
+  // no longer enumerates Vision details, but the user prompt or GPT
+  // enhancer can still inject these words).
+  { label: "lace_overlay", pattern: /\blace overlay\b/gi, replacement: "" },
+  { label: "lace_trim", pattern: /\blace trim\b/gi, replacement: "" },
+  { label: "high_waisted", pattern: /\bhigh[\s-]waist(?:ed)?\b/gi, replacement: "" },
+  { label: "scalloped", pattern: /\bscalloped(?:\s+(?:edges?|hems?|textured edges?))?\b/gi, replacement: "" },
   { label: "lingerie_sets", pattern: /\blingerie sets?\b/gi, replacement: "two-piece fashion garment" },
   { label: "intimate_apparel", pattern: /\bintimate apparel\b/gi, replacement: "fashion product" },
   { label: "lingerie", pattern: /\blingerie\b/gi, replacement: "fashion garment" },

@@ -45,10 +45,19 @@ const SENSITIVE_FORBIDDEN: readonly RegExp[] = [
   /\bskin realism\b/i,
   /\badult model\b/i,
   /\bhigh-cut leg openings?\b/i,
+  // New: garment-detail vocabulary that previously leaked through the
+  // Vision pipeline (audit of the lingerie source image).
+  /\blace overlay\b/i,
+  /\bhigh[\s-]?waist(?:ed)?\b/i,
+  /\bscalloped\b/i,
   /\bsexual/i,
   /\bsexy\b/i,
   /\bnaked\b/i,
 ];
+
+/** The two fixed safe templates emitted by `buildExternalProductPreservationBlock`. */
+const SAFE_TEMPLATE_GARMENT = /Keep the clothing on the model unchanged/i;
+const SAFE_TEMPLATE_GENERIC = /Preserve the visible product unchanged/i;
 
 function assertNoSensitive(text: string, label: string) {
   for (const re of SENSITIVE_FORBIDDEN) {
@@ -274,42 +283,58 @@ function expectGenericBlock(block: string, label: string) {
   );
 }
 
-// === 1b) External SAFE block — strips sensitive vocabulary ===
+// === 1b) External SAFE block — fixed safe templates ===
+//
+// New design (after lace/scalloped leak audit): the external block is no
+// longer a Vision-derived enumeration of colours/materials/details. It is
+// one of two fixed safe templates, chosen by `objectType`:
+//   - `objectType === "garment"`  → SAFE_TEMPLATE_GARMENT
+//   - any other recognised type   → SAFE_TEMPLATE_GENERIC
+// Low-confidence / unknown      → genericExternalPreservationBlock()
+//
+// We intentionally NO LONGER assert that the safe block mentions Vision
+// specifics (colour, category, "hoop", "sole", "navy", "midi dress").
+// Those are valuable for debug only — the source image carries the visual
+// identity, the prompt only needs to say "do not change it".
 
 {
   const safe = buildExternalProductPreservationBlock(lingerieAnalysis());
   assertNoSensitive(safe, "ext.A lingerie");
-  // semantic identity preserved through neutral wording
-  assert.match(
-    safe,
-    /two-piece fashion garment|fashion garment|garment top|garment bottom|visible fashion product/i,
-    "ext.A: neutralised category present"
-  );
-  assert.match(safe, /black/i, "ext.A: color preserved");
-  assert.match(safe, /lace/i, "ext.A: material preserved (lace is allowed)");
-  assert.ok(safe.length <= 450, `ext.A: length ${safe.length} <= 450`);
+  assert.match(safe, SAFE_TEMPLATE_GARMENT, "ext.A: garment safe template");
+  assert.ok(safe.length <= 350, `ext.A: length ${safe.length} <= 350`);
+  // Belt-and-suspenders: the safe template MUST NOT contain the previously
+  // leaking garment-detail vocabulary.
+  assert.ok(!/\blace\b/i.test(safe), "ext.A: no 'lace' in template");
+  assert.ok(!/\bhigh[\s-]?waist/i.test(safe), "ext.A: no 'high-waist' in template");
+  assert.ok(!/\bscalloped\b/i.test(safe), "ext.A: no 'scalloped' in template");
+  assert.ok(!/\btwo-piece\b/i.test(safe), "ext.A: no 'two-piece' in template");
 }
 
 {
   const safe = buildExternalProductPreservationBlock(dressAnalysis());
   assertNoSensitive(safe, "ext.B dress");
-  assert.match(safe, /midi dress/i, "ext.B: dress category preserved");
-  assert.match(safe, /navy/i, "ext.B: color preserved");
+  assert.match(safe, SAFE_TEMPLATE_GARMENT, "ext.B: garment safe template");
+  // Vision details (colour, hem, silhouette) are intentionally NOT in the
+  // safe external block anymore.
+  assert.ok(!/\bmidi\b/i.test(safe), "ext.B: no 'midi' detail leak");
+  assert.ok(!/\bnavy\b/i.test(safe), "ext.B: no 'navy' detail leak");
 }
 
 {
   const safe = buildExternalProductPreservationBlock(jewelryAnalysis());
   assertNoSensitive(safe, "ext.C jewelry");
-  assert.match(safe, /hoop/i, "ext.C: category preserved");
+  assert.match(safe, SAFE_TEMPLATE_GENERIC, "ext.C: generic safe template");
   assertNotMatches(safe, GARMENT_HARDCODE, "ext.C: no garment");
   assertNotMatches(safe, FOOTWEAR_HARDCODE, "ext.C: no footwear");
+  assert.ok(!/\bhoop\b/i.test(safe), "ext.C: no Vision 'hoop' leak");
 }
 
 {
   const safe = buildExternalProductPreservationBlock(sneakersAnalysis());
   assertNoSensitive(safe, "ext.D sneakers");
-  assert.match(safe, /sneakers/i, "ext.D: sneakers preserved");
-  assert.match(safe, /sole/i, "ext.D: sole preserved");
+  assert.match(safe, SAFE_TEMPLATE_GENERIC, "ext.D: generic safe template");
+  assert.ok(!/\bsneakers\b/i.test(safe), "ext.D: no Vision 'sneakers' leak");
+  assert.ok(!/\bsole\b/i.test(safe), "ext.D: no Vision 'sole' leak");
 }
 
 {
@@ -377,10 +402,19 @@ const baseBuilderInput = {
     "FLUX + sneakers: only Vision laces, not template lace"
   );
   assert.match(prompt, /sneakers/i, "FLUX + sneakers: sneakers in block");
-  assert.match(prompt, /Edit instruction:/i, "FLUX uses 'Edit instruction:' prefix");
+  assert.match(
+    prompt,
+    /Subject and product:/i,
+    "FLUX uses 'Subject and product:' section"
+  );
+  assert.match(
+    prompt,
+    /User request:/i,
+    "FLUX uses 'User request:' section"
+  );
 }
 
-// Unknown / no block — generic fallback, no category words
+// Unknown / no block — generic safe fallback, no category words
 {
   const nanoNoBlock = buildNanoBananaEnhancePrompt({
     ...baseBuilderInput,
@@ -389,10 +423,11 @@ const baseBuilderInput = {
   assertNotMatches(nanoNoBlock, LINGERIE_HARDCODE, "Nano fallback no lingerie");
   assertNotMatches(nanoNoBlock, FOOTWEAR_HARDCODE, "Nano fallback no footwear");
   assertNotMatches(nanoNoBlock, JEWELRY_HARDCODE, "Nano fallback no jewelry");
+  // Nano fallback safe sentence (kept in sync with `genericExternalPreservationBlock`).
   assert.match(
     nanoNoBlock,
-    /visible fashion product|main product recognisable|preserve the visible product exactly/i,
-    "Nano fallback uses generic block"
+    SAFE_TEMPLATE_GENERIC,
+    "Nano fallback uses generic safe template"
   );
 
   const fluxNoBlock = buildFluxKontextEditPrompt({
@@ -404,8 +439,13 @@ const baseBuilderInput = {
   assertNotMatches(fluxNoBlock, JEWELRY_HARDCODE, "FLUX fallback no jewelry");
   assert.match(
     fluxNoBlock,
-    /visible fashion product|main product recognisable|product fidelity/i,
-    "FLUX fallback uses generic block"
+    SAFE_TEMPLATE_GENERIC,
+    "FLUX fallback uses generic safe template"
+  );
+  assert.match(
+    fluxNoBlock,
+    /Subject and product:/i,
+    "FLUX fallback keeps sectioned template"
   );
 }
 
@@ -425,7 +465,9 @@ const baseBuilderInput = {
 
 // === 3) Final prompt + SAFE external block — sensitive words must not leak ===
 
-// Lingerie: full pipeline — Vision analysis → safe external block → builders
+// Lingerie: full pipeline — Vision analysis → safe external block → builders.
+// The safe block uses the garment-on-model template; no lace / bra / briefs
+// vocabulary even though Vision's primary description contained them.
 {
   const safe = buildExternalProductPreservationBlock(lingerieAnalysis());
   const nano = buildNanoBananaEnhancePrompt({
@@ -436,6 +478,7 @@ const baseBuilderInput = {
   assert.ok(nano.length <= 1200, `Nano length ${nano.length} <= 1200`);
   assert.match(nano, /Edit the source image/i, "Nano: new short header");
   assert.match(nano, /Improve only lighting/i, "Nano: improve-only line");
+  assert.match(nano, SAFE_TEMPLATE_GARMENT, "Nano + lingerie: garment template");
 
   const flux = buildFluxKontextEditPrompt({
     ...baseBuilderInput,
@@ -443,11 +486,22 @@ const baseBuilderInput = {
   });
   assertNoSensitive(flux, "FLUX + lingerie (safe block)");
   assert.ok(flux.length <= 900, `FLUX length ${flux.length} <= 900`);
-  assert.match(flux, /Edit instruction:/i, "FLUX: edit instruction prefix");
-  assert.match(flux, /Photoreal ecommerce result/i, "FLUX: short footer");
+  assert.match(
+    flux,
+    /Subject and product:/i,
+    "FLUX: subject and product section"
+  );
+  assert.match(flux, /Scene change:/i, "FLUX: scene change section");
+  assert.match(
+    flux,
+    /Photoreal premium ecommerce/i,
+    "FLUX: short result footer"
+  );
+  assert.match(flux, SAFE_TEMPLATE_GARMENT, "FLUX + lingerie: garment template");
 }
 
-// Dress + safe external block
+// Dress + safe external block — uses the same garment template (no
+// "midi dress" / "navy" leaks into the final prompt).
 {
   const safe = buildExternalProductPreservationBlock(dressAnalysis());
   const nano = buildNanoBananaEnhancePrompt({
@@ -455,11 +509,13 @@ const baseBuilderInput = {
     productPreservationBlock: safe,
   });
   assertNoSensitive(nano, "Nano + dress (safe block)");
-  assert.match(nano, /midi dress/i, "Nano + dress: still mentions dress");
+  assert.match(nano, SAFE_TEMPLATE_GARMENT, "Nano + dress: garment template");
+  assert.ok(!/\bmidi dress\b/i.test(nano), "Nano + dress: no Vision 'midi dress' leak");
+  assert.ok(!/\bnavy\b/i.test(nano), "Nano + dress: no Vision 'navy' leak");
   assert.ok(nano.length <= 1200, `Nano dress length ${nano.length} <= 1200`);
 }
 
-// Jewelry + safe external block
+// Jewelry + safe external block — uses the GENERIC product template.
 {
   const safe = buildExternalProductPreservationBlock(jewelryAnalysis());
   const nano = buildNanoBananaEnhancePrompt({
@@ -469,10 +525,11 @@ const baseBuilderInput = {
   assertNoSensitive(nano, "Nano + jewelry (safe block)");
   assertNotMatches(nano, GARMENT_HARDCODE, "Nano + jewelry: no garment");
   assertNotMatches(nano, FOOTWEAR_HARDCODE, "Nano + jewelry: no footwear");
-  assert.match(nano, /hoop/i, "Nano + jewelry: hoop mention");
+  assert.match(nano, SAFE_TEMPLATE_GENERIC, "Nano + jewelry: generic template");
+  assert.ok(!/\bhoop\b/i.test(nano), "Nano + jewelry: no Vision 'hoop' leak");
 }
 
-// Sneakers + safe external block
+// Sneakers + safe external block — uses the GENERIC product template.
 {
   const safe = buildExternalProductPreservationBlock(sneakersAnalysis());
   const flux = buildFluxKontextEditPrompt({
@@ -480,15 +537,15 @@ const baseBuilderInput = {
     productPreservationBlock: safe,
   });
   assertNoSensitive(flux, "FLUX + sneakers (safe block)");
-  assert.match(flux, /sneakers/i, "FLUX + sneakers: category");
-  assert.match(flux, /sole/i, "FLUX + sneakers: sole");
+  assert.match(flux, SAFE_TEMPLATE_GENERIC, "FLUX + sneakers: generic template");
+  assert.ok(!/\bsneakers\b/i.test(flux), "FLUX + sneakers: no Vision 'sneakers' leak");
+  assert.ok(!/\bsole\b/i.test(flux), "FLUX + sneakers: no Vision 'sole' leak");
   assert.ok(flux.length <= 900, `FLUX sneakers length ${flux.length} <= 900`);
 }
 
-// Adversarial: someone passes a NON-safe block by mistake → ideally we'd want
-// builders to still produce something but we accept that contamination is the
-// caller's responsibility. We assert SAFE flow path: when caller correctly
-// uses buildExternalProductPreservationBlock first, no sensitive vocab leaks.
+// Sanity check on the contract: the DETAILED Vision block (debug-only,
+// never sent to Fal) still contains category words; the SAFE external
+// block strips them entirely.
 {
   const detailed = buildProductPreservationBlock(lingerieAnalysis());
   assert.match(
@@ -498,8 +555,8 @@ const baseBuilderInput = {
   );
   const safe = buildExternalProductPreservationBlock(lingerieAnalysis());
   assert.ok(
-    !/\bbra\b|\bbriefs\b/i.test(safe),
-    "sanity: external block strips bra/briefs while keeping lace"
+    !/\bbra\b|\bbriefs\b|\blace\b/i.test(safe),
+    "sanity: external block strips bra/briefs/lace entirely"
   );
 }
 

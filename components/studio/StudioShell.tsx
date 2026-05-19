@@ -1125,6 +1125,7 @@ export function StudioShell({
                 shortAiSummaryEn: productGen.shortAiSummaryEn,
                 productSetType: productGen.productSetType,
                 productSourcePresentation: productGen.productSourcePresentation,
+                neutralBaseFitGuidanceEn: productGen.neutralBaseFitGuidanceEn,
                 promptLocale,
                 seed: useSeed,
                 angle,
@@ -1314,7 +1315,11 @@ export function StudioShell({
       setResults([]);
     }
 
-    const perStepTimeoutMs = 120_000;
+    // Try-on can legitimately take a while on lingerie / 2K / lining-heavy
+    // garments. Instead of hard-aborting the fetch, we let it run as long as
+    // the server takes and only show a soft "this is taking a bit longer
+    // than usual" notice after 4 minutes — no error, no aborted request.
+    const slowNoticeAfterMs = 240_000;
 
     try {
       const analysisForTryOn =
@@ -1336,21 +1341,23 @@ export function StudioShell({
         seed: useSeed,
       });
 
-      const controller = new AbortController();
-      const timeoutId = window.setTimeout(
-        () => controller.abort(),
-        perStepTimeoutMs
-      );
+      // Soft slow-notice timer: after `slowNoticeAfterMs` we just update the
+      // progress banner — the fetch itself is NEVER aborted. The user can
+      // keep waiting; Fal/FASHN will finish in its own time.
+      const slowNoticeTimer = window.setTimeout(() => {
+        setTryOnProgress(
+          "Примерка занимает чуть больше времени, чем обычно — не закрывайте страницу, мы продолжаем работать…"
+        );
+      }, slowNoticeAfterMs);
 
       let res: Response;
       try {
         res = await fetch("/api/ai/tryon", {
           method: "POST",
           body: formData,
-          signal: controller.signal,
         });
       } finally {
-        window.clearTimeout(timeoutId);
+        window.clearTimeout(slowNoticeTimer);
       }
 
       const parsed = await readJsonResponse<TryOnResponse>(res);
@@ -1390,12 +1397,6 @@ export function StudioShell({
       );
       setGenerationSeed(nextGenerationSeed());
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        setError(
-          "Примерка заняла слишком много времени. Попробуйте режим «1K» или другое фото модели."
-        );
-        return;
-      }
       const detail =
         error instanceof Error && error.message
           ? error.message
@@ -1873,6 +1874,8 @@ export function StudioShell({
                                 return next;
                               })
                             }
+                            modelDescription={modelDescription}
+                            onModelDescriptionChange={setModelDescription}
                             settingsLocked={
                               loading || modelGenerating || productAnalyzing
                             }

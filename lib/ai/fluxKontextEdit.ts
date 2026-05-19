@@ -28,6 +28,19 @@ export type FalDebugSink = {
 
 const EDIT_TIMEOUT_MS = 120_000;
 
+/**
+ * FLUX Kontext guidance_scale tiers.
+ *
+ * 3.5 is Fal's documented default. We previously used 4.5 for preserveProduct
+ * runs, but CFG > 4 on Kontext is the documented trigger for clip-to-black
+ * shadow outputs on portrait crops; 3.7 keeps product fidelity tight without
+ * over-driving the model into dark/blocky shadows. Retry runs after a dark
+ * output use the lower end (`FLUX_KONTEXT_GUIDANCE_RETRY_DARK`).
+ */
+export const FLUX_KONTEXT_GUIDANCE_DEFAULT = 3.5;
+export const FLUX_KONTEXT_GUIDANCE_PRESERVE = 3.7;
+export const FLUX_KONTEXT_GUIDANCE_RETRY_DARK = 3.3;
+
 /** FLUX Kontext Pro is billed per image (~$0.04). */
 export function estimateFluxKontextEditCostUsd(): number {
   return 0.04;
@@ -98,10 +111,23 @@ export async function runFluxKontextEdit(input: {
   aspectRatio: ImageEnhanceAspectRatio;
   outputFormat: ImageEnhanceOutputFormat;
   preserveProduct: boolean;
+  /**
+   * Optional explicit override for `guidance_scale`. Used by the dark-output
+   * retry path in `/api/ai/image/enhance` (FLUX-only, single attempt). When
+   * omitted, the preserve/default pair above is used.
+   */
+  guidanceScaleOverride?: number;
   guard: PaidAiGuardInput;
   /** Optional diagnostic hook. No-ops when omitted. */
   debugSink?: FalDebugSink;
 }): Promise<FluxKontextEditResult> {
+  const guidanceScale =
+    typeof input.guidanceScaleOverride === "number"
+      ? input.guidanceScaleOverride
+      : input.preserveProduct
+        ? FLUX_KONTEXT_GUIDANCE_PRESERVE
+        : FLUX_KONTEXT_GUIDANCE_DEFAULT;
+
   const payload: {
     prompt: string;
     image_url: string;
@@ -116,7 +142,7 @@ export async function runFluxKontextEdit(input: {
     image_url: input.sourceImageUrl,
     aspect_ratio: mapKontextAspectRatio(input.aspectRatio),
     output_format: mapKontextOutputFormat(input.outputFormat),
-    guidance_scale: input.preserveProduct ? 4.5 : 3.5,
+    guidance_scale: guidanceScale,
     safety_tolerance: "6",
     enhance_prompt: false,
     num_images: 1,

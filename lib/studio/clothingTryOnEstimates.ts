@@ -17,10 +17,18 @@ export const ESTIMATED_SAAS_PIPELINE_COST_KZT = {
   max: Math.round(ESTIMATED_FULL_CLOTHING_PIPELINE_USD.max * SAAS_PIPELINE_KZT_PER_USD),
 } as const;
 
-export const ESTIMATED_SAAS_PIPELINE_DURATION_SEC = { min: 60, max: 180 } as const;
+/**
+ * Full SaaS clothing pipeline timing for the "Итоговый результат" countdown.
+ * `.max` = ceiling shown to the user (the on-screen mm:ss). Soft target — when
+ * the timer hits 0 we still keep waiting; the request is never client-aborted.
+ */
+export const ESTIMATED_SAAS_PIPELINE_DURATION_SEC = { min: 60, max: 240 } as const;
 
-/** UI countdown while nano-banana model image generates */
-export const SAAS_MODEL_GENERATION_COUNTDOWN_SEC = 120;
+/**
+ * UI countdown while nano-banana model image generates (the "Создаём AI-модель"
+ * card). Soft target — keeps counting from this start value.
+ */
+export const SAAS_MODEL_GENERATION_COUNTDOWN_SEC = 180;
 
 /** @deprecated Use ESTIMATED_SAAS_PIPELINE_DURATION_SEC for clothing SaaS button */
 export const ESTIMATED_TRYON_DURATION_SEC = ESTIMATED_SAAS_PIPELINE_DURATION_SEC;

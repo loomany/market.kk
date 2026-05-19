@@ -467,17 +467,6 @@ export function ProcessedAssetsPanel({
     }
   };
 
-  const handleRetry = (asset: StudioSessionAsset) => {
-    if (asset.parentAssetId) {
-      setSelectedAssetId(asset.parentAssetId);
-    }
-    setProcessingMode(asset.type === "video" ? "video" : "image");
-    if (asset.prompt) {
-      setPrompt(asset.prompt);
-    }
-    onDeleteAsset(asset.id);
-  };
-
   const handleDownloadAsset = (asset: StudioSessionAsset) => {
     if (!asset.url) return;
     if (isVideoAsset(asset)) {
@@ -887,7 +876,10 @@ export function ProcessedAssetsPanel({
                 {lastImageEnhanceDebug.outputImageCheck ? (
                   <p
                     className={`break-words ${
-                      lastImageEnhanceDebug.outputImageCheck.isProbablyBlack
+                      lastImageEnhanceDebug.outputImageCheck
+                        .isFalSafetyPlaceholder ||
+                      lastImageEnhanceDebug.outputImageCheck.isProbablyBlack ||
+                      lastImageEnhanceDebug.outputImageCheck.likelyDarkOutput
                         ? "rounded-md border border-red-300 bg-red-50 p-1.5 text-red-700"
                         : ""
                     }`}
@@ -909,10 +901,87 @@ export function ProcessedAssetsPanel({
                     · isProbablyBlack=
                     {String(
                       lastImageEnhanceDebug.outputImageCheck.isProbablyBlack
+                    )}{" "}
+                    · meanLum=
+                    {lastImageEnhanceDebug.outputImageCheck.meanLuminance ?? "—"}{" "}
+                    · P5/P50/P95=
+                    {lastImageEnhanceDebug.outputImageCheck.luminanceP5 ?? "—"}/
+                    {lastImageEnhanceDebug.outputImageCheck.luminanceP50 ?? "—"}/
+                    {lastImageEnhanceDebug.outputImageCheck.luminanceP95 ?? "—"}{" "}
+                    · likelyDarkOutput=
+                    {String(
+                      lastImageEnhanceDebug.outputImageCheck.likelyDarkOutput
+                    )}{" "}
+                    · rgbPctZero=
+                    {lastImageEnhanceDebug.outputImageCheck.rgbPercentZero ??
+                      "—"}{" "}
+                    · isFalSafetyPlaceholder=
+                    {String(
+                      lastImageEnhanceDebug.outputImageCheck
+                        .isFalSafetyPlaceholder
                     )}
+                    {lastImageEnhanceDebug.outputImageCheck.luminanceError
+                      ? ` · lumErr=${lastImageEnhanceDebug.outputImageCheck.luminanceError}`
+                      : ""}
                     {lastImageEnhanceDebug.outputImageCheck.error
                       ? ` · err=${lastImageEnhanceDebug.outputImageCheck.error}`
                       : ""}
+                  </p>
+                ) : null}
+                {lastImageEnhanceDebug.darkRetry ? (
+                  <p
+                    className={`break-words ${
+                      lastImageEnhanceDebug.darkRetry.usedRetryResult
+                        ? "rounded-md border border-amber-300 bg-amber-50 p-1.5 text-amber-800"
+                        : "rounded-md border border-red-300 bg-red-50 p-1.5 text-red-700"
+                    }`}
+                  >
+                    <span className="font-semibold">darkRetry:</span> attempt=
+                    {lastImageEnhanceDebug.darkRetry.attempt} · reason=
+                    {lastImageEnhanceDebug.darkRetry.reason} · guidance=
+                    {lastImageEnhanceDebug.darkRetry.guidanceScale} · used=
+                    {String(lastImageEnhanceDebug.darkRetry.usedRetryResult)}
+                    {lastImageEnhanceDebug.darkRetry.outputImageCheck
+                      ? ` · retryMeanLum=${lastImageEnhanceDebug.darkRetry.outputImageCheck.meanLuminance ?? "—"} · retryLikelyDark=${String(lastImageEnhanceDebug.darkRetry.outputImageCheck.likelyDarkOutput)} · retryRgbPctZero=${lastImageEnhanceDebug.darkRetry.outputImageCheck.rgbPercentZero ?? "—"} · retryIsFalSafetyPlaceholder=${String(lastImageEnhanceDebug.darkRetry.outputImageCheck.isFalSafetyPlaceholder)}`
+                      : ""}
+                  </p>
+                ) : null}
+                {lastImageEnhanceDebug.nanoSoftRetry ? (
+                  <p
+                    className={`break-words ${
+                      lastImageEnhanceDebug.nanoSoftRetry.success
+                        ? "rounded-md border border-emerald-300 bg-emerald-50 p-1.5 text-emerald-800"
+                        : "rounded-md border border-red-300 bg-red-50 p-1.5 text-red-700"
+                    }`}
+                  >
+                    <span className="font-semibold">nanoSoftRetry:</span>{" "}
+                    attempt={lastImageEnhanceDebug.nanoSoftRetry.attempt} ·
+                    reason={lastImageEnhanceDebug.nanoSoftRetry.reason} ·
+                    removedResolution=
+                    {String(
+                      lastImageEnhanceDebug.nanoSoftRetry.removedResolution
+                    )}{" "}
+                    · removedLimitGenerations=
+                    {String(
+                      lastImageEnhanceDebug.nanoSoftRetry
+                        .removedLimitGenerations
+                    )}{" "}
+                    · requestId=
+                    {lastImageEnhanceDebug.nanoSoftRetry.requestId ?? "—"} ·
+                    success=
+                    {String(lastImageEnhanceDebug.nanoSoftRetry.success)}
+                    {lastImageEnhanceDebug.nanoSoftRetry.retryProviderError
+                      ? ` · err=${lastImageEnhanceDebug.nanoSoftRetry.retryProviderError}`
+                      : ""}
+                    {lastImageEnhanceDebug.nanoSoftRetry.outputImageCheck
+                      ? ` · retryMeanLum=${lastImageEnhanceDebug.nanoSoftRetry.outputImageCheck.meanLuminance ?? "—"} · retryRgbPctZero=${lastImageEnhanceDebug.nanoSoftRetry.outputImageCheck.rgbPercentZero ?? "—"} · retryIsFalSafetyPlaceholder=${String(lastImageEnhanceDebug.nanoSoftRetry.outputImageCheck.isFalSafetyPlaceholder)}`
+                      : ""}
+                  </p>
+                ) : null}
+                {lastImageEnhanceDebug.effectiveResolution ? (
+                  <p className="break-words">
+                    <span className="font-semibold">effectiveResolution:</span>{" "}
+                    {lastImageEnhanceDebug.effectiveResolution}
                   </p>
                 ) : null}
               </div>
@@ -944,30 +1013,6 @@ export function ProcessedAssetsPanel({
             </Button>
           ) : null}
 
-          {assets.some((a) => a.status === "error") ? (
-            <div className="space-y-2 border-t border-border pt-4">
-              {assets
-                .filter((a) => a.status === "error")
-                .slice(0, 3)
-                .map((asset) => (
-                  <div
-                    key={asset.id}
-                    className="flex items-center justify-between gap-2 rounded-[14px] border border-red-100 bg-red-50/50 px-3 py-2"
-                  >
-                    <p className="text-xs text-red-800">
-                      {asset.errorMessage ?? "Ошибка"}
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleRetry(asset)}
-                    >
-                      Повторить
-                    </Button>
-                  </div>
-                ))}
-            </div>
-          ) : null}
         </CardContent>
       </Card>
     </div>

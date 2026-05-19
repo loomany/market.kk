@@ -57,12 +57,20 @@ const SENSITIVE_FORBIDDEN: ReadonlyArray<readonly [string, RegExp]> = [
   ["skin_realism", /\bskin realism\b/i],
   ["natural_skin", /\bnatural skin\b/i],
   ["high_cut_leg", /\bhigh-cut leg openings?\b/i],
+  // New: garment-detail vocabulary that previously leaked through the
+  // Vision pipeline and triggered Fal safety placeholders.
+  ["lace_overlay", /\blace overlay\b/i],
+  ["high_waisted", /\bhigh[\s-]?waist(?:ed)?\b/i],
+  ["scalloped", /\bscalloped\b/i],
   ["sexy", /\bsexy\b/i],
   ["sexual", /\bsexual/i],
   ["erotic", /\berotic\b/i],
   ["nude", /\bnude\b/i],
   ["naked", /\bnaked\b/i],
 ];
+
+const SAFE_TEMPLATE_GARMENT = /Keep the clothing on the model unchanged/i;
+const SAFE_TEMPLATE_GENERIC = /Preserve the visible product unchanged/i;
 
 function assertNoSensitive(text: string, label: string) {
   for (const [name, re] of SENSITIVE_FORBIDDEN) {
@@ -257,6 +265,9 @@ function runPipeline(
     sanitized.removedSensitiveWords.length > 0,
     "A: at least one sensitive word reported as removed"
   );
+  // Spec: for clothing/lingerie/swimwear finalPrompt MUST contain the safe
+  // garment template sentence.
+  assert.match(finalSent, SAFE_TEMPLATE_GARMENT, "A: garment safe template");
 }
 
 // ============================================================================
@@ -278,57 +289,66 @@ function runPipeline(
     sanitized.removedDuplicatePatterns.length > 0,
     "B: at least one duplicate pattern reported"
   );
+  // Same spec assertion as Section A but for FLUX.
+  assert.match(finalSent, SAFE_TEMPLATE_GARMENT, "B: FLUX garment safe template");
 }
 
 // ============================================================================
-// C) Lingerie external block — <= 350 chars, neutral wording
+// C) Lingerie external block — fixed garment-on-model safe template
+//
+// New design: the external block no longer enumerates Vision details. For
+// garments it uses the fixed `SAFE_TEMPLATE_GARMENT`; we assert template
+// shape + length + no detail leakage.
 // ============================================================================
 
 {
   const block = buildExternalProductPreservationBlock(lingerie());
   assert.ok(block.length <= 350, `C external length ${block.length} <= 350`);
   assertNoSensitive(block, "C lingerie external block");
-  // Inside the block we don't even include "Preserve …" prefix — builders add it.
-  assert.ok(
-    !/preserve the visible product/i.test(block),
-    "C: block must NOT include 'Preserve the visible product' prefix"
-  );
+  assert.match(block, SAFE_TEMPLATE_GARMENT, "C: garment safe template");
+  // Detail vocabulary must NOT leak from Vision into the safe block.
+  assert.ok(!/\blace\b/i.test(block), "C: no 'lace' detail leak");
+  assert.ok(!/\bemerald\b/i.test(block), "C: no 'emerald' colour leak");
+  assert.ok(!/\btwo-piece\b/i.test(block), "C: no 'two-piece' shape leak");
 }
 
 // ============================================================================
-// D) Dress external block — no lingerie/bra/briefs
+// D) Dress external block — same garment template, no detail leakage
 // ============================================================================
 
 {
   const block = buildExternalProductPreservationBlock(dress());
   assertNoSensitive(block, "D dress block");
-  assert.match(block, /midi dress/i, "D: keeps category");
-  assert.match(block, /navy/i, "D: keeps colour");
+  assert.match(block, SAFE_TEMPLATE_GARMENT, "D: garment safe template");
+  assert.ok(!/\bmidi dress\b/i.test(block), "D: no Vision 'midi dress' leak");
+  assert.ok(!/\bnavy\b/i.test(block), "D: no Vision 'navy' leak");
 }
 
 // ============================================================================
-// E) Jewelry external block — no garment/body wording
+// E) Jewelry external block — generic-product safe template
 // ============================================================================
 
 {
   const block = buildExternalProductPreservationBlock(jewelry());
   assertNoSensitive(block, "E jewelry block");
-  assert.match(block, /hoop/i, "E: keeps category");
+  assert.match(block, SAFE_TEMPLATE_GENERIC, "E: generic safe template");
   assert.ok(
     !/\bdress\b|\bskirt\b|\bgarment\b/i.test(block),
     "E: no garment wording for jewelry"
   );
+  assert.ok(!/\bhoop\b/i.test(block), "E: no Vision 'hoop' leak");
 }
 
 // ============================================================================
-// F) Sneakers external block — no lingerie/body wording
+// F) Sneakers external block — generic-product safe template
 // ============================================================================
 
 {
   const block = buildExternalProductPreservationBlock(sneakers());
   assertNoSensitive(block, "F sneakers block");
-  assert.match(block, /sneakers/i, "F: keeps category");
-  assert.match(block, /sole/i, "F: keeps sole");
+  assert.match(block, SAFE_TEMPLATE_GENERIC, "F: generic safe template");
+  assert.ok(!/\bsneakers\b/i.test(block), "F: no Vision 'sneakers' leak");
+  assert.ok(!/\bsole\b/i.test(block), "F: no Vision 'sole' leak");
 }
 
 // ============================================================================
@@ -341,6 +361,11 @@ for (const [label, analysis] of [
   ["jewelry", jewelry()],
   ["sneakers", sneakers()],
 ] as const) {
+  const expectedTemplate =
+    analysis.objectType === "garment"
+      ? SAFE_TEMPLATE_GARMENT
+      : SAFE_TEMPLATE_GENERIC;
+
   const { finalSent } = runPipeline("nano-banana-pro", {
     userPrompt: "luxury apartment with soft window light",
     preserveProduct: true,
@@ -351,6 +376,11 @@ for (const [label, analysis] of [
   assert.ok(
     finalSent.length <= NANO_CAP,
     `G Nano ${label}: length ${finalSent.length} <= ${NANO_CAP}`
+  );
+  assert.match(
+    finalSent,
+    expectedTemplate,
+    `G Nano ${label}: safe template (${analysis.objectType})`
   );
 
   const { finalSent: fluxFinal } = runPipeline("flux-kontext-pro", {
@@ -363,6 +393,11 @@ for (const [label, analysis] of [
   assert.ok(
     fluxFinal.length <= FLUX_CAP,
     `G FLUX ${label}: length ${fluxFinal.length} <= ${FLUX_CAP}`
+  );
+  assert.match(
+    fluxFinal,
+    expectedTemplate,
+    `G FLUX ${label}: safe template (${analysis.objectType})`
   );
 }
 

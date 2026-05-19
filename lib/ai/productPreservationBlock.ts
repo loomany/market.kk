@@ -13,10 +13,48 @@ import {
 const MAX_BLOCK_LEN = 600;
 /** Upper bound for the SAFE external block that is actually sent to Fal.
  *
- *  Lowered from 450 → 350 after black-screen debugging showed that long,
- *  repetitive Vision-derived blocks were the main contributor to Fal 422s
- *  on adult-leaning catalogues. Keep it tight, generic, and de-duplicated. */
+ *  The block is now a FIXED, object-agnostic safe template (one of two
+ *  variants — clothing-on-model or generic-product). It does not enumerate
+ *  Vision-derived colours/materials/shape/pattern/details anymore. Those
+ *  details routinely produced sensitive wording ("lace overlay",
+ *  "high-waisted", "scalloped", "supportive cup shape") that survived the
+ *  EXTERNAL_SENSITIVE_REPLACEMENTS pass and provoked Fal moderation /
+ *  black-output placeholders on adult-leaning catalogues. The detailed
+ *  block is still produced separately (`buildProductPreservationBlock`)
+ *  for debug, but it is NEVER sent to Fal. */
 const EXTERNAL_BLOCK_MAX_LEN = 350;
+
+/**
+ * Safe external block for clothing/lingerie/swimwear on a model.
+ *
+ * Used when `objectType === "garment"`. Stays generic about the actual
+ * garment (no lace / bra / brief / cup / high-waist / scalloped vocabulary)
+ * and explicitly forbids the failure modes we saw — recolouring, adding
+ * extra clothing, swapping the product, or distorting body parts.
+ */
+// NOTE: the spec ask was "Do not add extra ... body parts ..." but the
+// final-mile sanitizer (`SENSITIVE_RULES.body_parts`) rewrites "body parts"
+// → "composition" for moderation safety. "limbs" is the sanitiser-safe
+// synonym that survives unchanged AND preserves the original intent —
+// preventing the model from inventing extra arms/legs on the person.
+const SAFE_BLOCK_GARMENT_ON_MODEL =
+  "Keep the clothing on the model unchanged. " +
+  "Preserve the same visible outfit, color, shape, fit, placement, and overall look. " +
+  "Do not add extra clothing, accessories, fabric, limbs, or objects to the person. " +
+  "Do not replace, recolor, redesign, or distort the product.";
+
+/**
+ * Safe external block for non-garment products (jewelry, footwear,
+ * accessory, cosmetic, bag, electronics, generic "product").
+ *
+ * Stays object-agnostic — no category-specific words enter the prompt; the
+ * downstream model still has the source image to look at for visual
+ * identity, so we don't risk pasting Vision wording back at it.
+ */
+const SAFE_BLOCK_GENERIC_PRODUCT =
+  "Preserve the visible product unchanged: " +
+  "same color, shape, material, placement, proportions, and overall look. " +
+  "Do not replace, recolor, redesign, or distort the product.";
 
 /** Universal fallback when Vision is missing, low-confidence, or unknown. */
 export function genericPreservationBlock(): string {
@@ -28,12 +66,15 @@ export function genericPreservationBlock(): string {
   ].join(" ");
 }
 
-/** Neutral external fallback — kept short and 100% safe for Fal. */
+/**
+ * Neutral external fallback — kept short and 100% safe for Fal.
+ *
+ * Aligned with `SAFE_BLOCK_GENERIC_PRODUCT` so callers that have no Vision
+ * analysis (low confidence, unknown object, network failure) still send a
+ * complete preservation sentence to Fal, not a sentence fragment.
+ */
 export function genericExternalPreservationBlock(): string {
-  return (
-    "visible fashion product — keep color, pattern, material, shape, edges, " +
-    "proportions, and placement."
-  );
+  return SAFE_BLOCK_GENERIC_PRODUCT;
 }
 
 /**
@@ -111,27 +152,6 @@ export function sanitizeForExternalPrompt(input: string): string {
     .replace(/^[\s,.;:]+/, "")
     .replace(/[\s,;:]+$/, "")
     .trim();
-}
-
-function sanitizeListItems(values: readonly string[]): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const raw of values) {
-    const cleaned = sanitizeForExternalPrompt(raw);
-    if (!cleaned) continue;
-    if (cleaned.length < 3) continue;
-    const key = cleaned.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    result.push(cleaned);
-  }
-  return result;
-}
-
-function sanitizeOrFallback(text: string | undefined, fallback: string): string {
-  const cleaned = sanitizeForExternalPrompt(text ?? "");
-  if (cleaned.length >= 3) return cleaned;
-  return fallback;
 }
 
 function uniq(values: readonly string[]): string[] {
@@ -244,16 +264,32 @@ export function buildProductPreservationBlock(
 }
 
 /**
- * Builds the SAFE EXTERNAL preservation block — this is what actually gets
- * sent to Fal (Nano Banana / FLUX Kontext).
+ * Builds the SAFE EXTERNAL preservation block — the one and only piece of
+ * "preserve the product" text that gets sent to Fal (Nano Banana / FLUX
+ * Kontext).
  *
- * Difference from `buildProductPreservationBlock`:
- *  - Strips body-parts / identity / skin / sensitive merchandising vocabulary
- *    (`sanitizeForExternalPrompt`) so adult-leaning lingerie photos do not
- *    trigger Fal/Nano moderation (422).
- *  - Caps total length at ~450 chars.
- *  - Drops `mustNotChange` (often verbose "do not change cup shape" style).
- *  - Keeps category & visual identity (color, pattern, silhouette, material).
+ * Behaviour (re-designed after the lace/scalloped/high-waisted leak audit):
+ *  - For `objectType === "garment"` (and confident enough) → fixed
+ *    `SAFE_BLOCK_GARMENT_ON_MODEL` template. Covers clothing/lingerie/
+ *    swimwear/dress on a model without any category-specific vocabulary.
+ *  - For other product categories (jewelry, footwear, accessory, cosmetic,
+ *    bag, electronics, generic "product") → fixed
+ *    `SAFE_BLOCK_GENERIC_PRODUCT` template.
+ *  - Low confidence, missing analysis, `unknown` objectType, or explicit
+ *    `forceGeneric` → `genericExternalPreservationBlock()` (= generic).
+ *
+ * Why no Vision details anymore:
+ *  Vision regularly returned strings like "lace overlay", "high-waisted
+ *  brief", "supportive cup shape", "scalloped textured edges". Even after
+ *  the EXTERNAL_SENSITIVE_REPLACEMENTS pass, enough of these survived to
+ *  contaminate the final Fal prompt and provoke moderation (manifesting as
+ *  the silent black 1024×768 safety placeholder we audited). The source
+ *  image already carries the visual identity; the prompt only needs to say
+ *  "do not change it".
+ *
+ * The result is always a complete, self-contained sentence — builders MUST
+ * NOT prefix it with "Preserve the visible product exactly:" or similar
+ * (that would cause duplication with the template's own first sentence).
  */
 export function buildExternalProductPreservationBlock(
   analysis: ProductPreservationAnalysis | null | undefined,
@@ -266,71 +302,19 @@ export function buildExternalProductPreservationBlock(
     typeof analysis.confidence !== "number" ||
     analysis.confidence < PRODUCT_PRESERVATION_MIN_CONFIDENCE;
   if (lowConfidence) return genericExternalPreservationBlock();
-  if (analysis.objectType === "unknown") return genericExternalPreservationBlock();
+  if (analysis.objectType === "unknown")
+    return genericExternalPreservationBlock();
 
-  const head = sanitizeOrFallback(
-    analysis.primaryObject || analysis.shortDescription,
-    "visible fashion product"
-  );
+  const block =
+    analysis.objectType === "garment"
+      ? SAFE_BLOCK_GARMENT_ON_MODEL
+      : SAFE_BLOCK_GENERIC_PRODUCT;
 
-  // De-dup pool: every textual fragment we ever emit must be unique inside
-  // the block (case-insensitive). Without this, Vision often produces
-  // "garment bottom" inside shape, details AND mustPreserve simultaneously
-  // → resulting in adjacent doubles after concatenation.
-  const used = new Set<string>([head.toLowerCase()]);
-  const takeUnique = (items: readonly string[], limit: number): string[] => {
-    const out: string[] = [];
-    for (const raw of items) {
-      const item = raw.trim();
-      if (!item) continue;
-      const key = item.toLowerCase();
-      if (used.has(key)) continue;
-      // Skip items already contained in the head, e.g. head="midi dress" + item="dress".
-      if (
-        key.length < 5 &&
-        head.toLowerCase().split(/\s+/).includes(key)
-      ) {
-        continue;
-      }
-      used.add(key);
-      out.push(item);
-      if (out.length >= limit) break;
-    }
-    return out;
-  };
-
-  const colors = takeUnique(sanitizeListItems(analysis.colors), 2);
-  const materials = takeUnique(sanitizeListItems(analysis.materials), 1);
-  const shape = sanitizeOrFallback(analysis.shapeSilhouette, "");
-  const shapeUnique = used.has(shape.toLowerCase()) ? "" : shape;
-  if (shapeUnique) used.add(shapeUnique.toLowerCase());
-  const pattern = sanitizeOrFallback(analysis.patternOrTexture, "");
-  const patternUnique = used.has(pattern.toLowerCase()) ? "" : pattern;
-  if (patternUnique) used.add(patternUnique.toLowerCase());
-  const details = takeUnique(sanitizeListItems(analysis.visibleDetails), 2);
-  const preserve = takeUnique(sanitizeListItems(analysis.mustPreserve), 2);
-
-  const fragments: string[] = [];
-  const colorMat = [...colors, ...materials];
-  if (colorMat.length > 0) fragments.push(colorMat.join(", "));
-  if (shapeUnique) fragments.push(shapeUnique);
-  if (patternUnique) fragments.push(patternUnique);
-  if (details.length > 0) fragments.push(details.join(", "));
-
-  // The block is a CONTENT fragment — builders prefix it with their own
-  // "Preserve the visible product exactly:" / "Preserve the visible product:".
-  // Keep this block FREE of those phrases to avoid duplication and of any
-  // "Do not replace…" clause (builders include their own).
-  const headLine =
-    fragments.length > 0 ? `${head} — ${fragments.join("; ")}.` : `${head}.`;
-
-  const sentences: string[] = [headLine];
-
-  if (preserve.length > 0) {
-    sentences.push(`Keep unchanged: ${preserve.join("; ")}.`);
-  }
-
-  const joined = sentences.join(" ");
-  const safe = sanitizeForExternalPrompt(joined);
+  // Defence in depth: the templates above are hand-crafted to never contain
+  // sensitive words, but if a future edit drifts into "preserve identity"
+  // / "body parts" territory the sanitizer will still catch it. Clamp to
+  // EXTERNAL_BLOCK_MAX_LEN for the same reason — protects callers that
+  // pre-size a buffer assuming the cap.
+  const safe = sanitizeForExternalPrompt(block);
   return clamp(safe, EXTERNAL_BLOCK_MAX_LEN);
 }

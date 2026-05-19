@@ -23,8 +23,14 @@ import {
 } from "@/lib/ai/paidAiGuard";
 
 export const runtime = "nodejs";
-/** Fal try-on can take 30–90s; avoid default route timeout in production. */
-export const maxDuration = 120;
+/**
+ * Fal try-on usually finishes in 30–90 s, but lingerie / lace / 2K runs can
+ * legitimately take several minutes. The client no longer aborts on a 2-min
+ * timer (a soft "taking a bit longer" notice fires at 4 min instead); we
+ * give the server enough headroom to actually deliver the result. 300 s is
+ * Vercel's max on the Pro plan for serverless functions.
+ */
+export const maxDuration = 300;
 
 const ROUTE_ID = "/api/ai/tryon";
 
