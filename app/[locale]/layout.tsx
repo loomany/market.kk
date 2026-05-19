@@ -51,6 +51,18 @@ export async function generateMetadata({
       template: `%s | ${siteName}`,
     },
     description: siteDescription,
+    // Site-wide noindex. Pairs with `app/robots.ts` `Disallow: /`. Remove
+    // both when the site is ready to be indexed by search engines.
+    robots: {
+      index: false,
+      follow: false,
+      nocache: true,
+      googleBot: {
+        index: false,
+        follow: false,
+        noimageindex: true,
+      },
+    },
     verification: {
       google: process.env.NEXT_PUBLIC_GSC_VERIFICATION || undefined,
       yandex: process.env.NEXT_PUBLIC_YANDEX_VERIFICATION || undefined,

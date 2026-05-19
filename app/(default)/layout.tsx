@@ -30,6 +30,18 @@ export const metadata: Metadata = {
   },
   description:
     "AI-студия товарных фото для маркетплейсов: одежда на AI-модели, product shot, чистый фон и проверка качества.",
+  // Site-wide noindex. Pairs with `app/robots.ts` `Disallow: /`. Remove
+  // both when the site is ready to be indexed by search engines.
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    googleBot: {
+      index: false,
+      follow: false,
+      noimageindex: true,
+    },
+  },
 };
 
 export default function RootLayout({

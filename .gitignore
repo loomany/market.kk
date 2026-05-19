@@ -45,3 +45,11 @@ next-env.d.ts
 .agents/
 skills-lock.json
 reports/dev-server-*.log
+
+# large local debug / matrix audit outputs (not for VCS)
+/.audit-outputs/
+
+# ad-hoc binary uploads in the repo root (drop-zone, not project assets)
+/66a156af-2b89-4af6-99fb-c5fd440c7e56*.png
+/olnMOU1ILRlXm4WVRCa65_t9WYFnuY.png
+/photo_*.jpg
