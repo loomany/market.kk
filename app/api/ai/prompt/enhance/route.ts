@@ -10,6 +10,7 @@ import {
   isEnglishPromptLocale,
 } from "@/lib/ai/promptLocale";
 import type { Locale } from "@/lib/i18n/locales";
+import { sanitizeImageEnhancerOutputText } from "@/lib/studio/imageEnhancerOutputSanitizer";
 
 export const runtime = "nodejs";
 
@@ -73,6 +74,55 @@ function safeJsonParse(text: string) {
   }
 }
 
+function buildOpenAiEnhancementRules(input: {
+  context: string;
+  displayLanguage: string;
+  lockedBasePrompt?: string;
+}): string[] {
+  const common: string[] = [
+    "Do not invent product details.",
+    "For clothing model: adult only, non-explicit, commercial catalog style.",
+    "For marketplace: no fake claims, no logos, no text, no watermark.",
+  ];
+
+  if (input.context === "video") {
+    return [
+      ...common,
+      "For video: describe motion, camera work, duration, pacing, and product fidelity.",
+      `enhancedPrompt: write ONLY in ${input.displayLanguage}. This is what the user reads and edits.`,
+      "generationPrompt: same instructions in English for Fal image/video models. No extra details.",
+      "negativePrompt: English only.",
+      `safetyNotes and suggestions: ${input.displayLanguage} only.`,
+    ];
+  }
+
+  const staticImageRules: string[] = [
+    ...common,
+    "This request is for a STATIC image only (photo edit or still catalog composition). generationPrompt must describe lighting, scene, materials, and product fidelity for a single still frame.",
+    "FORBIDDEN in generationPrompt and enhancedPrompt: Reels, Instagram/TikTok short video, clip duration, seconds, fps, animation, camera movement, pans, zooms, dolly, tracking shots, push-in, or any motion-directed / video-format language.",
+  ];
+
+  if (input.context === "model-description" && input.lockedBasePrompt) {
+    return [
+      ...staticImageRules,
+      "lockedBasePrompt is fixed UI parameters (age, body type, pose, crop, background). Do NOT rewrite or contradict it.",
+      "Enhance ONLY userPrompt — the user's optional addition (location, lighting, mood).",
+      `enhancedPrompt must contain ONLY the improved user addition in ${input.displayLanguage}, not the locked base.`,
+      "generationPrompt: same instructions in English for Fal image models (still image only). No extra details.",
+      "negativePrompt: English only.",
+      `safetyNotes and suggestions: ${input.displayLanguage} only.`,
+    ];
+  }
+
+  return [
+    ...staticImageRules,
+    `enhancedPrompt: write ONLY in ${input.displayLanguage}. This is what the user reads and edits.`,
+    "generationPrompt: same instructions in English for Fal image models (still image only). No extra details.",
+    "negativePrompt: English only.",
+    `safetyNotes and suggestions: ${input.displayLanguage} only.`,
+  ];
+}
+
 function extractOutputText(response: unknown) {
   if (
     typeof response === "object" &&
@@ -125,12 +175,20 @@ export async function POST(request: Request) {
   const displayLanguage = getPromptLanguageName(data.language);
 
   if (isMockMode()) {
-    const enhancedPrompt = buildMockEnhancedPrompt(data);
+    let enhancedPrompt = buildMockEnhancedPrompt(data);
+    let generationPrompt = buildMockGenerationPrompt(
+      enhancedPrompt,
+      data.language
+    );
+    if (data.context === "scene") {
+      enhancedPrompt = sanitizeImageEnhancerOutputText(enhancedPrompt);
+      generationPrompt = sanitizeImageEnhancerOutputText(generationPrompt);
+    }
     return NextResponse.json({
       ok: true,
       originalPrompt: data.userPrompt,
       enhancedPrompt,
-      generationPrompt: buildMockGenerationPrompt(enhancedPrompt, data.language),
+      generationPrompt,
       negativePrompt:
         "wrong product, changed color, changed pattern, distorted shape, extra text, watermark, logo, low quality",
       safetyNotes: isEnglishPromptLocale(data.language)
@@ -186,7 +244,7 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         model,
         instructions:
-          "You improve prompts for ecommerce product photo/video generation. Do not invent product details. Preserve product identity. Return only compact JSON. enhancedPrompt must be in the user's display language. generationPrompt and negativePrompt must be English with the same meaning as enhancedPrompt.",
+          "You improve prompts for ecommerce product photo and video generation. Do not invent product details. Preserve product identity. Return only compact JSON. enhancedPrompt must be in the user's display language. generationPrompt and negativePrompt must be English with the same meaning as enhancedPrompt. When context is 'video', motion and duration are allowed. When context is not 'video', output STATIC image prompts only — never Reels/short-video/duration/motion language.",
         input: [
           {
             role: "user",
@@ -201,24 +259,11 @@ export async function POST(request: Request) {
                   targetPlatform: data.targetPlatform,
                   displayLanguage,
                   languageLocale: data.language,
-                  rules: [
-                    "Do not invent product details.",
-                    "For clothing model: adult only, non-explicit, commercial catalog style.",
-                    "For marketplace: no fake claims, no logos, no text, no watermark.",
-                    "For video: describe motion, camera, duration, product fidelity.",
-                    ...(data.context === "model-description" && data.lockedBasePrompt
-                      ? [
-                          "lockedBasePrompt is fixed UI parameters (age, body type, pose, crop, background). Do NOT rewrite or contradict it.",
-                          "Enhance ONLY userPrompt — the user's optional addition (location, lighting, mood).",
-                          `enhancedPrompt must contain ONLY the improved user addition in ${displayLanguage}, not the locked base.`,
-                        ]
-                      : [
-                          `enhancedPrompt: write ONLY in ${displayLanguage}. This is what the user reads and edits.`,
-                        ]),
-                    "generationPrompt: same instructions in English for Fal/image/video models. No extra details.",
-                    "negativePrompt: English only.",
-                    `safetyNotes and suggestions: ${displayLanguage} only.`,
-                  ],
+                  rules: buildOpenAiEnhancementRules({
+                    context: data.context,
+                    displayLanguage,
+                    lockedBasePrompt: data.lockedBasePrompt,
+                  }),
                 }),
               },
             ],
@@ -274,13 +319,20 @@ export async function POST(request: Request) {
       throw new Error("OpenAI response did not include enhancedPrompt");
     }
 
-    const generationPrompt =
+    const generationPromptRaw =
       parsedOutput.generationPrompt?.trim() || parsedOutput.enhancedPrompt;
+
+    let enhancedPrompt = parsedOutput.enhancedPrompt;
+    let generationPrompt = generationPromptRaw;
+    if (data.context === "scene") {
+      enhancedPrompt = sanitizeImageEnhancerOutputText(enhancedPrompt);
+      generationPrompt = sanitizeImageEnhancerOutputText(generationPrompt);
+    }
 
     return NextResponse.json({
       ok: true,
       originalPrompt: data.userPrompt,
-      enhancedPrompt: parsedOutput.enhancedPrompt,
+      enhancedPrompt,
       generationPrompt,
       negativePrompt: parsedOutput.negativePrompt,
       safetyNotes: parsedOutput.safetyNotes,

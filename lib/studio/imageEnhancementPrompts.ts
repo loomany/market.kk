@@ -125,24 +125,35 @@ function clampPromptLength(text: string, maxLen: number): string {
   return truncated.trim();
 }
 
-/** Upper bound on the assembled Nano Banana prompt (safe margin for queue). */
-const NANO_BANANA_MAX_FINAL_LEN = 1800;
+/**
+ * Upper bound on the assembled Nano Banana prompt (safe margin for queue).
+ * Lowered from 1200 → 900 after black-screen / 422 debugging — shorter and
+ * cleaner prompts pass Fal moderation reliably. The final per-editor cap is
+ * also enforced post-sanitization in the route (see FINAL_PROMPT_LENGTH_CAPS).
+ */
+const NANO_BANANA_MAX_FINAL_LEN = 900;
 /** Upper bound on the raw intent that flows into the Nano builder. */
-const NANO_BANANA_MAX_INTENT_LEN = 600;
+const NANO_BANANA_MAX_INTENT_LEN = 280;
 
 /**
  * Server-side guardrails for fal-ai/nano-banana-pro/edit.
  *
- * The UI either already enriched the prompt via /api/ai/prompt/enhance
- * (`enhancedPrompt`) or only sends the raw `userPrompt`. Either way the
- * route MUST wrap the text with strict photorealism + product-preservation
- * rules so the editor never replaces the garment or produces CGI-looking
- * output. Returns a single English prompt string ready for Fal.
+ * Kept intentionally SHORT and SAFE: Nano/Fal moderation can 422 on long,
+ * sensitive-leaning prompts (lingerie photos especially). The caller passes
+ * `productPreservationBlock` — this MUST be the *external/safe* block
+ * produced by `buildExternalProductPreservationBlock(...)`, not the
+ * detailed analysis. When the block is absent we fall back to a generic,
+ * object-agnostic preservation sentence.
  */
 export function buildNanoBananaEnhancePrompt(input: {
   userPrompt: string;
   enhancedPrompt: string | null | undefined;
   preserveProduct: boolean;
+  /**
+   * Pre-computed SAFE external preservation block. Empty/undefined →
+   * generic fallback. Should already be sanitized for adult/identity words.
+   */
+  productPreservationBlock?: string | null;
 }): string {
   const rawIntent =
     input.enhancedPrompt?.trim() ||
@@ -150,57 +161,31 @@ export function buildNanoBananaEnhancePrompt(input: {
     "Improve realism, lighting, and background without changing the product.";
   const intent = clampPromptLength(rawIntent, NANO_BANANA_MAX_INTENT_LEN);
 
-  const photorealism = [
-    "photorealistic adult human model",
-    "real person, not plastic, not doll-like, not toy-like",
-    "natural skin texture with realistic pores",
-    "natural body shading and realistic skin tones",
-    "realistic fabric-to-skin contact and natural shadows",
-    "premium commercial studio lighting",
-    "remove CGI, wax, toy-like or doll-like appearance",
-  ];
+  const genericPreserveStrict =
+    "Visible fashion product — keep color, pattern, material, shape, edges, proportions, and placement exactly the same.";
 
-  const preserveStrict = [
-    "Preserve the exact product design",
-    "Preserve color, shape, silhouette, lace, pattern, fabric edges, straps, seams, and garment category",
-    "Do not replace the bra, briefs, or any garment with another product",
-    "Do not change the garment into a different product",
-    "Do not alter product color or decorative pattern",
-    "Improve only realism, light, shadows, background, skin realism, and artifact cleanup",
-  ];
+  const preserveCreative =
+    "Keep the main product recognisable. Background, lighting, and atmosphere may change. Do not replace the product or change its dominant color or pattern.";
 
-  const preserveCreative = [
-    "Keep the main product recognisable",
-    "Background, atmosphere and lighting may change",
-    "Do not replace the product with another item",
-    "Do not change the dominant product color or pattern",
-  ];
-
-  const negative = [
-    "avoid plastic skin",
-    "avoid doll face",
-    "avoid toy-like body",
-    "avoid waxy texture",
-    "avoid over-smoothed skin",
-    "avoid pasted-on garment",
-    "avoid warped lace",
-    "avoid distorted anatomy",
-    "avoid changing garment shape",
-    "avoid changing product color",
-    "avoid replacing the outfit",
-  ];
+  const dynamicBlock = (input.productPreservationBlock ?? "").trim();
 
   const preservation = input.preserveProduct
-    ? preserveStrict
+    ? dynamicBlock || genericPreserveStrict
     : preserveCreative;
 
+  const preservationLine = input.preserveProduct
+    ? `Keep the same subject and composition. Preserve the visible product exactly: ${preservation}`
+    : `Keep the same subject. ${preservation}`;
+
+  // ONE user intent, ONE product fidelity line, ONE short negative — by
+  // design (see prompt-spec). Anything more is duplication.
   const assembled = [
-    "Edit the source product photo for premium ecommerce use.",
-    `User intent: ${intent}`,
-    `Photorealism: ${photorealism.join("; ")}.`,
-    `Product fidelity: ${preservation.join("; ")}.`,
-    `Negative: ${negative.join("; ")}.`,
-    "Return one photoreal image; do not add text, logos, or watermarks.",
+    "Edit the source image for premium ecommerce quality.",
+    `User intent: ${intent}.`,
+    preservationLine,
+    "Improve only lighting, background, realism, shadows, and cleanup.",
+    "Do not replace, recolor, redesign, or distort the product.",
+    "No text, logos, or watermarks.",
   ].join(" ");
 
   return clampPromptLength(assembled, NANO_BANANA_MAX_FINAL_LEN);

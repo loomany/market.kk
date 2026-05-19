@@ -16,8 +16,14 @@ export type KontextEnhancePromptInput = {
   userPrompt: string;
   /** Optional pre-enhanced prompt returned by /api/ai/prompt/enhance. */
   enhancedPrompt: string | null | undefined;
-  /** When true, garment and body are locked; only scene/lighting changes. */
+  /** When true, product and (if visible) body are locked; only scene/lighting changes. */
   preserveProduct: boolean;
+  /**
+   * Pre-computed Vision-derived product preservation block. When empty,
+   * Kontext falls back to a generic, object-agnostic preservation sentence
+   * (no hardcoded "bra", "lace", "sneakers", etc.).
+   */
+  productPreservationBlock?: string | null;
 };
 
 /** Sentence-aware length clamp. */
@@ -31,15 +37,27 @@ function clampPromptLength(text: string, maxLen: number): string {
   return truncated.trim();
 }
 
-/** Kontext prompts must stay short — the model loses focus on long briefs. */
-const KONTEXT_MAX_FINAL_LEN = 1200;
-const KONTEXT_MAX_INSTRUCTION_LEN = 400;
+/**
+ * Kontext prompts must stay SHORT — the model loses focus on long briefs and
+ * is moderation-sensitive. Lowered from 900 → 750. Per-editor final cap is
+ * also enforced post-sanitization in the route (see FINAL_PROMPT_LENGTH_CAPS).
+ */
+const KONTEXT_MAX_FINAL_LEN = 750;
+const KONTEXT_MAX_INSTRUCTION_LEN = 240;
 
-/** Builds the final English prompt sent to fal-ai/flux-pro/kontext. */
+/**
+ * Builds the final English prompt sent to fal-ai/flux-pro/kontext.
+ *
+ * Kept intentionally SHORT and SAFE: FLUX moderation can 422 on long,
+ * sensitive-leaning prompts. The caller passes `productPreservationBlock` —
+ * this MUST be the *external/safe* block produced by
+ * `buildExternalProductPreservationBlock(...)`, not the detailed analysis.
+ */
 export function buildFluxKontextEditPrompt({
   userPrompt,
   enhancedPrompt,
   preserveProduct,
+  productPreservationBlock,
 }: KontextEnhancePromptInput): string {
   const rawInstruction =
     enhancedPrompt?.trim() ||
@@ -50,37 +68,30 @@ export function buildFluxKontextEditPrompt({
     KONTEXT_MAX_INSTRUCTION_LEN
   );
 
-  const preserveStrict = [
-    "Keep the same person, pose, body, face, skin tone, and clothing exactly the same",
-    "Only modify: scene, background, lighting, atmosphere, and light direction",
-    "Do not change: garment shape, garment color, garment pattern, lace details, straps, seams, fit, or the model's body proportions",
-  ];
+  const genericPreserveStrict =
+    "Visible fashion product — keep color, pattern, material, shape, edges, proportions, and placement exactly the same.";
 
-  const preserveCreative = [
-    "Keep the same person and recognisable garment design",
-    "Background, lighting, and atmosphere may change",
-    "Do not change the dominant product color or pattern",
-  ];
+  const preserveCreative =
+    "Keep the main product recognisable; do not change the dominant product color or pattern.";
 
-  const photorealism = [
-    "Photoreal result, premium ecommerce quality",
-    "Natural skin texture, natural shadows, realistic light direction",
-  ];
+  const dynamicBlock = (productPreservationBlock ?? "").trim();
 
-  const negative = [
-    "Avoid: plastic skin, waxy texture, doll-like appearance",
-    "Avoid: distorted lace, warped garment edges",
-    "Avoid: changing the outfit, pasted-on clothing",
-    "Avoid: text, logos, watermarks",
-  ];
+  const preservation = preserveProduct
+    ? dynamicBlock || genericPreserveStrict
+    : preserveCreative;
 
-  const constraints = preserveProduct ? preserveStrict : preserveCreative;
+  const compositionLine = preserveProduct
+    ? "Keep the same subject and visible product unchanged. Only modify background, lighting, atmosphere, and scene context."
+    : "Keep the source subject and the main product recognisable. Background, lighting, and atmosphere may change.";
 
+  // ONE instruction, ONE composition line, ONE product fidelity line, ONE
+  // short negative + footer — by design.
   const assembled = [
     `Edit instruction: ${instruction}.`,
-    `${constraints.join(". ")}.`,
-    `${photorealism.join(". ")}.`,
-    `${negative.join(". ")}.`,
+    compositionLine,
+    `Preserve the visible product: ${preservation}`,
+    "Do not replace, recolor, redesign, or distort the product.",
+    "Photoreal ecommerce result. No text, logos, watermarks.",
   ].join(" ");
 
   return clampPromptLength(assembled, KONTEXT_MAX_FINAL_LEN);

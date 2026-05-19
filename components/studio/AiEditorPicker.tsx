@@ -10,7 +10,6 @@ type AiEditorPickerProps = {
   value: string | null;
   onChange: (id: string) => void;
   disabled?: boolean;
-  showTechnical?: boolean;
 };
 
 export function AiEditorPicker({
@@ -19,7 +18,6 @@ export function AiEditorPicker({
   value,
   onChange,
   disabled,
-  showTechnical = false,
 }: AiEditorPickerProps) {
   return (
     <div className="space-y-3">
@@ -54,11 +52,6 @@ export function AiEditorPicker({
               <p className="mt-1.5 text-sm leading-6 text-slate-600">
                 {editor.description}
               </p>
-              {showTechnical ? (
-                <p className="mt-2 font-mono text-[10px] text-slate-400">
-                  {editor.technicalModel}
-                </p>
-              ) : null}
             </button>
           );
         })}

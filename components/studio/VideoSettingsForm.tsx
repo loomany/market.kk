@@ -19,7 +19,7 @@ export type VideoMotionPresetId = (typeof VIDEO_MOTION_PRESETS)[number]["id"];
 export type VideoAspectRatio = "1:1" | "4:5" | "9:16" | "16:9";
 
 const VIDEO_FRAME_OPTIONS = [
-  { value: "9:16", label: "9:16 — Stories / Reels" },
+  { value: "9:16", label: "9:16 — Reels / Stories" },
   { value: "4:5", label: "4:5 — маркетплейсы / соцсети" },
   { value: "1:1", label: "1:1 — квадрат" },
   { value: "16:9", label: "16:9 — горизонтальное видео" },
@@ -90,7 +90,7 @@ export function VideoSettingsForm({
           options={
             frameOptions.length > 0
               ? [...frameOptions]
-              : [{ value: "9:16", label: "9:16 — Stories / Reels" }]
+              : [{ value: "9:16", label: "9:16 — Reels / Stories" }]
           }
         />
         <Select

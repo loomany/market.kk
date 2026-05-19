@@ -14,7 +14,14 @@ export const promptEnhanceRequestSchema = z.object({
   lockedBasePrompt: z.string().trim().max(2000).optional(),
   sourceImageDescription: z.string().trim().max(1000).optional(),
   targetPlatform: z
-    .enum(["marketplace", "instagram", "reels", "catalog"])
+    .enum([
+      "marketplace",
+      "instagram",
+      "reels",
+      "catalog",
+      /** Static vertical image (Проработка) — not short-form video */
+      "social_static_vertical",
+    ])
     .default("marketplace"),
   /** Site UI locale — enhancedPrompt is written in this language */
   language: promptLocaleSchema.default("ru"),

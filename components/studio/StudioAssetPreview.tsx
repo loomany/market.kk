@@ -48,23 +48,30 @@ type StudioAssetPreviewProps = {
   asset: StudioSessionAsset;
   className?: string;
   compact?: boolean;
+  /** Render as a small circular avatar (object-cover). */
+  circle?: boolean;
 };
 
 export function StudioAssetPreview({
   asset,
   className,
   compact = false,
+  circle = false,
 }: StudioAssetPreviewProps) {
   const previewUrl = assetPreviewUrl(asset);
   const processing = asset.status === "processing";
   const errored = asset.status === "error";
   const isVideo = isVideoAsset(asset) && !processing && Boolean(asset.url);
+  const imgFit = circle ? "object-cover" : "object-contain";
 
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-[16px] border border-border bg-slate-50",
-        compact ? "h-36" : "h-40",
+        "relative overflow-hidden bg-slate-50",
+        circle
+          ? "rounded-full"
+          : "rounded-[16px] border border-border",
+        circle ? "" : compact ? "h-36" : "h-40",
         className
       )}
     >
@@ -85,9 +92,6 @@ export function StudioAssetPreview({
               />
             </div>
           ) : null}
-          <p className="relative z-10 text-[11px] text-slate-500">
-            Примерно 3:00
-          </p>
         </div>
       ) : errored ? (
         <div className="flex h-full flex-col items-center justify-center gap-2 px-3 text-center text-red-700">
@@ -97,7 +101,7 @@ export function StudioAssetPreview({
       ) : isVideo && asset.url ? (
         <video
           src={asset.url}
-          className="h-full w-full object-contain"
+          className={cn("h-full w-full", imgFit)}
           muted
           playsInline
           preload="metadata"
@@ -108,7 +112,7 @@ export function StudioAssetPreview({
         <img
           src={previewUrl}
           alt=""
-          className="h-full w-full object-contain"
+          className={cn("h-full w-full", imgFit)}
         />
       ) : (
         <div className="flex h-full items-center justify-center text-slate-400">

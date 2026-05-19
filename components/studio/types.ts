@@ -274,6 +274,22 @@ export type StudioSessionAsset = {
   parentAssetId?: string;
   errorMessage?: string;
   startedAt?: string;
+  /**
+   * Optional, session-only Vision preservation snapshot used by «Проработка».
+   * Not persisted to DB / not transferred to try-on pipeline. Cached per
+   * asset so we never call OpenAI twice for the same source image.
+   */
+  productPreservation?: {
+    analysis: import("@/lib/ai/productPreservationSchemas").ProductPreservationAnalysis;
+    /** Detailed block for dev debug only — never sent to Fal. */
+    preservationBlock: string;
+    /** Safe short block actually sent to Fal as productPreservationBlock. */
+    externalPreservationBlock: string;
+    provider: "openai" | "mock";
+    model: string;
+    usedVision: boolean;
+    analyzedAt: string;
+  };
 };
 
 export type ProductShotScenePreset =

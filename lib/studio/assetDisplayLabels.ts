@@ -22,9 +22,7 @@ export function getAssetTypeBadge(asset: StudioSessionAsset): string {
   }
 }
 
-export function getAssetStatusBadge(asset: StudioSessionAsset): string | null {
-  if (asset.status === "processing") return "Создаётся";
-  if (asset.status === "error") return "Ошибка";
+export function getAssetStatusBadge(_asset: StudioSessionAsset): string | null {
   return null;
 }
 

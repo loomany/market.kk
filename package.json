@@ -8,6 +8,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:image-sanitizer": "node --experimental-strip-types scripts/test-imageEnhancerSanitizer.ts",
+    "test:product-preservation": "node --experimental-strip-types scripts/test-productPreservation.ts",
+    "test:image-final-prompt": "node --experimental-strip-types scripts/test-imageFinalPrompt.ts",
     "smoke:ai:mock": "node --experimental-strip-types scripts/smoke/mock-ai-routes.ts"
   },
   "dependencies": {

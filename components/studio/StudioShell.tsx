@@ -1754,6 +1754,7 @@ export function StudioShell({
           <ProcessedAssetsPanel
             assets={sessionAssets}
             mockMode={mockMode}
+            paidAiRunsAllowed={paidAiRunsAllowed}
             promptLocale={promptLocale}
             onDeleteAsset={deleteSessionAsset}
             onAssetCreated={addSingleAssetToSession}

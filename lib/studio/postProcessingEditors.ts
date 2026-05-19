@@ -1,10 +1,11 @@
 import type { VideoModelKey } from "@/lib/ai/videoModels";
+import type { ImageEditorId as ImageEnhanceEditorId } from "@/lib/ai/imageEnhanceSchemas";
 
 export type PostProcessingMode = "video" | "image";
 
 export type VideoEditorId = VideoModelKey;
 
-export type ImageEditorId = "nano-banana-pro";
+export type ImageEditorId = ImageEnhanceEditorId;
 
 export type PostProcessingEditor = {
   id: VideoEditorId | ImageEditorId;
@@ -59,35 +60,96 @@ const NANO_BANANA_PRO_BASE: Omit<
   id: "nano-banana-pro",
   mode: "image",
   title: "Nano Banana Pro",
-  technicalModel: "fal-ai/nano-banana-pro",
+  technicalModel: "fal-ai/nano-banana-pro/edit",
   pros: "Реалистичная кожа, ткань и свет. Сохраняет товар.",
+};
+
+const FLUX_KONTEXT_PRO_BASE: Omit<
+  PostProcessingEditor,
+  "available" | "comingSoon" | "description" | "limitations"
+> = {
+  id: "flux-kontext-pro",
+  mode: "image",
+  title: "FLUX Kontext",
+  technicalModel: "fal-ai/flux-pro/kontext",
+  pros: "Хорош, когда нужно переместить модель в другую сцену.",
+};
+
+export type ImageEditorAvailabilityInput = {
+  mockMode: boolean;
+  /** Whether real paid Fal calls are enabled on the server (ALLOW_PAID_AI_RUNS). */
+  paidAiRunsAllowed?: boolean;
 };
 
 /** Visible image editors.
  *
- *  Real Nano Banana image-enhance endpoint is not wired up yet — it will be a
- *  separate backend stage. In production we show the card as "Скоро" so the
- *  user cannot trigger it; in demo (`mockMode`) we mark it as demo only.
+ *  - Demo (`mockMode`): оба редактора активны, результат — mock.
+ *  - Production с включёнными paid runs: оба активны (real Fal calls).
+ *  - Production без paid runs: показываем «Скоро», нажать нельзя.
  */
-export function getImageEditors(mockMode: boolean): PostProcessingEditor[] {
-  if (mockMode) {
+export function getImageEditors(
+  input: ImageEditorAvailabilityInput | boolean
+): PostProcessingEditor[] {
+  const normalized: ImageEditorAvailabilityInput =
+    typeof input === "boolean"
+      ? { mockMode: input }
+      : input;
+
+  if (normalized.mockMode) {
     return [
       {
         ...NANO_BANANA_PRO_BASE,
         description:
-          "Demo: показывает работу UI улучшения фото на mock-результатах.",
+          "Demo: показывает работу улучшения фото на mock-результатах.",
         limitations:
-          "Real улучшение фото будет подключено отдельным этапом backend.",
+          "В demo-режиме результат — пример. Включите real-режим для настоящего AI.",
+        available: true,
+      },
+      {
+        ...FLUX_KONTEXT_PRO_BASE,
+        description:
+          "Demo: смена сцены и контекста на mock-результатах.",
+        limitations:
+          "В demo-режиме результат — пример. Включите real-режим для настоящего AI.",
         available: true,
       },
     ];
   }
+
+  if (normalized.paidAiRunsAllowed) {
+    return [
+      {
+        ...NANO_BANANA_PRO_BASE,
+        description: "Реалистичные фото, улучшение света, фона и деталей.",
+        limitations:
+          "Стоимость зависит от качества (Быстро / Стандарт / Максимум).",
+        available: true,
+      },
+      {
+        ...FLUX_KONTEXT_PRO_BASE,
+        description:
+          "Смена сцены и контекста: пляж, интерьер, улица, lifestyle-кадр.",
+        limitations: "Не поддерживает 4:5 и WebP.",
+        available: true,
+      },
+    ];
+  }
+
   return [
     {
       ...NANO_BANANA_PRO_BASE,
-      description: "Лучше для реалистичных фото, света, фона и деталей.",
+      description: "Реалистичные фото, улучшение света, фона и деталей.",
       limitations:
-        "Подключение в production будет отдельным этапом — следите за обновлениями.",
+        "Real-режим временно отключён администратором. Скоро будет доступен.",
+      available: false,
+      comingSoon: true,
+    },
+    {
+      ...FLUX_KONTEXT_PRO_BASE,
+      description:
+        "Смена сцены и контекста: пляж, интерьер, улица, lifestyle-кадр.",
+      limitations:
+        "Real-режим временно отключён администратором. Скоро будет доступен.",
       available: false,
       comingSoon: true,
     },
