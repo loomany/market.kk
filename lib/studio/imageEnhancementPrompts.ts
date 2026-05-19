@@ -113,3 +113,95 @@ export function buildFallbackGenerationPrompt({
     `Negative: ${negative.join("; ")}.`,
   ].join(" ");
 }
+
+/** Sentence-aware length clamp. */
+function clampPromptLength(text: string, maxLen: number): string {
+  if (text.length <= maxLen) return text;
+  const truncated = text.slice(0, maxLen);
+  const lastDot = truncated.lastIndexOf(".");
+  if (lastDot > maxLen * 0.6) return truncated.slice(0, lastDot + 1).trim();
+  const lastSpace = truncated.lastIndexOf(" ");
+  if (lastSpace > maxLen * 0.6) return truncated.slice(0, lastSpace).trim();
+  return truncated.trim();
+}
+
+/** Upper bound on the assembled Nano Banana prompt (safe margin for queue). */
+const NANO_BANANA_MAX_FINAL_LEN = 1800;
+/** Upper bound on the raw intent that flows into the Nano builder. */
+const NANO_BANANA_MAX_INTENT_LEN = 600;
+
+/**
+ * Server-side guardrails for fal-ai/nano-banana-pro/edit.
+ *
+ * The UI either already enriched the prompt via /api/ai/prompt/enhance
+ * (`enhancedPrompt`) or only sends the raw `userPrompt`. Either way the
+ * route MUST wrap the text with strict photorealism + product-preservation
+ * rules so the editor never replaces the garment or produces CGI-looking
+ * output. Returns a single English prompt string ready for Fal.
+ */
+export function buildNanoBananaEnhancePrompt(input: {
+  userPrompt: string;
+  enhancedPrompt: string | null | undefined;
+  preserveProduct: boolean;
+}): string {
+  const rawIntent =
+    input.enhancedPrompt?.trim() ||
+    input.userPrompt.trim() ||
+    "Improve realism, lighting, and background without changing the product.";
+  const intent = clampPromptLength(rawIntent, NANO_BANANA_MAX_INTENT_LEN);
+
+  const photorealism = [
+    "photorealistic adult human model",
+    "real person, not plastic, not doll-like, not toy-like",
+    "natural skin texture with realistic pores",
+    "natural body shading and realistic skin tones",
+    "realistic fabric-to-skin contact and natural shadows",
+    "premium commercial studio lighting",
+    "remove CGI, wax, toy-like or doll-like appearance",
+  ];
+
+  const preserveStrict = [
+    "Preserve the exact product design",
+    "Preserve color, shape, silhouette, lace, pattern, fabric edges, straps, seams, and garment category",
+    "Do not replace the bra, briefs, or any garment with another product",
+    "Do not change the garment into a different product",
+    "Do not alter product color or decorative pattern",
+    "Improve only realism, light, shadows, background, skin realism, and artifact cleanup",
+  ];
+
+  const preserveCreative = [
+    "Keep the main product recognisable",
+    "Background, atmosphere and lighting may change",
+    "Do not replace the product with another item",
+    "Do not change the dominant product color or pattern",
+  ];
+
+  const negative = [
+    "avoid plastic skin",
+    "avoid doll face",
+    "avoid toy-like body",
+    "avoid waxy texture",
+    "avoid over-smoothed skin",
+    "avoid pasted-on garment",
+    "avoid warped lace",
+    "avoid distorted anatomy",
+    "avoid changing garment shape",
+    "avoid changing product color",
+    "avoid replacing the outfit",
+  ];
+
+  const preservation = input.preserveProduct
+    ? preserveStrict
+    : preserveCreative;
+
+  const assembled = [
+    "Edit the source product photo for premium ecommerce use.",
+    `User intent: ${intent}`,
+    `Photorealism: ${photorealism.join("; ")}.`,
+    `Product fidelity: ${preservation.join("; ")}.`,
+    `Negative: ${negative.join("; ")}.`,
+    "Return one photoreal image; do not add text, logos, or watermarks.",
+  ].join(" ");
+
+  return clampPromptLength(assembled, NANO_BANANA_MAX_FINAL_LEN);
+}
