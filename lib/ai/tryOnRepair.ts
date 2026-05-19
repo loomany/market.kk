@@ -1,6 +1,7 @@
 import "server-only";
 import { MODEL_GENERATION_EDIT_MODEL, getFalClientOrThrow } from "@/lib/ai/falClient";
 import type { ProductDescriptionAnalysis } from "@/lib/ai/productDescriptionAnalysisSchemas";
+import type { FalModelResolution } from "@/lib/ai/modelOutputSizes";
 import { buildTryOnRepairPrompt } from "@/lib/ai/productAnalysisPipeline";
 import type { PaidAiGuardInput } from "@/lib/ai/paidAiGuard";
 
@@ -10,6 +11,7 @@ export async function runTryOnRepair(input: {
   resultImageUrl: string;
   productAnalysis: ProductDescriptionAnalysis;
   userDescriptionRu?: string;
+  resolution?: FalModelResolution;
   guard: PaidAiGuardInput;
 }): Promise<{ url: string; requestId: string } | null> {
   if (process.env.AI_MOCK_MODE !== "0") {
@@ -29,7 +31,7 @@ export async function runTryOnRepair(input: {
         image_urls: [input.resultImageUrl],
         num_images: 1,
         output_format: "png",
-        resolution: "1K",
+        resolution: input.resolution ?? "2K",
         limit_generations: true,
       },
       logs: false,

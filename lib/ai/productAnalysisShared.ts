@@ -60,7 +60,13 @@ export function productAnalysisForModelGeneration(
   overrides: ProductAnalysisUiOverrides,
   userDescriptionRu: string,
   userEdited: boolean
-): Pick<GenerateModelRequest, "categoryContext" | "productDescriptionRu"> & {
+): Pick<
+  GenerateModelRequest,
+  | "categoryContext"
+  | "productDescriptionRu"
+  | "productMustPreserve"
+  | "productFitNotes"
+> & {
   shortAiSummaryEn?: string;
   productSetType?: GenerateModelRequest["productSetType"];
   productSourcePresentation?: GenerateModelRequest["productSourcePresentation"];
@@ -77,5 +83,8 @@ export function productAnalysisForModelGeneration(
     shortAiSummaryEn: analysis?.shortAiSummaryEn,
     productSetType: analysis?.setType,
     productSourcePresentation: analysis?.sourcePresentation,
+    productMustPreserve:
+      analysis?.mustPreserve?.length ? analysis.mustPreserve : undefined,
+    productFitNotes: analysis?.fitNotes?.length ? analysis.fitNotes : undefined,
   };
 }

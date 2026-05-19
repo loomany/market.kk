@@ -193,8 +193,18 @@ function hardRulesFor(
 
   if (request.gender === "female" && isAdultModelAge(request.modelAge)) {
     rules.push(
-      "Adult female catalog look: professional makeup, styled hair, warm smile with bright teeth, manicured nails when hands visible, sun-kissed even skin."
+      "Adult female premium glamorous catalog look: full makeup, salon hair, glossy lips, shaped brows, manicured nails, confident sensual but non-explicit pose, luxury campaign styling — not plain, boring, matronly, or shapeless."
     );
+  }
+
+  if (request.productMustPreserve?.length) {
+    rules.push(
+      `Must preserve for garment transfer: ${request.productMustPreserve.join("; ")}.`
+    );
+  }
+
+  if (request.productFitNotes?.length) {
+    rules.push(`Fit notes: ${request.productFitNotes.join("; ")}.`);
   }
 
   return rules;

@@ -125,25 +125,27 @@ function femaleAdultModelBeautyGuidance(input: GenerateModelRequest): string {
         : "";
 
   return (
-    `Mandatory female catalog model styling (always): ${youthHint}attractive symmetrical face, healthy sun-kissed tanned skin with even golden glow on face and body, ` +
-    "professional salon makeup always applied (groomed brows, subtle contour, mascara, soft blush, natural lip color — never bare face), " +
-    "professional salon hairstyle always finished and photo-ready (styled volume, blowout, or sleek waves — never messy or unkempt hair), " +
-    "warm natural smile with visible bright white clean teeth (friendly approachable expression — not neutral closed mouth, not serious pout), " +
-    "professional manicure on all visible hands and nails (neat shaped nails, nude or soft natural polish, groomed cuticles — never chipped, bitten, or bare neglected nails). " +
-    "Polished photogenic catalog look — believable, not cartoon, not heavy nightclub makeup."
+    `Mandatory premium glamorous adult female fashion model styling (always): ${youthHint}beautiful symmetrical face with confident eye contact, ` +
+    "healthy sun-kissed skin with even golden glow on face and body, " +
+    "full professional salon makeup (shaped brows, soft contour, mascara, blush, glossy natural lips — never bare face), " +
+    "salon-finished photo-ready hair (volume, blowout, or sleek waves — never messy or unkempt), " +
+    "elegant sensual but non-explicit catalog pose energy, warm natural smile with bright clean teeth when smiling, " +
+    "professional manicure on all visible hands (neat shaped nails, nude or soft polish). " +
+    "Luxury marketplace / boudoir campaign look — polished, attractive, curvy where selected, never plain, boring, matronly, or shapeless."
   );
 }
 
 function femaleAdultModelBeautyNegatives(): string {
   return (
-    "no bare face without makeup, no unkempt or messy hair, no neutral closed-mouth expression without smile, " +
+    "no bare face without makeup, no unkempt or messy hair, no plain boring catalog model, no auntie or matronly face, " +
+    "no shapeless boxy torso, no awkward hands covering garment areas, no neutral closed-mouth without expression, " +
     "no yellow stained or crooked teeth, no chipped bitten or unpolished nails when hands are visible"
   );
 }
 
 function expressionPhrase(input: GenerateModelRequest): string {
   if (input.gender === "female" && isAdultModelAge(input.modelAge)) {
-    return "warm natural smile with bright white teeth, friendly approachable catalog expression";
+    return "confident sensual but non-explicit catalog expression with warm natural smile and bright white teeth, direct eye contact";
   }
   return "calm confident expression";
 }
@@ -272,6 +274,16 @@ export function buildModelGenerationPrompt(
 
   if (input.shortAiSummaryEn?.trim()) {
     parts.push(`Product analysis: ${input.shortAiSummaryEn.trim()}`);
+  }
+
+  if (input.productMustPreserve?.length) {
+    parts.push(
+      `Preserve for try-on reference: ${input.productMustPreserve.join("; ")}.`
+    );
+  }
+
+  if (input.productFitNotes?.length) {
+    parts.push(`Fit notes: ${input.productFitNotes.join("; ")}.`);
   }
 
   if (input.productDescriptionRu?.trim()) {

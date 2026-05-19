@@ -42,9 +42,19 @@ import {
 type ModelPresetSelectorProps = {
   settings: ModelGenerationSettings;
   onSettingsChange: (settings: ModelGenerationSettings) => void;
+  outputSize: Partial<ModelOutputSizeSelection>;
+  onOutputSizeChange: (patch: Partial<ModelOutputSizeSelection>) => void;
+  /** Locks gender/body/crop while SaaS pipeline generates a model */
+  settingsLocked?: boolean;
+};
+
+export type ModelAdvancedControlsProps = {
+  settings: ModelGenerationSettings;
+  onSettingsChange: (settings: ModelGenerationSettings) => void;
   onGenerate: () => void;
   modelDescription: string;
   onModelDescriptionChange: (value: string) => void;
+  outputSize: Partial<ModelOutputSizeSelection>;
   generating?: boolean;
   generateError?: string | null;
   generateNotice?: string | null;
@@ -53,8 +63,6 @@ type ModelPresetSelectorProps = {
   isModelSaved?: boolean;
   onSaveModel?: () => void;
   onStartOverModel?: () => void;
-  outputSize: Partial<ModelOutputSizeSelection>;
-  onOutputSizeChange: (patch: Partial<ModelOutputSizeSelection>) => void;
   productPhotoCount?: number;
   useProductSampleAngles?: boolean;
   productSampleAngles?: ResolvedModelAngle[] | null;
@@ -62,6 +70,10 @@ type ModelPresetSelectorProps = {
   onApplyAnglesFromProducts?: () => void;
   onClearProductSampleAngles?: () => void;
   dictationLocale?: Locale;
+  showDevControls?: boolean;
+  modelGenerationSeed?: number;
+  tryOnSeed?: number;
+  onOutputSizeChange?: (patch: Partial<ModelOutputSizeSelection>) => void;
 };
 
 function SettingField({
@@ -312,26 +324,9 @@ function hintForOption<T extends string>(
 export function ModelPresetSelector({
   settings,
   onSettingsChange,
-  onGenerate,
-  modelDescription,
-  onModelDescriptionChange,
-  generating,
-  generateError,
-  generateNotice,
-  generateProgress,
-  generatedPreviewItems = [],
-  isModelSaved = false,
-  onSaveModel,
-  onStartOverModel,
   outputSize,
   onOutputSizeChange,
-  productPhotoCount = 0,
-  useProductSampleAngles = false,
-  productSampleAngles = null,
-  analyzingProductAngles = false,
-  onApplyAnglesFromProducts,
-  onClearProductSampleAngles,
-  dictationLocale = "ru",
+  settingsLocked = false,
 }: ModelPresetSelectorProps) {
   const patch = (partial: Partial<ModelGenerationSettings>) =>
     onSettingsChange(
@@ -353,31 +348,11 @@ export function ModelPresetSelector({
         ? "Для белья — по пояс, стоя; низ как брифы, не шорты. Полный рост — только если нужен весь комплект в кадре."
         : hintForOption(CROP_OPTIONS, settings.crop);
 
-  const ageDescription = isMinor
-    ? "До 18 лет недоступны сценарий «Бельё / купальники» и тип «Бикини / купальники»."
-    : "Влияет на лицо и пропорции: 21 — молодая 20+, 30 — зрелее. Для детской одежды укажите возраст ребёнка.";
-
-  const isPromptLocked = Boolean(generating);
-  const outputSizeReady = isModelOutputSizeComplete(outputSize);
+  const isPromptLocked = settingsLocked;
 
   const aspectRatioDescription = outputSize.aspectRatio
     ? hintForOption(FAL_MODEL_ASPECT_RATIO_OPTIONS, outputSize.aspectRatio)
     : "Формат кадра для карточки.";
-
-  const resolutionDescription = outputSize.resolution
-    ? hintForOption(FAL_MODEL_RESOLUTION_OPTIONS, outputSize.resolution)
-    : "Качество изображения.";
-
-  const basePrompt = useMemo(
-    () =>
-      buildModelBaseSettingsSummaryRu(settings, outputSize, {
-        productPoseLabel:
-          useProductSampleAngles && productSampleAngles?.[0]
-            ? productPoseLabelForUi(productSampleAngles[0])
-            : undefined,
-      }),
-    [settings, outputSize, useProductSampleAngles, productSampleAngles]
-  );
 
   return (
     <section className="space-y-6">
@@ -386,8 +361,8 @@ export function ModelPresetSelector({
           AI-модель для одежды
         </h3>
         <p className="mt-1 text-xs leading-5 text-slate-500">
-          Укажите возраст и параметры съёмки. Для детской одежды — возраст до 18
-          лет.
+          AI создаст модель автоматически. Выберите пол, национальность, тип
+          фигуры, кадр и формат — затем нажмите «Создать фото на модели».
         </p>
       </header>
 
@@ -413,13 +388,13 @@ export function ModelPresetSelector({
           />
           <SettingField
             label="Национальность модели"
-            description="Необязательно. Укажите, если важно для витрины и аудитории."
+            description="Например: казахская, славянская, азиатская. Если не указано — AI подберёт нейтральную коммерческую внешность."
           >
             <CustomParamInput
               value={settings.modelNationality}
               disabled={isPromptLocked}
-              placeholder="Например: казахская, славянская"
-              emptyHint="Введите национальность и подтвердите галочкой"
+              placeholder="Например: казахская, славянская, азиатская"
+              emptyHint="Необязательно — оставьте пустым для нейтральной внешности"
               confirmAriaLabel="Сохранить национальность"
               onChange={(modelNationality) => patch({ modelNationality })}
             />
@@ -463,53 +438,7 @@ export function ModelPresetSelector({
             onChange={(crop) => patch({ crop })}
             onCustomTextChange={(cropCustom) => patch({ cropCustom })}
           />
-          <SettingField label="Возраст модели" description={ageDescription}>
-            <input
-              id="model-age"
-              type="number"
-              min={MODEL_AGE_MIN}
-              max={MODEL_AGE_MAX}
-              inputMode="numeric"
-              value={settings.modelAge}
-              onChange={(event) => {
-                const next = parseInt(event.target.value, 10);
-                if (!Number.isFinite(next)) return;
-                patch({ modelAge: clampModelAge(next) });
-              }}
-              className="min-h-[42px] w-full rounded-[12px] border border-border bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-sm outline-none transition hover:border-slate-300 focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
-            />
-          </SettingField>
-          <SettingField
-            label="Поза модели"
-            description={
-              useProductSampleAngles && productSampleAngles
-                ? "Поза подобрана по фото товара — учтём в итоговом промте."
-                : "Подберите позу с фото товара или опишите вручную — необязательно."
-            }
-          >
-            <ModelAnglesField
-              customAngles={settings.customAngles}
-              disabled={isPromptLocked}
-              productPhotoCount={productPhotoCount}
-              useProductSampleAngles={useProductSampleAngles}
-              productSampleAngles={productSampleAngles}
-              analyzingProductAngles={analyzingProductAngles}
-              onApplyFromProduct={onApplyAnglesFromProducts}
-              onClearProductPose={onClearProductSampleAngles}
-              onCustomAnglesChange={(customAngles) => patch({ customAngles })}
-            />
-          </SettingField>
         </div>
-      </div>
-
-      <div className="border-t border-border/50 pt-5">
-        <ModelPromptComposer
-          basePrompt={basePrompt}
-          description={modelDescription}
-          onDescriptionChange={onModelDescriptionChange}
-          disabled={isPromptLocked}
-          dictationLocale={dictationLocale}
-        />
       </div>
 
       <div className="space-y-4 border-t border-border/50 pt-5">
@@ -523,9 +452,131 @@ export function ModelPresetSelector({
             onOutputSizeChange({ aspectRatio: aspectRatio as FalModelAspectRatio })
           }
         />
-        <SelectField
+        <SettingField
           label="Разрешение"
-          description={resolutionDescription}
+          description="По умолчанию 2K — лучше для кружева и мелких деталей."
+        >
+          <p className="rounded-[12px] border border-slate-200/80 bg-slate-50/80 px-3 py-2.5 text-sm font-medium text-slate-900">
+            2K
+          </p>
+        </SettingField>
+      </div>
+
+    </section>
+  );
+}
+
+export function ModelAdvancedControls({
+  settings,
+  onSettingsChange,
+  onGenerate,
+  modelDescription,
+  onModelDescriptionChange,
+  outputSize,
+  onOutputSizeChange,
+  generating,
+  generateError,
+  generateNotice,
+  generateProgress,
+  generatedPreviewItems = [],
+  isModelSaved = false,
+  onSaveModel,
+  onStartOverModel,
+  productPhotoCount = 0,
+  useProductSampleAngles = false,
+  productSampleAngles = null,
+  analyzingProductAngles = false,
+  onApplyAnglesFromProducts,
+  onClearProductSampleAngles,
+  dictationLocale = "ru",
+  showDevControls = false,
+  modelGenerationSeed,
+  tryOnSeed,
+}: ModelAdvancedControlsProps) {
+  const patch = (partial: Partial<ModelGenerationSettings>) =>
+    onSettingsChange(
+      sanitizeModelSettingsForAge({ ...settings, ...partial })
+    );
+  const isMinor = !isAdultModelAge(settings.modelAge);
+  const isPromptLocked = Boolean(generating);
+  const outputSizeReady = isModelOutputSizeComplete(outputSize);
+
+  const ageDescription = isMinor
+    ? "До 18 лет недоступны сценарий «Бельё / купальники» и тип «Бикини / купальники»."
+    : "Влияет на лицо и пропорции: 21 — молодая 20+, 30 — зрелее. Для детской одежды укажите возраст ребёнка.";
+
+  const basePrompt = useMemo(
+    () =>
+      buildModelBaseSettingsSummaryRu(settings, outputSize, {
+        productPoseLabel:
+          useProductSampleAngles && productSampleAngles?.[0]
+            ? productPoseLabelForUi(productSampleAngles[0])
+            : undefined,
+      }),
+    [settings, outputSize, useProductSampleAngles, productSampleAngles]
+  );
+
+  const resolutionDescription = outputSize.resolution
+    ? hintForOption(FAL_MODEL_RESOLUTION_OPTIONS, outputSize.resolution)
+    : "Качество изображения.";
+
+  return (
+    <div className="space-y-4">
+      <SettingField label="Возраст модели" description={ageDescription}>
+        <input
+          id="model-age-advanced"
+          type="number"
+          min={MODEL_AGE_MIN}
+          max={MODEL_AGE_MAX}
+          inputMode="numeric"
+          value={settings.modelAge}
+          disabled={isPromptLocked}
+          onChange={(event) => {
+            const next = parseInt(event.target.value, 10);
+            if (!Number.isFinite(next)) return;
+            patch({ modelAge: clampModelAge(next) });
+          }}
+          className="min-h-[42px] w-full rounded-[12px] border border-border bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-sm outline-none transition hover:border-slate-300 focus:border-teal-400 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-50"
+        />
+      </SettingField>
+
+      <SettingField
+        label="Поза модели"
+        description={
+          useProductSampleAngles && productSampleAngles
+            ? "Поза подобрана по фото товара — учтём в итоговом промте."
+            : "Подберите позу с фото товара или опишите вручную — необязательно."
+        }
+      >
+        <ModelAnglesField
+          customAngles={settings.customAngles}
+          disabled={isPromptLocked}
+          productPhotoCount={productPhotoCount}
+          useProductSampleAngles={useProductSampleAngles}
+          productSampleAngles={productSampleAngles}
+          analyzingProductAngles={analyzingProductAngles}
+          onApplyFromProduct={onApplyAnglesFromProducts}
+          onClearProductPose={onClearProductSampleAngles}
+          onCustomAnglesChange={(customAngles) => patch({ customAngles })}
+        />
+      </SettingField>
+
+      <ModelPromptComposer
+        basePrompt={basePrompt}
+        description={modelDescription}
+        onDescriptionChange={onModelDescriptionChange}
+        disabled={isPromptLocked}
+        dictationLocale={dictationLocale}
+      />
+
+      {showDevControls && onOutputSizeChange ? (
+        <SelectField
+          label="Разрешение (dev)"
+          description={
+            outputSize.resolution === "1K"
+              ? "1K быстрее, 2K лучше для кружева и мелких деталей"
+              : resolutionDescription
+          }
           placeholder="Выберите качество"
           value={outputSize.resolution}
           options={FAL_MODEL_RESOLUTION_OPTIONS}
@@ -533,7 +584,7 @@ export function ModelPresetSelector({
             onOutputSizeChange({ resolution: resolution as FalModelResolution })
           }
         />
-      </div>
+      ) : null}
 
       <Button
         type="button"
@@ -575,6 +626,14 @@ export function ModelPresetSelector({
           onStartOver={() => onStartOverModel?.()}
         />
       ) : null}
-    </section>
+
+      {showDevControls &&
+      typeof modelGenerationSeed === "number" &&
+      typeof tryOnSeed === "number" ? (
+        <p className="rounded-[12px] border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-600">
+          seed model: {modelGenerationSeed} · seed try-on: {tryOnSeed}
+        </p>
+      ) : null}
+    </div>
   );
 }

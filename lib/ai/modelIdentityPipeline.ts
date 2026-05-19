@@ -27,8 +27,11 @@ export function lingerieModelPoseGuidance(): string {
 /** Студийный комплект для генерации (не SKU с фото товара). */
 export function lingerieCatalogOutfitGuidance(): string {
   return (
-    "Wearing a simple matching lingerie set (bra and brief) in one cohesive catalog color such as black or soft nude, " +
-    `${lingerieBottomCutGuidance()}, ${lingerieModelPoseGuidance()} — generic studio lingerie for try-on base, ` +
+    "Wearing a plain seamless matching bra and brief set in one neutral catalog color (soft nude or black), " +
+    "no lace, prints, logos or decorative patterns on the base model garment, " +
+    `${lingerieBottomCutGuidance()}, ${lingerieModelPoseGuidance()}, ` +
+    "hands relaxed away from chest and hips, confident sensual but non-explicit editorial lingerie catalog pose, " +
+    "beautiful premium commercial lingerie look — generic studio base for virtual try-on, " +
     "not the customer's marketplace lace pattern or product colors"
   );
 }

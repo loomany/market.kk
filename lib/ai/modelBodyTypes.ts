@@ -36,7 +36,7 @@ export function bodyTypePromptPhrase(
     case "swimwear":
       return "swimwear and bikini catalog model with toned fit physique, beachwear commercial styling, non-explicit";
     case "curvy":
-      return "curvy model with balanced hourglass proportions, natural waist and hips, realistic commercial look";
+      return "curvy hourglass fashion model with defined waist, full hips and bust, premium glamorous catalog proportions, sensual but non-explicit editorial stance";
     case "petite":
       return "petite model with smaller frame and shorter stature, delicate realistic proportions";
     case "tall":

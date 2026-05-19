@@ -17,6 +17,8 @@ export function buildGenerateModelRequestBody(input: {
   shortAiSummaryEn?: string;
   productSetType?: GenerateModelRequest["productSetType"];
   productSourcePresentation?: GenerateModelRequest["productSourcePresentation"];
+  productMustPreserve?: GenerateModelRequest["productMustPreserve"];
+  productFitNotes?: GenerateModelRequest["productFitNotes"];
 }): GenerateModelRequest {
   const {
     settings,
@@ -31,6 +33,8 @@ export function buildGenerateModelRequestBody(input: {
     shortAiSummaryEn,
     productSetType,
     productSourcePresentation,
+    productMustPreserve,
+    productFitNotes,
   } = input;
 
   return {
@@ -59,6 +63,8 @@ export function buildGenerateModelRequestBody(input: {
     shortAiSummaryEn: shortAiSummaryEn?.trim() || undefined,
     productSetType,
     productSourcePresentation,
+    productMustPreserve,
+    productFitNotes,
     referenceImageUrl: referenceImageUrl ?? undefined,
     promptLocale,
   };

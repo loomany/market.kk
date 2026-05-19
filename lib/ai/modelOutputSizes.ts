@@ -21,10 +21,10 @@ export type ModelOutputSizeSelection = {
   resolution: FalModelResolution;
 };
 
-/** Default studio model output: WB/Ozon portrait + balanced resolution */
+/** Default studio model output: WB/Ozon portrait + 2K for lace/detail */
 export const DEFAULT_MODEL_OUTPUT_SIZE: ModelOutputSizeSelection = {
   aspectRatio: "3:4",
-  resolution: "1K",
+  resolution: "2K",
 };
 
 export const FAL_MODEL_ASPECT_RATIO_OPTIONS: {

@@ -9,6 +9,7 @@ import {
   type TryOnInputSource,
   type TryOnRequest,
 } from "@/lib/ai/falSchemas";
+import type { FalModelResolution } from "@/lib/ai/modelOutputSizes";
 import { effectiveProductDescriptionRu } from "@/lib/ai/productAnalysisPipeline";
 import { runTryOnJudge } from "@/lib/ai/tryOnJudge";
 import { runTryOnRepair } from "@/lib/ai/tryOnRepair";
@@ -114,6 +115,7 @@ async function runTryOnQualityPipeline(input: {
   productAnalysis: NonNullable<ReturnType<typeof getProductAnalysisFromPayload>>;
   userDescriptionRu?: string;
   userEdited?: boolean;
+  repairResolution?: FalModelResolution;
   guard: PaidAiGuardInput;
 }): Promise<{
   images: { url: string; width?: number; height?: number }[];
@@ -142,11 +144,12 @@ async function runTryOnQualityPipeline(input: {
   });
 
   let repaired = false;
-  if (!judge.pass && judge.score < 0.72) {
+  if (judge.score < 0.72) {
     const repair = await runTryOnRepair({
       resultImageUrl: images[0]!.url,
       productAnalysis: input.productAnalysis,
       userDescriptionRu: userDesc,
+      resolution: input.repairResolution,
       guard: input.guard,
     });
     if (repair?.url) {
@@ -237,6 +240,7 @@ async function runTryOn(
         productAnalysis,
         userDescriptionRu: options?.payload?.userDescriptionRu,
         userEdited: options?.payload?.userEditedProductDescription,
+        repairResolution: options?.payload?.modelResolution,
         guard,
       });
       images = piped.images;

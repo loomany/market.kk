@@ -1,5 +1,9 @@
 import { z } from "zod";
 import { validateImageFile } from "@/lib/ai/imageConstraints";
+import {
+  FAL_MODEL_RESOLUTIONS,
+  type FalModelResolution,
+} from "@/lib/ai/modelOutputSizes";
 import { parseProductAnalysisJson } from "@/lib/ai/productDescriptionAnalysisSchemas";
 
 export const tryOnRequestSchema = z.object({
@@ -43,6 +47,12 @@ export type TryOnSuccessResponse = {
   images: TryOnImage[];
   requestId: string;
   inputSource?: TryOnInputSource;
+  quality?: {
+    judged: boolean;
+    repaired: boolean;
+    judgeScore?: number;
+    judgeIssues?: string[];
+  };
 };
 
 export type TryOnErrorResponse = {
@@ -109,7 +119,18 @@ export type TryOnFormPayload = {
   productAnalysisJson?: string;
   userDescriptionRu?: string;
   userEditedProductDescription?: boolean;
+  modelResolution?: FalModelResolution;
 };
+
+function parseModelResolutionFormValue(
+  value: FormDataEntryValue | null
+): FalModelResolution | undefined {
+  const normalized = normalizeTryOnFormValue(value);
+  if (!normalized) return undefined;
+  return FAL_MODEL_RESOLUTIONS.includes(normalized as FalModelResolution)
+    ? (normalized as FalModelResolution)
+    : undefined;
+}
 
 export function buildTryOnFormPayload(formData: FormData): TryOnFormPayload {
   const productImageFile = getFileFromFormData(formData, "productImageFile");
@@ -169,6 +190,9 @@ export function buildTryOnFormPayload(formData: FormData): TryOnFormPayload {
     userEditedProductDescription: parseBooleanFormValue(
       formData.get("userEditedProductDescription"),
       false
+    ),
+    modelResolution: parseModelResolutionFormValue(
+      formData.get("modelResolution")
     ),
   };
 }

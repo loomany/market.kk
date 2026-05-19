@@ -86,6 +86,8 @@ export const generateModelRequestSchema = z
   productSourcePresentation: z
     .enum(["on-model", "flat-lay", "unknown"])
     .optional(),
+  productMustPreserve: z.array(z.string().trim().max(160)).max(16).optional(),
+  productFitNotes: z.array(z.string().trim().max(200)).max(12).optional(),
   /** Hero image URL — when set, uses image edit to preserve face and outfit */
   referenceImageUrl: z.string().url().max(2048).optional(),
   /** Locale of customDescription in the UI; server translates to English for Fal */
