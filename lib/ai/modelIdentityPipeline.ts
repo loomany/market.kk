@@ -1,14 +1,14 @@
 import type { GenerateModelRequest } from "@/lib/ai/modelGenerationSchemas";
 
-/**
- * Нейтральный bodysuit отключён: для белья модель снова в каталожном комплекте (как раньше).
- * Конкретный товар с карточки — только на шаге FASHN-примерки.
- */
+/** Base model for virtual try-on — never pre-wear the marketplace SKU. */
 export function shouldUseNeutralBaseModelGeneration(
-  _input: Pick<GenerateModelRequest, "categoryContext">
+  input: Pick<GenerateModelRequest, "categoryContext">
 ): boolean {
-  return false;
+  return input.categoryContext === "lingerie";
 }
+
+export const MODEL_GENERATION_NO_GARMENT_COPY_RULE =
+  "Do not recreate, copy, imitate, or pre-wear the uploaded garment. The target product will be applied later by virtual try-on. The base model must wear only plain seamless neutral underwear with no lace, no pattern, no logo, no colored floral details.";
 
 /** Крой низа для базовой модели — FASHN копирует силуэт с model_image. */
 export function lingerieBottomCutGuidance(): string {
@@ -24,16 +24,21 @@ export function lingerieModelPoseGuidance(): string {
   );
 }
 
-/** Студийный комплект для генерации (не SKU с фото товара). */
-export function lingerieCatalogOutfitGuidance(): string {
+/** Plain studio base for lingerie try-on — SKU colors/pattern come from FASHN only. */
+export function lingerieNeutralBaseOutfitGuidance(): string {
   return (
-    "Wearing a plain seamless matching bra and brief set in one neutral catalog color (soft nude or black), " +
-    "no lace, prints, logos or decorative patterns on the base model garment, " +
+    "plain seamless neutral bra and brief set, simple smooth fabric, nude beige or solid black only, " +
+    "no lace, no prints, no decorative straps, no floral pattern, no turquoise or green accents, " +
+    "no logos, no product design recreation, " +
     `${lingerieBottomCutGuidance()}, ${lingerieModelPoseGuidance()}, ` +
-    "hands relaxed away from chest and hips, confident sensual but non-explicit editorial lingerie catalog pose, " +
-    "beautiful premium commercial lingerie look — generic studio base for virtual try-on, " +
-    "not the customer's marketplace lace pattern or product colors"
+    "hands relaxed away from chest and hips, confident sensual but non-explicit editorial catalog pose, " +
+    "generic studio base for virtual try-on only"
   );
+}
+
+/** @deprecated Use neutral base + try-on; kept for non-neutral paths. */
+export function lingerieCatalogOutfitGuidance(): string {
+  return lingerieNeutralBaseOutfitGuidance();
 }
 
 export function neutralBaseOutfitGuidance(): string {
@@ -44,5 +49,8 @@ export function neutralBaseOutfitGuidance(): string {
 }
 
 export function neutralBaseOutfitLockForEdit(): string {
-  return "Keep the exact same neutral grey/beige bodysuit base layer as the reference.";
+  return (
+    "Keep the exact same plain seamless neutral bra and brief base as the reference — " +
+    "no lace, no prints, no floral pattern, no turquoise or green accents."
+  );
 }

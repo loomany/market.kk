@@ -5,17 +5,15 @@ import { resolveStudioTryOnSettings } from "@/lib/studio/resolveStudioTryOnSetti
 import type {
   GarmentPhotoType,
   ModelCategoryContext,
-  ProductCategory,
 } from "@/components/studio/types";
-
 export function appendStudioTryOnFields(
   formData: FormData,
   input: {
     productFile: File;
     modelFile: File | null;
     modelImageUrl: string | null;
-    productCategory: ProductCategory;
     garmentPhotoType: GarmentPhotoType;
+    garmentPhotoTypeManualOverride: boolean;
     categoryContext: ModelCategoryContext;
     isLingerie: boolean;
     productAnalysis: ProductDescriptionAnalysis | null;
@@ -34,8 +32,8 @@ export function appendStudioTryOnFields(
 
   const tryOnSettings = resolveStudioTryOnSettings({
     isLingerie: input.isLingerie,
-    productCategory: input.productCategory,
     garmentPhotoType: input.garmentPhotoType,
+    garmentPhotoTypeManualOverride: input.garmentPhotoTypeManualOverride,
     categoryContext: input.categoryContext,
     productAnalysis: input.productAnalysis,
   });

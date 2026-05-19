@@ -79,7 +79,7 @@ export function mockLingerieSetOnModelAnalysis(): ProductDescriptionAnalysis {
     shortAiSummaryEn:
       "on-model lingerie set, bra + high-waist brief, black base, turquoise-green floral lace, wide bra straps, supportive full cups, preserve cup shape, preserve lace texture, preserve high-waist fit, do not treat as flat-lay",
     categoryContext: "lingerie",
-    productCategory: "one-pieces",
+    productCategory: "auto",
     sourcePresentation: "on-model",
     garmentPhotoType: "model",
     setType: "bra_brief_set",
@@ -120,6 +120,22 @@ export function mockLingerieSetOnModelAnalysis(): ProductDescriptionAnalysis {
       "necklace is visible but is not the product",
     ],
     confidence: 0.95,
+    sourceModel: {
+      bodyType: "plus-size curvy hourglass",
+      sizeClass: "plus-size",
+      pose: "front-facing standing pose, torso slightly angled, hands near hips",
+      poseRu:
+        "стоя анфас, корпус слегка в полуоборот, руки у бёдер",
+      crop: "upper-thigh",
+      cameraAngle: "straight-on catalog camera angle",
+      handsPosition: "relaxed near hips/thighs",
+      framing: "product-focused crop from upper body to upper thighs",
+      bodyVisibility: "torso, waist, hips, bust visible; full face may be cropped",
+      descriptionRu:
+        "На фото plus-size модель, стоя, фронтально, кадр по пояс — до верхней части бёдер.",
+      promptEn:
+        "Create a new synthetic adult female model with similar plus-size curvy hourglass proportions, similar front-facing standing catalog pose, hands relaxed near hips, product-focused framing from upper body to upper thighs, straight-on camera angle. Do not copy the original person's face, identity, tattoos, skin marks, or recognizable features.",
+    },
   };
 }
 
@@ -138,9 +154,18 @@ function parseAnalysis(
     );
     if (descriptionRu.length < 20) return null;
 
+    const sourceModelRaw = parsed.sourceModel;
+    const sourceModel =
+      sourceModelRaw === null || sourceModelRaw === undefined
+        ? null
+        : typeof sourceModelRaw === "object"
+          ? sourceModelRaw
+          : null;
+
     const result = productDescriptionAnalysisSchema.safeParse({
       ...parsed,
       descriptionRu,
+      sourceModel,
       accentColors: Array.isArray(parsed.accentColors)
         ? parsed.accentColors.filter((v): v is string => typeof v === "string")
         : [],

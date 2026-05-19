@@ -17,7 +17,7 @@ const SCENARIO_OPTIONS: {
   {
     id: "lingerie",
     label: "Бельё / купальники",
-    hint: "Только 18+, нейтральная взрослая каталожная подача",
+    hint: "Только 18+, нейтральная взрослая подача для карточки товара",
   },
   {
     id: "jewelry",
@@ -39,12 +39,14 @@ type ModelScenarioSelectorProps = {
   value: ModelCategoryContext;
   modelAge: number;
   onChange: (value: ModelCategoryContext) => void;
+  disabled?: boolean;
 };
 
 export function ModelScenarioSelector({
   value,
   modelAge,
   onChange,
+  disabled = false,
 }: ModelScenarioSelectorProps) {
   const isMinor = !isAdultModelAge(modelAge);
 
@@ -59,6 +61,7 @@ export function ModelScenarioSelector({
         disabled: isMinor && opt.id === "lingerie",
       }))}
       onChange={onChange}
+      disabled={disabled}
     />
   );
 }

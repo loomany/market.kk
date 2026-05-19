@@ -2,6 +2,8 @@ import type {
   ProductDescriptionAnalysis,
   ProductDescriptionAnalysisDebug,
 } from "@/lib/ai/productDescriptionAnalysisSchemas";
+import { finalizeSourceModel } from "@/lib/ai/sourceModelPostProcess";
+import { garmentPhotoTypeFromSourcePresentation } from "@/lib/studio/garmentPhotoTypeFromPresentation";
 
 export type { ProductDescriptionAnalysisDebug };
 
@@ -16,11 +18,15 @@ const ON_MODEL_TEXT_SIGNALS_RU = [
   "грудь",
   "живот",
   "рука",
+  "нога",
   "бедра",
   "плечо",
   "торс",
   "талия",
   "кожа",
+  "лицо",
+  "манекен",
+  "человек",
 ] as const;
 
 const ON_MODEL_TEXT_SIGNALS_EN = [
@@ -29,6 +35,7 @@ const ON_MODEL_TEXT_SIGNALS_EN = [
   "worn on",
   "wearing",
   "human body",
+  "mannequin",
   "torso",
   "skin",
   "body",
@@ -39,7 +46,35 @@ const ON_MODEL_TEXT_SIGNALS_EN = [
   "belly",
   "shoulder",
   "arm",
+  "leg",
+  "face",
   "model",
+] as const;
+
+const FLAT_LAY_TEXT_SIGNALS_RU = [
+  "flat lay",
+  "flat-lay",
+  "на вешалке",
+  "вешалк",
+  "лежит",
+  "на полу",
+  "на столе",
+  "отдельно",
+  "без модели",
+  "без тела",
+] as const;
+
+const FLAT_LAY_TEXT_SIGNALS_EN = [
+  "flat lay",
+  "flat-lay",
+  "on hanger",
+  "hanging",
+  "on floor",
+  "on table",
+  "laid flat",
+  "product only",
+  "no model",
+  "no body",
 ] as const;
 
 export function textSignalsOnModel(text: string): boolean {
@@ -48,6 +83,24 @@ export function textSignalsOnModel(text: string): boolean {
     ON_MODEL_TEXT_SIGNALS_RU.some((signal) => normalized.includes(signal)) ||
     ON_MODEL_TEXT_SIGNALS_EN.some((signal) => normalized.includes(signal))
   );
+}
+
+function textSignalsFlatLay(text: string): boolean {
+  const normalized = text.toLowerCase();
+  return (
+    FLAT_LAY_TEXT_SIGNALS_RU.some((signal) => normalized.includes(signal)) ||
+    FLAT_LAY_TEXT_SIGNALS_EN.some((signal) => normalized.includes(signal))
+  );
+}
+
+function syncGarmentPhotoTypeFromPresentation(
+  analysis: ProductDescriptionAnalysis
+): ProductDescriptionAnalysis {
+  const garmentPhotoType = garmentPhotoTypeFromSourcePresentation(
+    analysis.sourcePresentation
+  );
+  if (analysis.garmentPhotoType === garmentPhotoType) return analysis;
+  return { ...analysis, garmentPhotoType };
 }
 
 export function applyProductDescriptionSafetyRules(
@@ -67,13 +120,51 @@ export function applyProductDescriptionSafetyRules(
     rawVisionAnswer ?? "",
   ].join("\n");
   const onModelSignals = textSignalsOnModel(corpus);
+  const flatLaySignals = textSignalsFlatLay(corpus);
 
   let next: ProductDescriptionAnalysis = { ...analysis };
   let correctedBySafetyRule = false;
   const postProcessingOverrides: string[] = [];
   let reason: string | null = null;
 
-  if (
+  if (onModelSignals) {
+    if (next.sourcePresentation !== "on-model") {
+      next = {
+        ...next,
+        sourcePresentation: "on-model",
+        garmentPhotoType: "model",
+      };
+      correctedBySafetyRule = true;
+      postProcessingOverrides.push(
+        "on-model body signals → sourcePresentation on-model, garmentPhotoType model"
+      );
+      reason =
+        "Visible body, skin, or worn garment on person/mannequin — classified as on-model.";
+    } else if (next.garmentPhotoType !== "model") {
+      next = { ...next, garmentPhotoType: "model" };
+      correctedBySafetyRule = true;
+      postProcessingOverrides.push("on-model → garmentPhotoType model");
+    }
+  } else if (
+    flatLaySignals &&
+    next.sourcePresentation !== "on-model"
+  ) {
+    if (next.sourcePresentation !== "flat-lay") {
+      next = {
+        ...next,
+        sourcePresentation: "flat-lay",
+        garmentPhotoType: "flat-lay",
+      };
+      correctedBySafetyRule = true;
+      postProcessingOverrides.push(
+        "flat-lay signals → sourcePresentation flat-lay, garmentPhotoType flat-lay"
+      );
+      reason = "Garment shown separately without body — flat-lay.";
+    } else if (next.garmentPhotoType !== "flat-lay") {
+      next = { ...next, garmentPhotoType: "flat-lay" };
+      postProcessingOverrides.push("flat-lay → garmentPhotoType flat-lay");
+    }
+  } else if (
     next.sourcePresentation === "on-model" &&
     next.garmentPhotoType === "flat-lay"
   ) {
@@ -84,35 +175,12 @@ export function applyProductDescriptionSafetyRules(
       "sourcePresentation is on-model but garmentPhotoType was flat-lay; corrected to model.";
   }
 
-  const forceLingerieOnModel =
-    next.categoryContext === "lingerie" &&
-    onModelSignals &&
-    (next.sourcePresentation !== "on-model" ||
-      next.garmentPhotoType === "flat-lay");
-
-  if (forceLingerieOnModel) {
-    next = {
-      ...next,
-      sourcePresentation: "on-model",
-      garmentPhotoType: "model",
-    };
-    correctedBySafetyRule = true;
+  const synced = syncGarmentPhotoTypeFromPresentation(next);
+  if (synced.garmentPhotoType !== next.garmentPhotoType) {
     postProcessingOverrides.push(
-      "lingerie + on-model signals → sourcePresentation on-model, garmentPhotoType model"
+      `garmentPhotoType synced from sourcePresentation → ${synced.garmentPhotoType}`
     );
-    reason =
-      "Garment is worn on a visible human torso with skin, chest, waist and hand visible, so source is on-model.";
-  } else if (
-    !correctedBySafetyRule &&
-    next.categoryContext === "lingerie" &&
-    next.sourcePresentation === "on-model" &&
-    next.garmentPhotoType === "auto"
-  ) {
-    next = { ...next, garmentPhotoType: "model" };
-    correctedBySafetyRule = true;
-    postProcessingOverrides.push("lingerie on-model → garmentPhotoType model");
-    reason =
-      "Lingerie on-model presentation; garmentPhotoType set to model for try-on.";
+    next = synced;
   }
 
   if (
@@ -125,12 +193,17 @@ export function applyProductDescriptionSafetyRules(
     postProcessingOverrides.push("setType unknown → bra_brief_set");
   }
 
-  if (
-    next.categoryContext === "lingerie" &&
-    next.productCategory === "auto"
-  ) {
-    next = { ...next, productCategory: "one-pieces" };
-    postProcessingOverrides.push("lingerie productCategory auto → one-pieces");
+  const finalizedSourceModel = finalizeSourceModel({
+    sourcePresentation: next.sourcePresentation,
+    sourceModel: next.sourceModel,
+  });
+  if (finalizedSourceModel !== next.sourceModel) {
+    if (next.sourceModel && !finalizedSourceModel) {
+      postProcessingOverrides.push("sourceModel cleared (empty or invalid)");
+    } else if (next.sourceModel?.promptEn !== finalizedSourceModel?.promptEn) {
+      postProcessingOverrides.push("sourceModel.promptEn rebuilt/sanitized");
+    }
+    next = { ...next, sourceModel: finalizedSourceModel };
   }
 
   return {

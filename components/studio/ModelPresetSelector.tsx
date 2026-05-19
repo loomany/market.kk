@@ -12,6 +12,7 @@ import {
   MODEL_AGE_MIN,
   sanitizeModelSettingsForAge,
 } from "@/lib/ai/modelAge";
+import { withLingerieModelDefaults } from "@/lib/studio/lingerieTryOnDefaults";
 import {
   FAL_MODEL_ASPECT_RATIO_OPTIONS,
   FAL_MODEL_RESOLUTION_OPTIONS,
@@ -46,6 +47,8 @@ type ModelPresetSelectorProps = {
   onOutputSizeChange: (patch: Partial<ModelOutputSizeSelection>) => void;
   /** Locks gender/body/crop while SaaS pipeline generates a model */
   settingsLocked?: boolean;
+  /** Shown over parameters while locked (e.g. product vision analysis) */
+  settingsLockMessage?: string;
 };
 
 export type ModelAdvancedControlsProps = {
@@ -107,6 +110,7 @@ function SelectField<T extends string>({
   options,
   onChange,
   placeholder = "Выберите…",
+  disabled = false,
 }: {
   label: string;
   description?: string;
@@ -119,6 +123,7 @@ function SelectField<T extends string>({
   }[];
   onChange: (value: T) => void;
   placeholder?: string;
+  disabled?: boolean;
 }) {
   return (
     <SettingField label={label} description={description}>
@@ -126,6 +131,7 @@ function SelectField<T extends string>({
         triggerClassName="rounded-[12px] font-medium"
         placeholder={placeholder}
         menuMatchTriggerWidth
+        disabled={disabled}
         value={value}
         options={options.map((opt) => ({
           value: opt.id,
@@ -265,6 +271,7 @@ function SelectWithCustomField<T extends string>({
         placeholder={placeholder}
         value={value}
         options={options}
+        disabled={disabled}
         onChange={onChange}
       />
       {isCustom ? (
@@ -314,6 +321,29 @@ const CROP_OPTIONS: { id: ModelCrop; label: string; hint: string }[] = [
   },
 ];
 
+const LINGERIE_CROP_OPTIONS: { id: ModelCrop; label: string; hint: string }[] = [
+  {
+    id: "upper-thigh",
+    label: "До верхней части бедра",
+    hint: "Каталожный кадр белья: голова, весь комплект, верх бёдер — рекомендуемый формат",
+  },
+  {
+    id: "upper-body",
+    label: "По пояс",
+    hint: "Только верх тела — если низ комплекта не нужен в кадре",
+  },
+  {
+    id: "full-body",
+    label: "В полный рост",
+    hint: "Весь силуэт с ногами — только если нужен полный рост",
+  },
+  {
+    id: MODEL_PARAM_CUSTOM,
+    label: MODEL_CUSTOM_SELECT_OPTION.label,
+    hint: MODEL_CUSTOM_SELECT_OPTION.hint,
+  },
+];
+
 function hintForOption<T extends string>(
   options: { id: T; hint: string }[],
   value: T
@@ -327,10 +357,13 @@ export function ModelPresetSelector({
   outputSize,
   onOutputSizeChange,
   settingsLocked = false,
+  settingsLockMessage,
 }: ModelPresetSelectorProps) {
   const patch = (partial: Partial<ModelGenerationSettings>) =>
     onSettingsChange(
-      sanitizeModelSettingsForAge({ ...settings, ...partial })
+      withLingerieModelDefaults(
+        sanitizeModelSettingsForAge({ ...settings, ...partial })
+      )
     );
   const isMinor = !isAdultModelAge(settings.modelAge);
   const isLingerieScenario = settings.categoryContext === "lingerie";
@@ -345,7 +378,7 @@ export function ModelPresetSelector({
     settings.crop === MODEL_PARAM_CUSTOM
       ? settings.cropCustom.trim() || MODEL_CUSTOM_SELECT_OPTION.hint
       : isLingerieScenario
-        ? "Для белья — по пояс, стоя; низ как брифы, не шорты. Полный рост — только если нужен весь комплект в кадре."
+        ? hintForOption(LINGERIE_CROP_OPTIONS, settings.crop)
         : hintForOption(CROP_OPTIONS, settings.crop);
 
   const isPromptLocked = settingsLocked;
@@ -355,37 +388,52 @@ export function ModelPresetSelector({
     : "Формат кадра для карточки.";
 
   return (
-    <section className="space-y-6">
-      <header>
+    <section className="relative space-y-6">
+      {isPromptLocked && settingsLockMessage ? (
+        <div
+          className="absolute inset-0 z-10 flex items-center justify-center rounded-[14px] bg-white/80 px-4 backdrop-blur-[2px]"
+          role="status"
+          aria-live="polite"
+        >
+          <p className="text-center text-sm font-medium leading-5 text-teal-950">
+            {settingsLockMessage}
+          </p>
+        </div>
+      ) : null}
+
+      <header
+        className={isPromptLocked ? "pointer-events-none opacity-50" : undefined}
+      >
         <h3 className="text-sm font-semibold text-slate-950">
           AI-модель для одежды
         </h3>
         <p className="mt-1 text-xs leading-5 text-slate-500">
-          AI создаст модель автоматически. Выберите пол, национальность, тип
-          фигуры, кадр и формат — затем нажмите «Создать фото на модели».
+          {isLingerieScenario
+            ? "AI создаст модель автоматически. Выберите национальность, тип фигуры, кадр и формат — затем нажмите «Создать фото на модели»."
+            : "AI создаст модель автоматически. Выберите пол, национальность, тип фигуры, кадр и формат — затем нажмите «Создать фото на модели»."}
         </p>
       </header>
 
-      {isLingerieScenario ? (
-        <p className="rounded-[14px] border border-teal-100 bg-teal-50/80 px-3 py-2.5 text-xs leading-5 text-teal-950">
-          На этом шаге модель в студийном белье (общий комплект, не ваш SKU с
-          карточки). Ваш товар с фото слева накладывается на шаге «Примерка».
-          Поза с товара — только положение тела.
-        </p>
-      ) : null}
-
-      <div className="space-y-4">
+      <div
+        className={cn(
+          "space-y-4",
+          isPromptLocked && "pointer-events-none select-none opacity-50"
+        )}
+      >
         <span className="block px-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
           Параметры съёмки
         </span>
         <div className="flex flex-col gap-4">
-          <SelectField
-            label="Пол модели"
-            description={hintForOption(GENDER_OPTIONS, settings.gender)}
-            value={settings.gender}
-            options={GENDER_OPTIONS}
-            onChange={(gender) => patch({ gender })}
-          />
+          {!isLingerieScenario ? (
+            <SelectField
+              label="Пол модели"
+              description={hintForOption(GENDER_OPTIONS, settings.gender)}
+              value={settings.gender}
+              options={GENDER_OPTIONS}
+              disabled={isPromptLocked}
+              onChange={(gender) => patch({ gender })}
+            />
+          ) : null}
           <SettingField
             label="Национальность модели"
             description="Например: казахская, славянская, азиатская. Если не указано — AI подберёт нейтральную коммерческую внешность."
@@ -425,41 +473,41 @@ export function ModelPresetSelector({
             placeholder="Выберите кадр"
             value={settings.crop}
             customText={settings.cropCustom}
-            options={CROP_OPTIONS.map((item) => ({
-              id: item.id,
-              label: item.label,
-              shortHint:
-                item.id === MODEL_PARAM_CUSTOM
-                  ? MODEL_CUSTOM_SELECT_OPTION.shortHint
-                  : undefined,
-            }))}
+            options={(isLingerieScenario ? LINGERIE_CROP_OPTIONS : CROP_OPTIONS).map(
+              (item) => ({
+                id: item.id,
+                label: item.label,
+                shortHint:
+                  item.id === MODEL_PARAM_CUSTOM
+                    ? MODEL_CUSTOM_SELECT_OPTION.shortHint
+                    : undefined,
+              })
+            )}
             customPlaceholder="Например: по колено, модель на стуле"
             disabled={isPromptLocked}
-            onChange={(crop) => patch({ crop })}
+            onChange={(crop) => patch({ crop, cropCustom: "" })}
             onCustomTextChange={(cropCustom) => patch({ cropCustom })}
           />
         </div>
       </div>
 
-      <div className="space-y-4 border-t border-border/50 pt-5">
+      <div
+        className={cn(
+          "space-y-4 border-t border-border/50 pt-5",
+          isPromptLocked && "pointer-events-none select-none opacity-50"
+        )}
+      >
         <SelectField
           label="Соотношение сторон"
           description={aspectRatioDescription}
           placeholder="Выберите формат"
           value={outputSize.aspectRatio}
           options={FAL_MODEL_ASPECT_RATIO_OPTIONS}
+          disabled={isPromptLocked}
           onChange={(aspectRatio) =>
             onOutputSizeChange({ aspectRatio: aspectRatio as FalModelAspectRatio })
           }
         />
-        <SettingField
-          label="Разрешение"
-          description="По умолчанию 2K — лучше для кружева и мелких деталей."
-        >
-          <p className="rounded-[12px] border border-slate-200/80 bg-slate-50/80 px-3 py-2.5 text-sm font-medium text-slate-900">
-            2K
-          </p>
-        </SettingField>
       </div>
 
     </section>

@@ -126,7 +126,12 @@ function coerceGenerationSettings(
     readEnum(raw.pose, ["front", "slight-angle", MODEL_PARAM_CUSTOM] as const) ??
     "front";
   const crop =
-    readEnum(raw.crop, ["full-body", "upper-body", MODEL_PARAM_CUSTOM] as const) ??
+    readEnum(raw.crop, [
+      "full-body",
+      "upper-body",
+      "upper-thigh",
+      MODEL_PARAM_CUSTOM,
+    ] as const) ??
     "full-body";
   const background =
     readEnum(raw.background, ["white", "light-gray", "studio"] as const) ?? "white";

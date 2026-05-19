@@ -1,6 +1,10 @@
 import type { ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
+import {
+  SaasPipelineCountdown,
+  SAAS_PIPELINE_COUNTDOWN_SEC,
+} from "@/components/studio/SaasPipelineCountdown";
 import { cn } from "@/lib/utils";
 
 /** Общая шапка колонки студии (как у шага «Фото товара») */
@@ -21,17 +25,38 @@ type PreviewCardProps = {
   loadingDetail?: string | null;
   /** Shown under loadingDetail when preview already has image(s) */
   loadingSubdetail?: string | null;
+  loadingVariant?: "spinner" | "countdown";
+  countdownSeconds?: number;
+  countdownLabel?: string;
+  /** Fixed 3:4 viewport so paired studio cards align in a row */
+  catalogViewport?: boolean;
+  className?: string;
 };
 
 function PreviewLoadingOverlay({
   detail,
   subdetail,
   fullBleed,
+  variant = "spinner",
+  countdownSeconds = SAAS_PIPELINE_COUNTDOWN_SEC,
+  countdownLabel,
 }: {
   detail: string;
   subdetail?: string | null;
   fullBleed?: boolean;
+  variant?: "spinner" | "countdown";
+  countdownSeconds?: number;
+  countdownLabel?: string;
 }) {
+  if (variant === "countdown" && !fullBleed) {
+    return (
+      <SaasPipelineCountdown
+        totalSeconds={countdownSeconds}
+        label={countdownLabel ?? detail}
+      />
+    );
+  }
+
   return (
     <div
       className={cn(
@@ -63,6 +88,11 @@ export function PreviewCard({
   loading = false,
   loadingDetail = null,
   loadingSubdetail = null,
+  loadingVariant = "spinner",
+  countdownSeconds = SAAS_PIPELINE_COUNTDOWN_SEC,
+  countdownLabel,
+  catalogViewport = false,
+  className,
 }: PreviewCardProps) {
   const hasPreview = Boolean(content || url);
   const loadingText = loadingDetail?.trim() || "Генерируем…";
@@ -73,15 +103,52 @@ export function PreviewCard({
   return (
     <div
       className={cn(
-        "flex h-full min-h-0 flex-col overflow-hidden rounded-[20px] border border-slate-200/90 bg-white shadow-sm"
+        "flex h-full min-h-0 flex-col overflow-hidden rounded-[20px] border border-slate-200/90 bg-white shadow-sm",
+        className
       )}
     >
       <div className={cn(studioColumnHeaderClass, "shrink-0 justify-between")}>
         <p className={studioColumnTitleClass}>{title}</p>
         {badge ? <Badge variant="violet">{badge}</Badge> : null}
       </div>
-      <div className="relative flex min-h-[260px] flex-1 flex-col border-t border-border bg-slate-50">
-        {content ? (
+      <div
+        className={cn(
+          "relative border-t border-border bg-slate-50",
+          catalogViewport
+            ? "aspect-[3/4] w-full"
+            : "flex min-h-[260px] flex-1 flex-col"
+        )}
+      >
+        {catalogViewport ? (
+          <div className="absolute inset-0 flex flex-col overflow-hidden">
+            {content ? (
+              <div className="flex min-h-0 flex-1 flex-col">{content}</div>
+            ) : url ? (
+              <div className="flex flex-1 items-center justify-center p-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={url}
+                  alt={`Предпросмотр: ${title}`}
+                  className="max-h-full max-w-full object-contain"
+                />
+              </div>
+            ) : loading ? (
+              <PreviewLoadingOverlay
+                detail={loadingText}
+                subdetail={subdetail}
+                variant={loadingVariant}
+                countdownSeconds={countdownSeconds}
+                countdownLabel={countdownLabel}
+              />
+            ) : (
+              <div className="flex flex-1 items-center justify-center p-4">
+                <p className="text-center text-sm leading-6 text-slate-500">
+                  {empty}
+                </p>
+              </div>
+            )}
+          </div>
+        ) : content ? (
           content
         ) : url ? (
           <div className="flex flex-1 items-center justify-center p-2">
@@ -93,17 +160,24 @@ export function PreviewCard({
             />
           </div>
         ) : loading ? (
-          <PreviewLoadingOverlay detail={loadingText} subdetail={subdetail} />
+          <PreviewLoadingOverlay
+            detail={loadingText}
+            subdetail={subdetail}
+            variant={loadingVariant}
+            countdownSeconds={countdownSeconds}
+            countdownLabel={countdownLabel}
+          />
         ) : (
           <div className="flex flex-1 items-center justify-center p-4 text-center text-sm leading-6 text-slate-500">
             {empty}
           </div>
         )}
-        {loading && hasPreview ? (
+        {loading && hasPreview && loadingVariant === "spinner" ? (
           <PreviewLoadingOverlay
             detail={loadingText}
             subdetail={subdetail}
             fullBleed
+            variant="spinner"
           />
         ) : null}
       </div>

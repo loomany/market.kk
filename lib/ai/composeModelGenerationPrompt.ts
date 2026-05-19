@@ -15,9 +15,18 @@ import {
 import { isFullBodyCrop } from "@/lib/ai/modelFraming";
 import { isAdultModelAge } from "@/lib/ai/modelAge";
 import {
+  lingerieFullBodyFootwearGuidance,
+  shouldApplyLingerieFullBodyHeels,
+} from "@/lib/ai/lingerieFullBodyFootwear";
+import {
   lingerieBottomCutGuidance,
   lingerieModelPoseGuidance,
+  MODEL_GENERATION_NO_GARMENT_COPY_RULE,
 } from "@/lib/ai/modelIdentityPipeline";
+import {
+  SOURCE_MODEL_GENERATION_RULE,
+  SOURCE_MODEL_LINGERIE_NEUTRAL_BASE_RULE,
+} from "@/lib/ai/sourceModelPromptRules";
 
 const ROUTE_ID = "/api/ai/generate-model";
 const ESTIMATED_COMPOSE_COST_USD = 0.012;
@@ -117,6 +126,7 @@ function hardRulesFor(
     "End with a concise 'Do not generate:' negative list (watermark, text, logo, bad anatomy, extra limbs, blurry).",
     "Commercial e-commerce catalog only — photorealistic, not cartoon.",
     "Never invent product lace, colors, or garment details the user did not specify.",
+    MODEL_GENERATION_NO_GARMENT_COPY_RULE,
     "No text, watermark, or logo on the image.",
     "Hands must not cover torso, chest, waist, hips, or garment areas needed for virtual try-on.",
   ];
@@ -125,19 +135,27 @@ function hardRulesFor(
     rules.push(
       "Mandatory full head-to-toe framing: entire head, face, hair, and feet visible — never portrait-only or cropped forehead/feet."
     );
+  } else if (request.crop === "upper-thigh") {
+    rules.push(
+      "Mandatory lingerie catalog framing: full head and face visible, entire bra and brief in frame, crop ends around upper-mid thigh — not full-body, not waist-only, never crop bra, briefs, forehead, or chin."
+    );
   } else if (request.crop === "upper-body") {
     rules.push(
       "Mandatory waist-up / torso-to-upper-thigh framing: full head, full face, forehead, hair, shoulders, torso, waist and hips visible — never crop eyes, forehead, top of head, chin, hands, waist, hips, or garment areas."
     );
   }
 
+  const neutralBase = options?.neutralBaseForTryOn ?? false;
+
   if (request.shortAiSummaryEn?.trim()) {
     rules.push(
-      `Product analysis summary (high priority): ${request.shortAiSummaryEn.trim()}`
+      neutralBase
+        ? `Try-on framing context only (do not draw garment): ${request.shortAiSummaryEn.trim()}`
+        : `Product analysis summary (high priority): ${request.shortAiSummaryEn.trim()}`
     );
   }
 
-  if (request.productDescriptionRu?.trim()) {
+  if (!neutralBase && request.productDescriptionRu?.trim()) {
     rules.push(
       `Merchant product description (highest priority): ${request.productDescriptionRu.trim()}`
     );
@@ -147,7 +165,13 @@ function hardRulesFor(
     rules.push(`Product set type: ${request.productSetType}.`);
   }
 
-  if (request.productSourcePresentation === "on-model") {
+  if (request.sourceModelPromptEn?.trim()) {
+    rules.push(SOURCE_MODEL_GENERATION_RULE);
+    rules.push(`Source body/pose reference: ${request.sourceModelPromptEn.trim()}`);
+    if (options?.neutralBaseForTryOn && request.categoryContext === "lingerie") {
+      rules.push(SOURCE_MODEL_LINGERIE_NEUTRAL_BASE_RULE);
+    }
+  } else if (request.productSourcePresentation === "on-model") {
     rules.push(
       "Source product photo shows garment worn on a body — generate model suitable for try-on transfer."
     );
@@ -159,12 +183,17 @@ function hardRulesFor(
     );
   }
 
+  if (shouldApplyLingerieFullBodyHeels(request)) {
+    rules.push(lingerieFullBodyFootwearGuidance());
+  }
+
   if (request.categoryContext === "lingerie") {
     rules.push("Adult 18+ only, non-explicit, editorial lingerie/swim catalog styling.");
     if (options?.neutralBaseForTryOn) {
       rules.push(
-        "Neutral bodysuit base for try-on pipeline — customer's product colors come only from try-on, not this generation."
+        "Plain seamless neutral bra and brief base for try-on — no lace, no floral pattern, no turquoise or green accents on the base model."
       );
+      rules.push(MODEL_GENERATION_NO_GARMENT_COPY_RULE);
     } else {
       rules.push(
         "One cohesive lingerie or swimwear set in a single color and design for catalog consistency."
@@ -197,13 +226,13 @@ function hardRulesFor(
     );
   }
 
-  if (request.productMustPreserve?.length) {
+  if (!neutralBase && request.productMustPreserve?.length) {
     rules.push(
       `Must preserve for garment transfer: ${request.productMustPreserve.join("; ")}.`
     );
   }
 
-  if (request.productFitNotes?.length) {
+  if (!neutralBase && request.productFitNotes?.length) {
     rules.push(`Fit notes: ${request.productFitNotes.join("; ")}.`);
   }
 

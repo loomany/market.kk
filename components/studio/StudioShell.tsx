@@ -46,8 +46,18 @@ import {
   composeExactProductCard,
   scenePresetToExactBackground,
 } from "@/lib/studio/exactProductCard";
-import { estimateTryOnOnlyCostUsd } from "@/lib/studio/clothingTryOnEstimates";
-import { LINGERIE_TRYON_DEFAULTS } from "@/lib/studio/lingerieTryOnDefaults";
+import {
+  estimateTryOnOnlyCostUsd,
+  formatSaasPipelineCostKztRange,
+  SAAS_MODEL_GENERATION_COUNTDOWN_SEC,
+} from "@/lib/studio/clothingTryOnEstimates";
+import { mapSourceModelToGenerationSettings } from "@/lib/studio/mapSourceModelToGenerationSettings";
+import { isSourceModelPopulated } from "@/lib/ai/sourceModelPostProcess";
+import {
+  LINGERIE_TRYON_DEFAULTS,
+  withLingerieModelDefaults,
+} from "@/lib/studio/lingerieTryOnDefaults";
+import { applyDefaultLingerieCrop } from "@/lib/studio/lingerieCropDefaults";
 import { productAnalysisForModelGeneration } from "@/lib/ai/productAnalysisShared";
 import {
   mapApiImagesToStudioResults,
@@ -84,7 +94,8 @@ import {
   ModelAdvancedControls,
   ModelPresetSelector,
 } from "./ModelPresetSelector";
-import { GarmentSettingsPanel } from "./GarmentSettingsPanel";
+import { GarmentPhotoTypeAdvancedSelect } from "./GarmentSettingsPanel";
+import { garmentPhotoTypeFromSourcePresentation } from "@/lib/studio/garmentPhotoTypeFromPresentation";
 import { ModelScenarioSelector } from "./ModelScenarioSelector";
 import { ProductCheckPanel } from "./ProductCheckPanel";
 import type {
@@ -93,10 +104,12 @@ import type {
 } from "@/lib/ai/productDescriptionAnalysisSchemas";
 import { isConfidentProductAnalysis } from "@/lib/ai/productDescriptionAnalysisSchemas";
 import { applyConfidentProductAnalysis } from "@/lib/studio/applyProductAnalysis";
+import { resolveSourceModelBodyTypeSettings } from "@/lib/studio/mapSourceModelToGenerationSettings";
 import { ProductShotSettingsPanel } from "./ProductShotSettingsPanel";
 import { StudioModeSelector } from "./StudioModeSelector";
+import { downloadImageFile } from "@/lib/studio/downloadImages";
 import { GenerationResultGrid } from "./GenerationResultGrid";
-import { TryOnCostEstimate } from "./TryOnCostEstimate";
+import { TryOnResultActions } from "./TryOnResultActions";
 import {
   PreviewImageCarousel,
   type PreviewCarouselItem,
@@ -114,7 +127,6 @@ import {
   DEFAULT_PRODUCT_SHOT_SETTINGS,
   type GarmentPhotoType,
   type ModelGenerationSettings,
-  type ProductCategory,
   type ProductShotSettings,
   type StudioMode,
   type StudioResultImage,
@@ -246,8 +258,6 @@ export function StudioShell({
   const productPhotosRef = useRef<StudioProductPhoto[]>([]);
   const [modelFile, setModelFile] = useState<File | null>(null);
   const [modelPreviewUrl, setModelPreviewUrl] = useState<string | null>(null);
-  const [productCategory, setProductCategory] =
-    useState<ProductCategory>("auto");
   const [garmentPhotoType, setGarmentPhotoType] =
     useState<GarmentPhotoType>("auto");
   const [productDescription, setProductDescription] = useState("");
@@ -257,14 +267,14 @@ export function StudioShell({
   const [productAnalysisError, setProductAnalysisError] = useState<string | null>(
     null
   );
-  const [productSettingsApplied, setProductSettingsApplied] = useState<
-    boolean | null
-  >(null);
   const [productAnalysisDebug, setProductAnalysisDebug] =
     useState<ProductDescriptionAnalysisDebug | null>(null);
   const [userEditedProductDescription, setUserEditedProductDescription] =
     useState(false);
   const manualProductSettingsOverride = useRef(false);
+  const manualCropOverride = useRef(false);
+  const skipCropOverrideMark = useRef(false);
+  const manualGarmentPhotoTypeOverride = useRef(false);
   const productAnalysisRequestId = useRef(0);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const showDevControls = isStudioAiDebugEnabled();
@@ -446,24 +456,26 @@ export function StudioShell({
     setProductAnalysis(null);
     setProductAnalysisDebug(null);
     setProductAnalysisError(null);
-    setProductSettingsApplied(null);
     setUserEditedProductDescription(false);
     manualProductSettingsOverride.current = false;
-    setProductCategory("auto");
+    manualCropOverride.current = false;
+    manualGarmentPhotoTypeOverride.current = false;
     setGarmentPhotoType("auto");
   }, []);
 
-  const handleProductDescriptionChange = useCallback((value: string) => {
-    setProductDescription(value);
-    setUserEditedProductDescription(true);
-  }, []);
+  const applyLingerieCropIfAllowed = useCallback(
+    (settings: ModelGenerationSettings) =>
+      manualCropOverride.current
+        ? settings
+        : applyDefaultLingerieCrop(settings),
+    []
+  );
 
   const runProductDescriptionAnalysis = useCallback(
     async (file: File): Promise<ProductDescriptionAnalysis | null> => {
       const requestId = ++productAnalysisRequestId.current;
       setProductAnalyzing(true);
       setProductAnalysisError(null);
-      setProductSettingsApplied(null);
 
       try {
         const formData = new FormData();
@@ -496,44 +508,42 @@ export function StudioShell({
         setUserEditedProductDescription(false);
 
         const confident = isConfidentProductAnalysis(analysis.confidence);
-        setProductSettingsApplied(confident);
+        const hasSourceModel =
+          analysis.sourcePresentation === "on-model" &&
+          isSourceModelPopulated(analysis.sourceModel);
 
-        if (confident && !manualProductSettingsOverride.current) {
+        if (!manualProductSettingsOverride.current) {
+          skipCropOverrideMark.current = true;
           setModelSettings((prev) => {
-            const applied = applyConfidentProductAnalysis({
-              analysis,
-              modelSettings: prev,
-            });
-            let next = applied.modelSettings;
-            if (
-              analysis.categoryContext === "lingerie" &&
-              next.crop === "full-body"
-            ) {
-              next = { ...next, crop: "upper-body" };
+            let next = prev;
+            if (confident) {
+              const applied = applyConfidentProductAnalysis({
+                analysis,
+                modelSettings: prev,
+              });
+              next = applied.modelSettings;
+              if (analysis.categoryContext === "lingerie") {
+                next = withLingerieModelDefaults(next);
+                next = applyLingerieCropIfAllowed(next);
+              }
+            } else if (hasSourceModel && analysis.sourceModel) {
+              next = {
+                ...next,
+                ...resolveSourceModelBodyTypeSettings(analysis.sourceModel),
+              };
             }
             return next;
           });
-          if (analysis.categoryContext === "lingerie") {
-            setProductCategory(
-              analysis.productCategory === "auto"
-                ? LINGERIE_TRYON_DEFAULTS.productCategory
-                : analysis.productCategory
-            );
+          if (!manualGarmentPhotoTypeOverride.current) {
             setGarmentPhotoType(
-              analysis.sourcePresentation === "on-model" ||
-                analysis.garmentPhotoType === "model"
-                ? "model"
-                : analysis.garmentPhotoType === "auto"
-                  ? LINGERIE_TRYON_DEFAULTS.garmentPhotoType
-                  : analysis.garmentPhotoType
+              garmentPhotoTypeFromSourcePresentation(analysis.sourcePresentation)
             );
+          }
+          if (analysis.categoryContext === "lingerie") {
             setModelOutputSize((prev) => ({
               ...prev,
               resolution: LINGERIE_TRYON_DEFAULTS.modelResolution,
             }));
-          } else {
-            setProductCategory(analysis.productCategory);
-            setGarmentPhotoType(analysis.garmentPhotoType);
           }
         }
         return analysis;
@@ -549,7 +559,7 @@ export function StudioShell({
         }
       }
     },
-    []
+    [applyLingerieCropIfAllowed]
   );
 
   const handleReanalyzeProduct = useCallback(() => {
@@ -971,25 +981,40 @@ export function StudioShell({
 
   const handleModelSettingsChange = useCallback(
     (settings: ModelGenerationSettings) => {
+      if (!skipCropOverrideMark.current) {
+        if (
+          settings.crop !== modelSettings.crop ||
+          settings.cropCustom !== modelSettings.cropCustom
+        ) {
+          manualCropOverride.current = true;
+        }
+      }
+      skipCropOverrideMark.current = false;
+
       const wasLingerie = modelSettings.categoryContext === "lingerie";
       const isLingerie = settings.categoryContext === "lingerie";
       let nextSettings = settings;
 
       if (isLingerie && !wasLingerie) {
-        setProductCategory(LINGERIE_TRYON_DEFAULTS.productCategory);
-        setGarmentPhotoType(LINGERIE_TRYON_DEFAULTS.garmentPhotoType);
         setModelOutputSize((prev) => ({
           ...prev,
           resolution: LINGERIE_TRYON_DEFAULTS.modelResolution,
         }));
-        if (settings.crop === "full-body") {
-          nextSettings = { ...settings, crop: "upper-body" };
-        }
+        nextSettings = applyLingerieCropIfAllowed(nextSettings);
+      }
+
+      if (isLingerie) {
+        nextSettings = withLingerieModelDefaults(nextSettings);
       }
 
       setModelSettings(nextSettings);
     },
-    [modelSettings.categoryContext]
+    [
+      applyLingerieCropIfAllowed,
+      modelSettings.categoryContext,
+      modelSettings.crop,
+      modelSettings.cropCustom,
+    ]
   );
 
   const handleGenerateModel = async (seedOverride?: number) => {
@@ -1007,7 +1032,7 @@ export function StudioShell({
 
     if (!isModelOutputSizeComplete(modelOutputSize)) {
       setModelGenerateError(
-        "Выберите соотношение сторон и разрешение изображения."
+        "Выберите соотношение сторон изображения."
       );
       setModelGenerating(false);
       return;
@@ -1071,12 +1096,9 @@ export function StudioShell({
                 },
                 outputSize: modelOutputSize,
                 modelDescription,
-                productDescriptionRu: productGen.productDescriptionRu,
                 shortAiSummaryEn: productGen.shortAiSummaryEn,
                 productSetType: productGen.productSetType,
                 productSourcePresentation: productGen.productSourcePresentation,
-                productMustPreserve: productGen.productMustPreserve,
-                productFitNotes: productGen.productFitNotes,
                 promptLocale,
                 seed: useSeed,
                 angle,
@@ -1189,11 +1211,11 @@ export function StudioShell({
     const size = isModelOutputSizeComplete(modelOutputSize)
       ? modelOutputSize
       : { ...DEFAULT_MODEL_OUTPUT_SIZE };
-    if (!showAdvancedSettings && size.resolution !== "2K") {
+    if (!showDevControls && size.resolution !== "2K") {
       return { ...size, resolution: "2K" };
     }
     return size;
-  }, [modelOutputSize, showAdvancedSettings]);
+  }, [modelOutputSize, showDevControls]);
 
   const hasUserUploadedModel = useCallback(
     () =>
@@ -1209,6 +1231,9 @@ export function StudioShell({
     appendResults?: boolean;
     analysisOverride?: ProductDescriptionAnalysis | null;
     skipLoadingState?: boolean;
+    /** SaaS orchestrator — model may be created in the same run */
+    modelImageUrlOverride?: string | null;
+    requireExistingModel?: boolean;
   }) => {
     const useSeed = options?.seedOverride ?? generationSeed;
 
@@ -1229,8 +1254,12 @@ export function StudioShell({
       return;
     }
 
-    const resolvedModelUrl = modelFile ? null : resolveModelImageUrl();
-    if (!modelFile && !resolvedModelUrl) {
+    const requireModel = options?.requireExistingModel !== false;
+    const resolvedModelUrl = modelFile
+      ? null
+      : (options?.modelImageUrlOverride?.trim() ||
+          resolveModelImageUrl());
+    if (requireModel && !modelFile && !resolvedModelUrl) {
       if (generatedModelUrl && !isRemoteImageUrl(generatedModelUrl)) {
         setError(
           "Ссылка на AI-модель устарела. Нажмите «Сгенерировать AI-модель» ещё раз или загрузите фото модели."
@@ -1270,8 +1299,8 @@ export function StudioShell({
         productFile,
         modelFile,
         modelImageUrl: resolvedModelUrl,
-        productCategory,
         garmentPhotoType,
+        garmentPhotoTypeManualOverride: manualGarmentPhotoTypeOverride.current,
         categoryContext: modelSettings.categoryContext,
         isLingerie: isLingerieScenario,
         productAnalysis: analysisForTryOn,
@@ -1518,7 +1547,11 @@ export function StudioShell({
         }
       }
 
-      if (!hasUserUploadedModel()) {
+      let modelUrlForTryOn: string | null = null;
+
+      if (hasUserUploadedModel()) {
+        modelUrlForTryOn = modelFile ? null : resolveModelImageUrl();
+      } else {
         const needsFreshModel =
           !generatedModelUrl || !isRemoteImageUrl(generatedModelUrl);
         if (needsFreshModel) {
@@ -1540,8 +1573,20 @@ export function StudioShell({
           );
 
           try {
-            const { url } = await fetchGenerateSingleStudioModel({
+            const hasSourceModel =
+              analysis.sourcePresentation === "on-model" &&
+              isSourceModelPopulated(analysis.sourceModel);
+            const mapped = mapSourceModelToGenerationSettings({
               settings: modelSettings,
+              sourceModel: analysis.sourceModel,
+            });
+            let genSettings = withLingerieModelDefaults(mapped.settings);
+            if (analysis.categoryContext === "lingerie") {
+              genSettings = applyLingerieCropIfAllowed(genSettings);
+            }
+
+            const { url } = await fetchGenerateSingleStudioModel({
+              settings: genSettings,
               outputSize: pipelineSize,
               modelDescription,
               promptLocale,
@@ -1551,8 +1596,10 @@ export function StudioShell({
               productDescription,
               userEditedProductDescription,
               useProductSampleAngles,
+              cameraAnglePromptOverride: mapped.cameraAnglePrompt,
               signal: controller.signal,
             });
+            modelUrlForTryOn = url;
             setGeneratedModelUrl(url);
             setGeneratedModelPreviews([
               { id: angle.key, url, label: angle.label },
@@ -1572,13 +1619,22 @@ export function StudioShell({
             window.clearTimeout(timeoutId);
             setModelGenerating(false);
           }
+        } else {
+          modelUrlForTryOn = resolveModelImageUrl();
         }
+      }
+
+      if (!modelFile && !modelUrlForTryOn) {
+        setError("Не удалось получить изображение модели для примерки.");
+        return;
       }
 
       setTryOnProgress("Переносим товар на модель…");
       await handleGenerateTryOn({
         analysisOverride: analysis,
         skipLoadingState: true,
+        modelImageUrlOverride: modelUrlForTryOn,
+        requireExistingModel: false,
       });
     } finally {
       setLoading(false);
@@ -1597,6 +1653,7 @@ export function StudioShell({
   const hasProductInput = productPhotos.length > 0;
   const primaryBlocker = (() => {
     if (!hasProductInput) return "Сначала загрузите фото.";
+    if (productAnalyzing) return "Идёт AI-анализ товара…";
 
     if (isClothingMode) {
       const anglesError = validateGenerationAngles();
@@ -1628,6 +1685,8 @@ export function StudioShell({
   const PrimaryIcon = isClothingMode ? Wand2 : Camera;
 
   const isLingerieScenario = modelSettings.categoryContext === "lingerie";
+  const finalTryOnResult = results[0] ?? null;
+  const pipelineBusy = isClothingMode && loading;
 
   return (
     <div className="min-h-screen">
@@ -1702,47 +1761,30 @@ export function StudioShell({
                           <ProductCheckPanel
                             hasPhoto={productPhotos.length > 0}
                             description={productDescription}
-                            onDescriptionChange={handleProductDescriptionChange}
                             analyzing={productAnalyzing}
                             error={productAnalysisError}
                             analysis={productAnalysis}
-                            analysisDebug={productAnalysisDebug}
-                            userEditedProductDescription={
-                              userEditedProductDescription
-                            }
-                            settingsApplied={productSettingsApplied}
                             scenario={modelSettings.categoryContext}
-                            productCategory={productCategory}
-                            garmentPhotoType={garmentPhotoType}
                             onReanalyze={handleReanalyzeProduct}
                           />
                           <ModelScenarioSelector
                             value={modelSettings.categoryContext}
                             modelAge={modelSettings.modelAge}
+                            disabled={productAnalyzing}
                             onChange={(categoryContext) => {
                               manualProductSettingsOverride.current = true;
-                              handleModelSettingsChange({
+                              let next: ModelGenerationSettings = {
                                 ...modelSettings,
                                 categoryContext,
-                                ...(categoryContext === "lingerie"
-                                  ? { crop: "full-body" }
-                                  : {}),
-                              });
+                              };
+                              if (categoryContext === "lingerie") {
+                                next = applyLingerieCropIfAllowed(
+                                  withLingerieModelDefaults(next)
+                                );
+                              }
+                              skipCropOverrideMark.current = true;
+                              handleModelSettingsChange(next);
                             }}
-                          />
-                          <GarmentSettingsPanel
-                            embedded
-                            productCategory={productCategory}
-                            onProductCategoryChange={(value) => {
-                              manualProductSettingsOverride.current = true;
-                              setProductCategory(value);
-                            }}
-                            garmentPhotoType={garmentPhotoType}
-                            onGarmentPhotoTypeChange={(value) => {
-                              manualProductSettingsOverride.current = true;
-                              setGarmentPhotoType(value);
-                            }}
-                            lingerieMode={isLingerieScenario}
                           />
                         </div>
                       ) : null}
@@ -1803,21 +1845,64 @@ export function StudioShell({
                                 return next;
                               })
                             }
-                            settingsLocked={loading || modelGenerating}
-                          />
-                          <details
-                            className="mt-6 rounded-[14px] border border-slate-200/80 bg-slate-50/50 px-3 py-2"
-                            open={advancedOpen}
-                            onToggle={(event) =>
-                              setAdvancedOpen(
-                                (event.currentTarget as HTMLDetailsElement).open
-                              )
+                            settingsLocked={
+                              loading || modelGenerating || productAnalyzing
                             }
-                          >
-                            <summary className="cursor-pointer text-sm font-medium text-slate-800">
+                            settingsLockMessage={
+                              productAnalyzing
+                                ? "Идёт AI-анализ товара. Настройки модели откроются после завершения."
+                                : undefined
+                            }
+                          />
+                          <div className="relative mt-6">
+                            {productAnalyzing ? (
+                              <div
+                                className="absolute inset-0 z-10 flex items-center justify-center rounded-[14px] bg-white/80 px-4 backdrop-blur-[2px]"
+                                role="status"
+                                aria-live="polite"
+                              >
+                                <p className="text-center text-sm leading-5 text-slate-700">
+                                  Идёт AI-анализ товара. Дополнительные настройки
+                                  откроются после завершения.
+                                </p>
+                              </div>
+                            ) : null}
+                            <details
+                              className={`rounded-[14px] border border-slate-200/80 bg-slate-50/50 px-3 py-2${
+                                productAnalyzing
+                                  ? " pointer-events-none select-none opacity-60"
+                                  : ""
+                              }`}
+                              open={productAnalyzing ? false : advancedOpen}
+                              onToggle={(event) => {
+                                if (productAnalyzing) {
+                                  event.preventDefault();
+                                  return;
+                                }
+                                setAdvancedOpen(
+                                  (event.currentTarget as HTMLDetailsElement).open
+                                );
+                              }}
+                            >
+                            <summary
+                              className={`text-sm font-medium text-slate-800${
+                                productAnalyzing
+                                  ? " cursor-not-allowed"
+                                  : " cursor-pointer"
+                              }`}
+                            >
                               Дополнительные настройки
                             </summary>
                             <div className="mt-4 space-y-4 border-t border-border/50 pt-4">
+                              {(showAdvancedSettings || showDevControls) && (
+                                <GarmentPhotoTypeAdvancedSelect
+                                  garmentPhotoType={garmentPhotoType}
+                                  onGarmentPhotoTypeChange={(value) => {
+                                    manualGarmentPhotoTypeOverride.current = true;
+                                    setGarmentPhotoType(value);
+                                  }}
+                                />
+                              )}
                               <ModelAdvancedControls
                                 settings={modelSettings}
                                 onSettingsChange={handleModelSettingsChange}
@@ -1893,21 +1978,22 @@ export function StudioShell({
                                   variant="outline"
                                   className="w-full"
                                   disabled={loading || !hasProductInput}
-                                  onClick={() => void handleGenerateTryOn()}
+                                  onClick={() =>
+                                    void handleGenerateTryOn({
+                                      requireExistingModel: true,
+                                    })
+                                  }
                                 >
                                   Только примерка (dev)
                                 </Button>
                               ) : null}
                             </div>
                           </details>
+                          </div>
                         </StudioWorkflowStep>
 
                         <StudioWorkflowStep step={3} label="Создание фото" isLast>
                           <div className="space-y-3">
-                            <TryOnCostEstimate
-                              mockMode={mockMode}
-                              paidAiRunsAllowed={paidAiRunsAllowed}
-                            />
                             <Button
                               className="w-full"
                               size="lg"
@@ -1923,6 +2009,15 @@ export function StudioShell({
                               AI сам создаст модель, перенесёт товар и улучшит
                               финальный кадр.
                             </p>
+                            <p className="text-center text-xs font-medium tabular-nums text-slate-500">
+                              {formatSaasPipelineCostKztRange()}
+                            </p>
+                            {productAnalysis?.sourcePresentation === "on-model" &&
+                            isSourceModelPopulated(productAnalysis.sourceModel) ? (
+                              <p className="text-center text-xs leading-5 text-teal-900">
+                                AI подберёт модель похожей комплекции и позы
+                              </p>
+                            ) : null}
                             {tryOnProgress ? (
                               <p className="rounded-[12px] border border-teal-100 bg-teal-50 px-3 py-2 text-center text-sm text-teal-900">
                                 {tryOnProgress}
@@ -1979,7 +2074,7 @@ export function StudioShell({
             <div
               className={
                 isClothingMode
-                  ? "space-y-4 lg:sticky lg:top-6 lg:z-10 lg:max-h-[calc(100dvh-5rem)] lg:overflow-y-auto lg:overscroll-contain"
+                  ? "space-y-4 lg:sticky lg:top-6 lg:z-10"
                   : "space-y-4"
               }
             >
@@ -1996,63 +2091,90 @@ export function StudioShell({
               ) : null}
 
               {isClothingMode ? (
-                <>
-                <div className="grid items-stretch gap-4 sm:grid-cols-2">
-                  <PreviewCard
-                    title="Товар"
-                    url={
-                      productCarouselItems.length === 1
-                        ? (productCarouselItems[0]?.url ?? null)
-                        : null
-                    }
-                    empty="Загрузите фото товара"
-                    content={
-                      productCarouselItems.length > 1 ? (
-                        <PreviewImageCarousel
-                          items={productCarouselItems}
-                          showDownloadActions={false}
-                          className="min-h-[260px]"
+                <div className="mx-auto w-full max-w-4xl">
+                  <div className="grid grid-cols-1 items-stretch gap-5 sm:grid-cols-2 sm:gap-6">
+                    <div className="flex min-w-0">
+                      <PreviewCard
+                        catalogViewport
+                        className="w-full"
+                        title="Товар"
+                        url={
+                          productCarouselItems.length === 1
+                            ? (productCarouselItems[0]?.url ?? null)
+                            : null
+                        }
+                        empty="Загрузите фото товара"
+                        content={
+                          productCarouselItems.length > 1 ? (
+                            <PreviewImageCarousel
+                              items={productCarouselItems}
+                              showDownloadActions={false}
+                              className="h-full min-h-0"
+                              imageClassName="max-h-full max-w-full object-contain"
+                            />
+                          ) : undefined
+                        }
+                      />
+                    </div>
+                    <div className="flex min-w-0">
+                        <PreviewCard
+                          catalogViewport
+                          className="w-full"
+                          title="AI-модель"
+                          url={
+                            modelCarouselItems.length === 1
+                              ? (modelCarouselItems[0]?.url ?? null)
+                              : null
+                          }
+                          empty="Сгенерируется при создании фото на модели"
+                          loading={modelGenerating}
+                          loadingVariant="countdown"
+                          countdownSeconds={SAAS_MODEL_GENERATION_COUNTDOWN_SEC}
+                          countdownLabel="Создаём AI-модель"
+                          loadingSubdetail={
+                            pipelineBusy && !modelGenerating
+                              ? tryOnProgress
+                              : null
+                          }
+                          content={
+                            modelCarouselItems.length > 1 ? (
+                              <PreviewImageCarousel
+                                items={modelCarouselItems}
+                                showDownloadActions={false}
+                                className="h-full min-h-0"
+                                imageClassName="max-h-full max-w-full object-contain"
+                              />
+                            ) : undefined
+                          }
                         />
-                      ) : undefined
-                    }
-                  />
-                  <PreviewCard
-                    title="AI-модель"
-                    url={
-                      modelCarouselItems.length === 1
-                        ? (modelCarouselItems[0]?.url ?? null)
-                        : null
-                    }
-                    empty="Сгенерируйте или загрузите модель"
-                    loading={modelGenerating}
-                    loadingDetail={modelGenerateProgress}
-                    content={
-                      modelCarouselItems.length > 1 ? (
-                        <PreviewImageCarousel
-                          items={modelCarouselItems}
-                          className="min-h-[260px]"
-                        />
-                      ) : undefined
-                    }
-                    badge={
-                      modelSource === "saved" && savedModelUrl
-                        ? "AI-модель"
-                        : undefined
-                    }
-                  />
+                    </div>
+                    <div className="min-w-0">
+                      <PreviewCard
+                        title="Итоговый результат"
+                        url={finalTryOnResult?.url ?? null}
+                        empty="Нажмите «Создать фото на модели»"
+                        loading={pipelineBusy && !finalTryOnResult?.url}
+                        loadingVariant="countdown"
+                        countdownLabel="Создаём фото на модели"
+                        loadingDetail={tryOnProgress}
+                        footer={
+                          finalTryOnResult ? (
+                            <TryOnResultActions
+                              onDownload={() =>
+                                void downloadImageFile(
+                                  finalTryOnResult.url,
+                                  `${finalTryOnResult.id}.png`
+                                )
+                              }
+                              onStartOver={handleStartOver}
+                            />
+                          ) : undefined
+                        }
+                      />
+                    </div>
+                    <div className="hidden sm:block" aria-hidden />
+                  </div>
                 </div>
-                  <GenerationResultGrid
-                    results={results}
-                    loading={loading}
-                    loadingDetail={tryOnProgress}
-                    isProductShotMode={isProductShotMode}
-                    isClothingTryOnMode
-                    productPreviewUrl={effectiveProductPreviewUrl}
-                    productPreviewItems={productCarouselItems}
-                    onStartOver={handleStartOver}
-                    embedded
-                  />
-                </>
               ) : (
                 <>
                   <PreviewCard

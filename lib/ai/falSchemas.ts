@@ -52,6 +52,9 @@ export type TryOnSuccessResponse = {
     repaired: boolean;
     judgeScore?: number;
     judgeIssues?: string[];
+    repairAttempted?: boolean;
+    repairSucceeded?: boolean;
+    repairErrorReason?: string;
   };
 };
 

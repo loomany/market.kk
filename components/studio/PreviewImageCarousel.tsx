@@ -20,6 +20,7 @@ type PreviewImageCarouselProps = {
   items: PreviewCarouselItem[];
   downloadFilenamePrefix?: string;
   className?: string;
+  imageClassName?: string;
   showDownloadActions?: boolean;
 };
 
@@ -27,6 +28,7 @@ export function PreviewImageCarousel({
   items,
   downloadFilenamePrefix = "vitrina-ai-model",
   className,
+  imageClassName = "max-h-[460px] w-full object-contain",
   showDownloadActions = true,
 }: PreviewImageCarouselProps) {
   const trackRef = useRef<HTMLDivElement>(null);
@@ -134,7 +136,7 @@ export function PreviewImageCarousel({
                 <img
                   src={item.url}
                   alt={item.label}
-                  className="max-h-[460px] w-full object-contain"
+                  className={imageClassName}
                   draggable={false}
                 />
               </div>

@@ -1,57 +1,45 @@
 import type { ProductDescriptionAnalysis } from "@/lib/ai/productDescriptionAnalysisSchemas";
-import { mapCategoryForTryOn } from "@/lib/ai/falSchemas";
-import { resolveTryOnGarmentSettings } from "@/lib/ai/productAnalysisShared";
+import { mapFashnCategoryForTryOn } from "@/lib/ai/productAnalysisShared";
 import type {
   GarmentPhotoType,
   ModelCategoryContext,
   ProductCategory,
 } from "@/components/studio/types";
-import { resolveLingerieTryOnSettings } from "@/lib/studio/resolveLingerieTryOnSettings";
+import { garmentPhotoTypeFromSourcePresentation } from "@/lib/studio/garmentPhotoTypeFromPresentation";
 
 export function resolveStudioTryOnSettings(input: {
   isLingerie: boolean;
-  productCategory: ProductCategory;
   garmentPhotoType: GarmentPhotoType;
+  garmentPhotoTypeManualOverride: boolean;
   categoryContext: ModelCategoryContext;
   productAnalysis: ProductDescriptionAnalysis | null;
 }): {
   productCategory: ProductCategory;
   garmentPhotoType: GarmentPhotoType;
-  fashnCategory: ReturnType<
-    typeof resolveTryOnGarmentSettings
-  >["fashnCategory"];
+  fashnCategory: ReturnType<typeof mapFashnCategoryForTryOn>;
 } {
-  const fromUi = resolveTryOnGarmentSettings(input.productAnalysis, {
-    productCategory: input.productCategory,
-    garmentPhotoType: input.garmentPhotoType,
-    categoryContext: input.categoryContext,
-  });
+  const productCategory: ProductCategory = input.isLingerie
+    ? "auto"
+    : ((input.productAnalysis?.productCategory as ProductCategory) ?? "auto");
 
-  let { productCategory, garmentPhotoType } = fromUi;
-
-  if (
-    garmentPhotoType === "auto" &&
-    input.productAnalysis?.sourcePresentation === "on-model"
-  ) {
-    garmentPhotoType = "model";
-  }
-
-  if (input.isLingerie) {
-    const lingerie = resolveLingerieTryOnSettings({
-      productCategory,
-      garmentPhotoType,
-    });
-    productCategory = lingerie.productCategory;
-    garmentPhotoType =
-      lingerie.garmentPhotoType === "flat-lay" &&
-      input.productAnalysis?.sourcePresentation === "on-model"
-        ? "model"
-        : lingerie.garmentPhotoType;
+  let garmentPhotoType: GarmentPhotoType;
+  if (input.garmentPhotoTypeManualOverride) {
+    garmentPhotoType = input.garmentPhotoType;
+  } else if (input.productAnalysis) {
+    garmentPhotoType = garmentPhotoTypeFromSourcePresentation(
+      input.productAnalysis.sourcePresentation
+    );
+  } else {
+    garmentPhotoType = input.garmentPhotoType;
   }
 
   return {
     productCategory,
     garmentPhotoType,
-    fashnCategory: mapCategoryForTryOn(productCategory),
+    fashnCategory: mapFashnCategoryForTryOn({
+      productCategory,
+      categoryContext: input.categoryContext,
+      productAnalysis: input.productAnalysis,
+    }),
   };
 }

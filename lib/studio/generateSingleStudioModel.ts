@@ -19,6 +19,7 @@ export async function fetchGenerateSingleStudioModel(input: {
   productDescription: string;
   userEditedProductDescription: boolean;
   useProductSampleAngles: boolean;
+  cameraAnglePromptOverride?: string;
   signal?: AbortSignal;
 }): Promise<{ url: string; response: GenerateModelResponse }> {
   const productGen = productAnalysisForModelGeneration(
@@ -39,12 +40,15 @@ export async function fetchGenerateSingleStudioModel(input: {
         },
         outputSize: input.outputSize,
         modelDescription: input.modelDescription,
-        productDescriptionRu: productGen.productDescriptionRu,
         shortAiSummaryEn: productGen.shortAiSummaryEn,
         productSetType: productGen.productSetType,
         productSourcePresentation: productGen.productSourcePresentation,
-        productMustPreserve: productGen.productMustPreserve,
-        productFitNotes: productGen.productFitNotes,
+        sourceModelPromptEn: productGen.sourceModelPromptEn,
+        sourceModelSizeClass: productGen.sourceModelSizeClass,
+        sourceModelPose: productGen.sourceModelPose,
+        sourceModelCameraAngle: productGen.sourceModelCameraAngle,
+        sourceModelHandsPosition: productGen.sourceModelHandsPosition,
+        cameraAnglePromptOverride: input.cameraAnglePromptOverride,
         promptLocale: input.promptLocale,
         seed: input.seed,
         angle: input.angle,

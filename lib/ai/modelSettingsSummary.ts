@@ -16,6 +16,7 @@ const GENDER_LABELS: Record<ModelGenerationSettings["gender"], string> = {
 const CROP_LABELS: Record<ModelGenerationSettings["crop"], string> = {
   "full-body": "в полный рост",
   "upper-body": "по пояс",
+  "upper-thigh": "до верхней части бедра",
   [MODEL_PARAM_CUSTOM]: "свой вариант",
 };
 

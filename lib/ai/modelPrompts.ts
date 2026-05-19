@@ -9,10 +9,16 @@ import {
   lingerieBottomCutGuidance,
   lingerieCatalogOutfitGuidance,
   lingerieModelPoseGuidance,
+  lingerieNeutralBaseOutfitGuidance,
+  MODEL_GENERATION_NO_GARMENT_COPY_RULE,
   neutralBaseOutfitGuidance,
   neutralBaseOutfitLockForEdit,
   shouldUseNeutralBaseModelGeneration,
 } from "@/lib/ai/modelIdentityPipeline";
+import {
+  SOURCE_MODEL_GENERATION_RULE,
+  SOURCE_MODEL_LINGERIE_NEUTRAL_BASE_RULE,
+} from "@/lib/ai/sourceModelPromptRules";
 import { lightingPromptPhrase } from "@/lib/ai/modelLighting";
 import {
   isAdultModelAge,
@@ -22,16 +28,23 @@ import {
   modelAgeYears,
 } from "@/lib/ai/modelAge";
 import { MODEL_PARAM_CUSTOM } from "@/lib/ai/modelCustomParams";
+import {
+  lingerieFullBodyFootwearGuidance,
+  shouldApplyLingerieFullBodyHeels,
+} from "@/lib/ai/lingerieFullBodyFootwear";
 
 function cropPhrase(input: GenerateModelRequest): string {
   if (isFullBodyCrop(input)) {
     return "full-length head-to-toe framing";
   }
+  if (input.crop === "upper-thigh") {
+    return "commercial lingerie catalog crop from full head through upper-mid thighs, entire bra and brief fully visible";
+  }
   if (input.crop === MODEL_PARAM_CUSTOM && input.cropCustom?.trim()) {
     return input.cropCustom.trim();
   }
   if (input.categoryContext === "lingerie" && input.crop === "upper-body") {
-    return "waist-up to upper-thigh catalog crop with full head, full face, torso, waist and hips visible";
+    return "waist-up catalog crop with full head, full face, torso, waist and hips visible";
   }
   return input.crop === "full-body"
     ? "full-length head-to-toe framing"
@@ -216,7 +229,7 @@ export function buildModelGenerationPrompt(
     input.categoryContext === "lingerie"
       ? [
           neutralBase
-            ? `Realistic full-body studio photo of a ${ageLabel} ${input.gender} fashion model${nationalityClause(input)} for virtual apparel try-on, ${bodyType}, ${crop}, ${pose}, ${lighting}, ${expression}, ${neutralBaseOutfitGuidance()}, natural editorial posture with subtle weight shift and relaxed asymmetric arms, visible torso and hips, ${backdrop}, believable human presence, no sunglasses, no heavy jewelry, no props, no text, no watermark, no logo, non-explicit, not sexualized.`
+            ? `Realistic full-body studio photo of a ${ageLabel} ${input.gender} fashion model${nationalityClause(input)} for virtual lingerie try-on, ${bodyType}, ${crop}, ${pose}, ${lighting}, ${expression}, ${lingerieNeutralBaseOutfitGuidance()}, natural editorial posture with subtle weight shift and relaxed asymmetric arms, visible torso and hips, ${backdrop}, believable human presence, no sunglasses, no heavy jewelry, no props, no text, no watermark, no logo, non-explicit, not sexualized.`
             : `Realistic full-body studio photo of a ${ageLabel} ${input.gender} fashion model${nationalityClause(input)} for premium lingerie catalog try-on, ${bodyType}, ${crop}, ${pose}, ${lighting}, ${expression}, ${lingerieCatalogOutfitGuidance()}, natural editorial posture with subtle weight shift and relaxed asymmetric arms, visible torso and hips, ${backdrop}, believable human presence, no sunglasses, no heavy jewelry, no props, no text, no watermark, no logo, non-explicit, not sexualized, suitable for virtual try-on.`,
         ]
       : [
@@ -242,13 +255,18 @@ export function buildModelGenerationPrompt(
     }
   }
 
+  if (shouldApplyLingerieFullBodyHeels(input)) {
+    parts.push(lingerieFullBodyFootwearGuidance());
+  }
+
   if (input.categoryContext === "lingerie") {
     parts.push(
       `Model age ${modelAgeYears(input.modelAge)}+ only, natural editorial styling, hands not covering chest, waist, hips, or garment area, no cropped headshot, no portrait-only framing.`
     );
     if (neutralBase) {
+      parts.push(MODEL_GENERATION_NO_GARMENT_COPY_RULE);
       parts.push(
-        "Identity for all angles: same woman, same neutral bodysuit base — customer's product lace and colors come only from try-on step, not from this generation."
+        "Identity for all angles: same woman, same plain neutral bra-and-brief base — marketplace lace, colors, and SKU design come only from try-on, not from this generation."
       );
     } else {
       parts.push(
@@ -272,21 +290,31 @@ export function buildModelGenerationPrompt(
     );
   }
 
-  if (input.shortAiSummaryEn?.trim()) {
-    parts.push(`Product analysis: ${input.shortAiSummaryEn.trim()}`);
+  if (input.sourceModelPromptEn?.trim()) {
+    parts.push(SOURCE_MODEL_GENERATION_RULE);
+    parts.push(input.sourceModelPromptEn.trim());
+    if (neutralBase && input.categoryContext === "lingerie") {
+      parts.push(SOURCE_MODEL_LINGERIE_NEUTRAL_BASE_RULE);
+    }
   }
 
-  if (input.productMustPreserve?.length) {
+  if (input.shortAiSummaryEn?.trim() && !neutralBase) {
+    parts.push(`Product analysis: ${input.shortAiSummaryEn.trim()}`);
+  } else if (input.shortAiSummaryEn?.trim() && neutralBase) {
+    parts.push(`Try-on context only (do not draw garment): ${input.shortAiSummaryEn.trim()}`);
+  }
+
+  if (!neutralBase && input.productMustPreserve?.length) {
     parts.push(
       `Preserve for try-on reference: ${input.productMustPreserve.join("; ")}.`
     );
   }
 
-  if (input.productFitNotes?.length) {
+  if (!neutralBase && input.productFitNotes?.length) {
     parts.push(`Fit notes: ${input.productFitNotes.join("; ")}.`);
   }
 
-  if (input.productDescriptionRu?.trim()) {
+  if (!neutralBase && input.productDescriptionRu?.trim()) {
     parts.push(
       `Product context from merchant (highest priority): ${input.productDescriptionRu.trim()}`
     );

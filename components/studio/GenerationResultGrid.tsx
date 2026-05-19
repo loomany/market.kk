@@ -17,6 +17,8 @@ import {
   ResultCompareSkeleton,
 } from "./PreviewCard";
 import { Button } from "@/components/ui/Button";
+import { downloadImageFile } from "@/lib/studio/downloadImages";
+import { TryOnResultActions } from "@/components/studio/TryOnResultActions";
 import { cn } from "@/lib/utils";
 type GenerationResultGridProps = {
   results: StudioResultImage[];
@@ -146,52 +148,10 @@ function ExactCardResultPanel({
         className="mt-4 w-full"
         style={{ maxWidth: exportPreviewSize.width }}
       >
-        <ResultColumnActions onDownload={onDownload} onStartOver={onStartOver} />
+        <TryOnResultActions onDownload={onDownload} onStartOver={onStartOver} />
       </div>
     </article>
   );
-}
-
-function ResultColumnActions({
-  onDownload,
-  onStartOver,
-}: {
-  onDownload: () => void;
-  onStartOver: () => void;
-}) {
-  return (
-    <div className="space-y-2">
-      <Button
-        variant="secondary"
-        size="sm"
-        className="w-full"
-        onClick={onDownload}
-      >
-        <Download className="h-4 w-4" />
-        Скачать
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        className="w-full"
-        onClick={onStartOver}
-      >
-        <RotateCcw className="h-4 w-4" />
-        Начать сначала
-      </Button>
-    </div>
-  );
-}
-
-function downloadPng(url: string, filename: string) {
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.target = "_blank";
-  link.rel = "noopener noreferrer";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
 }
 
 function ResultImage({
@@ -289,6 +249,10 @@ export function GenerationResultGrid({
 
   const clothingEmbedded = embedded && isClothingTryOnMode;
 
+  if (clothingEmbedded) {
+    return null;
+  }
+
   const loadingBanner = (
     <div className="mb-4 rounded-[22px] border border-teal-100 bg-teal-50/70 px-4 py-3 text-sm leading-6 text-teal-950">
       {loadingDetail ? (
@@ -302,15 +266,6 @@ export function GenerationResultGrid({
   );
 
   if (loading) {
-    if (clothingEmbedded) {
-      return (
-        <div>
-          {loadingBanner}
-          <ResultCompareSkeleton />
-        </div>
-      );
-    }
-
     if (embedded) {
       return (
         <div>
@@ -387,8 +342,8 @@ export function GenerationResultGrid({
           label ?? (isProductShotMode ? "Готовая карточка" : "Результат");
         const resultActions = (
           <>
-            <ResultColumnActions
-              onDownload={() => downloadPng(result.url, `${result.id}.png`)}
+            <TryOnResultActions
+              onDownload={() => void downloadImageFile(result.url, `${result.id}.png`)}
               onStartOver={onStartOver}
             />
           </>
@@ -472,9 +427,9 @@ export function GenerationResultGrid({
                   </div>
                 }
                 footer={
-                  <ResultColumnActions
+                  <TryOnResultActions
                     onDownload={() =>
-                      downloadPng(removedUrl!, `${result.id}-no-bg.png`)
+                      void downloadImageFile(removedUrl!, `${result.id}-no-bg.png`)
                     }
                     onStartOver={onStartOver}
                   />
@@ -551,7 +506,7 @@ export function GenerationResultGrid({
                 key={`${result.id}-card`}
                 title="Готовая карточка"
                 exportPreviewSize={exportPreviewSize}
-                onDownload={() => downloadPng(result.url, `${result.id}.png`)}
+                onDownload={() => void downloadImageFile(result.url, `${result.id}.png`)}
                 onStartOver={onStartOver}
               >
                 <ExportSizeFrame
@@ -574,7 +529,7 @@ export function GenerationResultGrid({
                 title="PNG без фона"
                 exportPreviewSize={exportPreviewSize}
                 onDownload={() =>
-                  downloadPng(removedUrl!, `${result.id}-no-bg.png`)
+                  void downloadImageFile(removedUrl!, `${result.id}-no-bg.png`)
                 }
                 onStartOver={onStartOver}
               >
@@ -648,7 +603,7 @@ export function GenerationResultGrid({
                   variant="secondary"
                   size="sm"
                   className="w-full"
-                  onClick={() => downloadPng(result.url, `${result.id}.png`)}
+                  onClick={() => void downloadImageFile(result.url, `${result.id}.png`)}
                 >
                   <Download className="h-4 w-4" />
                   Скачать

@@ -12,6 +12,7 @@ import type { SceneGenerateResponse } from "@/lib/ai/sceneSchemas";
 import type { VideoGenerateResponse } from "@/lib/ai/videoSchemas";
 import type { Locale } from "@/lib/i18n/localeConfig";
 import type { StudioSessionAsset } from "./types";
+import { downloadImageFile } from "@/lib/studio/downloadImages";
 
 type ProcessingAction =
   | "video"
@@ -43,17 +44,6 @@ const motionPresets = [
   { id: "continue-scene", label: "Продолжить сцену" },
   { id: "product-fidelity", label: "Товар без искажений" },
 ] as const;
-
-function downloadAsset(url: string, filename: string) {
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.target = "_blank";
-  link.rel = "noopener noreferrer";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
 
 export function ProcessedAssetsPanel({
   assets,
@@ -336,7 +326,12 @@ export function ProcessedAssetsPanel({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => downloadAsset(selectedAsset.url, `${selectedAsset.id}`)}
+                    onClick={() =>
+                      void downloadImageFile(
+                        selectedAsset.url,
+                        `${selectedAsset.id}.png`
+                      )
+                    }
                   >
                     <Download className="h-4 w-4" />
                     Скачать

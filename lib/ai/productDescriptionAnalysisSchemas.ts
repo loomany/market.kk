@@ -23,6 +23,45 @@ const bottomsPartSchema = z.object({
   rise: z.string().trim().max(120).nullable(),
 });
 
+export const SOURCE_MODEL_SIZE_CLASSES = [
+  "petite",
+  "slim",
+  "standard",
+  "curvy",
+  "plus-size",
+  "xl",
+  "2xl",
+  "unknown",
+] as const;
+
+export const SOURCE_MODEL_CROPS = [
+  "full-body",
+  "upper-body",
+  "waist-up",
+  "upper-thigh",
+  "close-up",
+  "unknown",
+] as const;
+
+export const productSourceModelSchema = z.object({
+  bodyType: z.string().trim().max(200).nullable(),
+  sizeClass: z.enum(SOURCE_MODEL_SIZE_CLASSES).nullable(),
+  pose: z.string().trim().max(400).nullable(),
+  /** Short Russian pose line for merchant UI */
+  poseRu: z.string().trim().max(200).nullable(),
+  crop: z.enum(SOURCE_MODEL_CROPS).nullable(),
+  cameraAngle: z.string().trim().max(300).nullable(),
+  handsPosition: z.string().trim().max(200).nullable(),
+  framing: z.string().trim().max(300).nullable(),
+  bodyVisibility: z.string().trim().max(200).nullable(),
+  descriptionRu: z.string().trim().max(400).nullable(),
+  promptEn: z.string().trim().max(900).nullable(),
+});
+
+export type ProductSourceModel = z.infer<typeof productSourceModelSchema>;
+export type SourceModelSizeClass = (typeof SOURCE_MODEL_SIZE_CLASSES)[number];
+export type SourceModelCrop = (typeof SOURCE_MODEL_CROPS)[number];
+
 export const productDescriptionAnalysisSchema = z.object({
   descriptionRu: z.string().trim().min(20).max(PRODUCT_POSE_DESCRIPTION_RU_MAX),
   shortAiSummaryEn: z.string().trim().min(10).max(600),
@@ -55,6 +94,8 @@ export const productDescriptionAnalysisSchema = z.object({
   warnings: z.array(z.string().trim().max(200)).max(12),
 
   confidence: z.number().min(0).max(1),
+
+  sourceModel: z.union([productSourceModelSchema, z.null()]),
 });
 
 export type ProductDescriptionAnalysis = z.infer<
@@ -102,6 +143,10 @@ export function parseProductAnalysisJson(
       return null;
     }
   }
+  if (typeof value === "object" && value !== null && !("sourceModel" in value)) {
+    value = { ...value, sourceModel: null };
+  }
+
   const parsed = productDescriptionAnalysisSchema.safeParse(value);
   return parsed.success ? parsed.data : null;
 }

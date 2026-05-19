@@ -1,5 +1,6 @@
 import type { GenerateModelRequest } from "@/lib/ai/modelGenerationSchemas";
 import { MODEL_PARAM_CUSTOM } from "@/lib/ai/modelCustomParams";
+import { LINGERIE_CATALOG_FRAMING_EN } from "@/lib/studio/lingerieCropDefaults";
 
 export function isFullBodyCrop(input: GenerateModelRequest): boolean {
   if (input.crop === "full-body") return true;
@@ -20,6 +21,10 @@ export function mandatoryFramingGuidance(
     return (
       "Mandatory framing (highest priority, overrides conflicting angle text): full-length catalog shot with the entire model visible from top of hair and forehead through chin, both feet and floor visible, camera pulled back with generous headroom and footroom, do not crop or cut off head, face, hair, or feet, not torso-only, not headless, not chin-to-knee close-up."
     );
+  }
+
+  if (input.crop === "upper-thigh") {
+    return `Mandatory framing (highest priority): ${LINGERIE_CATALOG_FRAMING_EN}`;
   }
 
   if (input.crop === "upper-body") {

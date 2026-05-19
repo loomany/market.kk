@@ -151,7 +151,11 @@ export const MODEL_BODY_TYPE_IDS = MODEL_BODY_TYPES.map(
   (item) => item.id
 ) as [ModelBodyType, ...ModelBodyType[]];
 export type ModelPose = "front" | "slight-angle" | typeof MODEL_PARAM_CUSTOM;
-export type ModelCrop = "full-body" | "upper-body" | typeof MODEL_PARAM_CUSTOM;
+export type ModelCrop =
+  | "full-body"
+  | "upper-body"
+  | "upper-thigh"
+  | typeof MODEL_PARAM_CUSTOM;
 export type ModelBackground = "white" | "light-gray" | "studio";
 export type ModelLighting =
   | "studio"

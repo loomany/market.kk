@@ -11,27 +11,24 @@ export {
 
 export function buildTryOnRepairPrompt(
   analysis: ProductDescriptionAnalysis,
-  userDescriptionRu?: string
+  _userDescriptionRu?: string
 ): string {
-  const preserve = analysis.mustPreserve.length
-    ? analysis.mustPreserve.join("; ")
-    : "exact product colors, pattern, and garment design";
-  const fit = analysis.fitNotes.length
-    ? analysis.fitNotes.join("; ")
-    : "natural fabric integration on the model body";
+  if (analysis.categoryContext === "lingerie") {
+    return [
+      "Improve this adult e-commerce lingerie try-on result. Keep the same model, face, pose and body.",
+      "Preserve the uploaded product design: black base, emerald/turquoise floral lace, wide straps, supportive bra cups, high-waist brief.",
+      "Fix garment realism: natural cup shape, realistic lace edges, correct high-waist brief fit, natural shadows and fabric integration.",
+      "Do not turn the briefs into leggings, shorts, skirt, dress, or low-rise bottoms.",
+      "Non-explicit marketplace catalog image.",
+    ].join(" ");
+  }
 
-  const desc = userDescriptionRu?.trim() || analysis.descriptionRu;
-
+  const preserve = analysis.mustPreserve.slice(0, 6).join(", ");
   return [
-    "Refine this e-commerce try-on result for marketplace catalog quality.",
-    `Product: ${analysis.shortAiSummaryEn}`,
-    desc ? `Merchant description: ${desc.slice(0, 280)}` : "",
-    `MUST preserve: ${preserve}.`,
-    `Fit: ${fit}.`,
-    "Improve natural fabric integration and realistic shadows; reduce pasted-on look.",
-    "Do NOT change product design, lace placement, strap width, cup depth, or brief rise.",
-    "Do NOT change base color or accent lace colors.",
-    "Commercial catalog, non-explicit, no text or watermark.",
+    "Improve this adult e-commerce try-on result. Keep the same model, face, pose and body.",
+    preserve ? `Preserve: ${preserve}.` : "",
+    "Fix natural fabric integration and shadows; reduce pasted-on look.",
+    "Non-explicit marketplace catalog image.",
   ]
     .filter(Boolean)
     .join(" ");

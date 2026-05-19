@@ -19,6 +19,14 @@ export function buildGenerateModelRequestBody(input: {
   productSourcePresentation?: GenerateModelRequest["productSourcePresentation"];
   productMustPreserve?: GenerateModelRequest["productMustPreserve"];
   productFitNotes?: GenerateModelRequest["productFitNotes"];
+  sourceModelPromptEn?: string;
+  sourceModelSizeClass?: string;
+  sourceModelPose?: string;
+  sourceModelCrop?: string;
+  sourceModelCameraAngle?: string;
+  sourceModelHandsPosition?: string;
+  sourceModelFraming?: string;
+  cameraAnglePromptOverride?: string;
 }): GenerateModelRequest {
   const {
     settings,
@@ -35,6 +43,14 @@ export function buildGenerateModelRequestBody(input: {
     productSourcePresentation,
     productMustPreserve,
     productFitNotes,
+    sourceModelPromptEn,
+    sourceModelSizeClass,
+    sourceModelPose,
+    sourceModelCrop,
+    sourceModelCameraAngle,
+    sourceModelHandsPosition,
+    sourceModelFraming,
+    cameraAnglePromptOverride,
   } = input;
 
   return {
@@ -57,7 +73,14 @@ export function buildGenerateModelRequestBody(input: {
     numImages: 1,
     seed,
     customDescription: modelDescription?.trim() || undefined,
-    cameraAnglePrompt: angle?.prompt,
+    cameraAnglePrompt: angle?.prompt ?? cameraAnglePromptOverride,
+    sourceModelPromptEn,
+    sourceModelSizeClass,
+    sourceModelPose,
+    sourceModelCrop,
+    sourceModelCameraAngle,
+    sourceModelHandsPosition,
+    sourceModelFraming,
     productPoseDescriptionRu: productPoseDescriptionRu?.trim() || undefined,
     productDescriptionRu: productDescriptionRu?.trim() || undefined,
     shortAiSummaryEn: shortAiSummaryEn?.trim() || undefined,

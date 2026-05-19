@@ -124,6 +124,9 @@ async function runTryOnQualityPipeline(input: {
     repaired: boolean;
     judgeScore?: number;
     judgeIssues?: string[];
+    repairAttempted?: boolean;
+    repairSucceeded?: boolean;
+    repairErrorReason?: string;
   };
 }> {
   if (process.env.TRYON_QUALITY_PIPELINE === "0") {
@@ -144,7 +147,12 @@ async function runTryOnQualityPipeline(input: {
   });
 
   let repaired = false;
+  let repairAttempted = false;
+  let repairSucceeded = false;
+  let repairErrorReason: string | undefined;
+
   if (judge.score < 0.72) {
+    repairAttempted = true;
     const repair = await runTryOnRepair({
       resultImageUrl: images[0]!.url,
       productAnalysis: input.productAnalysis,
@@ -152,9 +160,13 @@ async function runTryOnQualityPipeline(input: {
       resolution: input.repairResolution,
       guard: input.guard,
     });
-    if (repair?.url) {
+    if (repair.ok) {
       images = [{ ...images[0]!, url: repair.url }];
       repaired = true;
+      repairSucceeded = true;
+    } else {
+      repairErrorReason = repair.errorReason;
+      console.error("[fal tryon] repair did not produce image:", repairErrorReason);
     }
   }
 
@@ -165,6 +177,9 @@ async function runTryOnQualityPipeline(input: {
       repaired,
       judgeScore: judge.score,
       judgeIssues: judge.issues,
+      repairAttempted,
+      repairSucceeded,
+      ...(repairErrorReason ? { repairErrorReason } : {}),
     },
   };
 }
@@ -230,6 +245,9 @@ async function runTryOn(
           repaired: boolean;
           judgeScore?: number;
           judgeIssues?: string[];
+          repairAttempted?: boolean;
+          repairSucceeded?: boolean;
+          repairErrorReason?: string;
         }
       | undefined;
 

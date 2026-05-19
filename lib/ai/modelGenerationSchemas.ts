@@ -35,7 +35,7 @@ export const generateModelRequestSchema = z
     .default("front"),
   poseCustom: z.string().trim().max(MODEL_CUSTOM_TEXT_MAX).optional(),
   crop: z
-    .enum(["full-body", "upper-body", MODEL_PARAM_CUSTOM])
+    .enum(["full-body", "upper-body", "upper-thigh", MODEL_PARAM_CUSTOM])
     .default("full-body"),
   cropCustom: z.string().trim().max(MODEL_CUSTOM_TEXT_MAX).optional(),
   bodyTypeCustom: z.string().trim().max(MODEL_CUSTOM_TEXT_MAX).optional(),
@@ -88,6 +88,14 @@ export const generateModelRequestSchema = z
     .optional(),
   productMustPreserve: z.array(z.string().trim().max(160)).max(16).optional(),
   productFitNotes: z.array(z.string().trim().max(200)).max(12).optional(),
+  /** On-model reference: body/pose/framing only (from product analysis) */
+  sourceModelPromptEn: z.string().trim().max(900).optional(),
+  sourceModelSizeClass: z.string().trim().max(40).optional(),
+  sourceModelPose: z.string().trim().max(400).optional(),
+  sourceModelCrop: z.string().trim().max(40).optional(),
+  sourceModelCameraAngle: z.string().trim().max(300).optional(),
+  sourceModelHandsPosition: z.string().trim().max(200).optional(),
+  sourceModelFraming: z.string().trim().max(300).optional(),
   /** Hero image URL — when set, uses image edit to preserve face and outfit */
   referenceImageUrl: z.string().url().max(2048).optional(),
   /** Locale of customDescription in the UI; server translates to English for Fal */
