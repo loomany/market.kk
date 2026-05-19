@@ -235,7 +235,7 @@ export const STUDIO_MODES: {
     id: "post-processing",
     label: "Проработка",
     description:
-      "Доработайте уже созданные изображения: видео, фон, сцена, Reels.",
+      "Создайте видео или прокачайте готовые фото для витрины и соцсетей.",
     recommendedFor: "Рекомендуем после генерации",
   },
 ];
@@ -247,6 +247,8 @@ export type StudioAssetType =
   | "background-removed"
   | "video"
   | "scene";
+
+export type StudioSessionAssetStatus = "ready" | "processing" | "error";
 
 export type StudioSessionAsset = {
   id: string;
@@ -267,6 +269,11 @@ export type StudioSessionAsset = {
   duration?: number;
   format?: string;
   label?: string;
+  /** Post-processing UI: in-flight or failed generation */
+  status?: StudioSessionAssetStatus;
+  parentAssetId?: string;
+  errorMessage?: string;
+  startedAt?: string;
 };
 
 export type ProductShotScenePreset =

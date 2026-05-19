@@ -890,10 +890,36 @@ export function StudioShell({
     assets.forEach((asset) => void persistAsset(asset));
   }, [persistAsset]);
 
-  const addSingleAssetToSession = useCallback((asset: StudioSessionAsset) => {
-    setSessionAssets((prev) => [asset, ...prev].slice(0, 48));
-    void persistAsset(asset);
-  }, [persistAsset]);
+  const addSingleAssetToSession = useCallback(
+    (asset: StudioSessionAsset) => {
+      setSessionAssets((prev) => [asset, ...prev].slice(0, 48));
+      if (asset.status !== "processing" && asset.status !== "error") {
+        void persistAsset(asset);
+      }
+    },
+    [persistAsset]
+  );
+
+  const updateSessionAsset = useCallback(
+    (id: string, patch: Partial<StudioSessionAsset>) => {
+      setSessionAssets((prev) => {
+        const next = prev.map((asset) =>
+          asset.id === id ? { ...asset, ...patch } : asset
+        );
+        const updated = next.find((asset) => asset.id === id);
+        if (
+          updated &&
+          updated.status !== "processing" &&
+          updated.status !== "error" &&
+          updated.url
+        ) {
+          void persistAsset(updated);
+        }
+        return next;
+      });
+    },
+    [persistAsset]
+  );
 
   const deleteSessionAsset = useCallback((id: string) => {
     setSessionAssets((prev) => prev.filter((asset) => asset.id !== id));
@@ -1731,6 +1757,7 @@ export function StudioShell({
             promptLocale={promptLocale}
             onDeleteAsset={deleteSessionAsset}
             onAssetCreated={addSingleAssetToSession}
+            onUpdateAsset={updateSessionAsset}
           />
         ) : (
         <div className="grid gap-6 lg:grid-cols-[420px_1fr] lg:items-stretch">
