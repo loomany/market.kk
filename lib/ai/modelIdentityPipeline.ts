@@ -24,14 +24,27 @@ export function lingerieModelPoseGuidance(): string {
   );
 }
 
-/** Plain studio base for lingerie try-on — SKU colors/pattern come from FASHN only. */
+/**
+ * Plain studio base for lingerie try-on — SKU colors/pattern come from FASHN only.
+ *
+ * The pose clause is FASHN-safe by design: raised arms / arms behind head /
+ * Vogue editorial stances are explicitly forbidden because FASHN cannot
+ * reliably transfer bra straps, cup shape, and high-waist briefs onto a base
+ * model whose shoulders are not square to the camera.
+ */
 export function lingerieNeutralBaseOutfitGuidance(): string {
   return (
     "plain seamless neutral bra and brief set, simple smooth fabric, nude beige or solid black only, " +
     "no lace, no prints, no decorative straps, no floral pattern, no turquoise or green accents, " +
     "no logos, no product design recreation, " +
     `${lingerieBottomCutGuidance()}, ${lingerieModelPoseGuidance()}, ` +
-    "hands relaxed away from chest and hips, confident sensual but non-explicit editorial catalog pose, " +
+    "hands relaxed away from chest and hips, " +
+    "arms must stay relaxed at the sides or slightly away from the body, " +
+    "both shoulders must stay square to the camera, " +
+    "do not raise either arm above the shoulder line, " +
+    "do not place a hand behind the head, neck, hair, or above the head, " +
+    "do not cross arms in front of the bra band or torso, " +
+    "calm non-explicit editorial catalog pose, " +
     "generic studio base for virtual try-on only"
   );
 }

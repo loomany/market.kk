@@ -11,6 +11,7 @@
     "test:image-sanitizer": "node --experimental-strip-types scripts/test-imageEnhancerSanitizer.ts",
     "test:product-preservation": "node --experimental-strip-types scripts/test-productPreservation.ts",
     "test:image-final-prompt": "node --experimental-strip-types scripts/test-imageFinalPrompt.ts",
+    "test:tryon-safe-pose": "node --experimental-strip-types --import=./scripts/lib/registerTsAlias.mjs scripts/test-tryOnSafePose.ts",
     "smoke:ai:mock": "node --experimental-strip-types scripts/smoke/mock-ai-routes.ts"
   },
   "dependencies": {

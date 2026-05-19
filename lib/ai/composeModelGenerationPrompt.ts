@@ -131,6 +131,15 @@ function hardRulesFor(
     "Hands must not cover torso, chest, waist, hips, or garment areas needed for virtual try-on.",
   ];
 
+  // Try-on safe pose: applies to every flow that ends in FASHN virtual try-on
+  // (lingerie / clothing / general). Jewelry models do not go through FASHN
+  // and may keep editorial freedom, so we skip the rule there.
+  if (request.categoryContext !== "jewelry") {
+    rules.push(
+      "Try-on safe pose: both arms relaxed and held below the shoulder line, hands not above shoulders, hands not behind head or neck, shoulders square to camera, no Vogue pose, no runway raised-arm pose, no dynamic editorial raised-arm pose. Keep chest, waist, hips, straps, and garment zones clear for virtual try-on."
+    );
+  }
+
   if (isFullBodyCrop(request)) {
     rules.push(
       "Mandatory full head-to-toe framing: entire head, face, hair, and feet visible — never portrait-only or cropped forehead/feet."

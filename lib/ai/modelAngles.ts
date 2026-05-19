@@ -66,42 +66,42 @@ export const MODEL_ANGLE_PRESETS: {
     label: "Главное фото",
     hint: "Во весь рост, спереди",
     prompt:
-      "editorial full-length hero shot facing camera, natural relaxed posture with subtle weight on one leg and soft knee bend, shoulders easy not squared, slight asymmetric hand placement (one hand on hip or resting on outer thigh), calm confident expression, premium DTC fashion catalog aesthetic, clean seamless studio background, full body head-to-toe in frame",
+      "editorial full-length hero shot facing camera, natural relaxed posture with subtle weight on one leg and soft knee bend, both shoulders square to camera, arms relaxed naturally along the body with hands below the shoulder line, one hand may rest lightly on the outer thigh, the other relaxed along the body, calm confident expression, premium DTC fashion catalog aesthetic, clean seamless studio background, full body head-to-toe in frame",
   },
   {
     id: "close-up-detail",
     label: "Детали изделия",
     hint: "Крупный план кружева и посадки",
     prompt:
-      "editorial close shot from collarbone to upper thighs, torso slightly angled to show garment drape and fabric texture, relaxed shoulders and natural neckline, hands away from product details, soft directional studio light, premium ecommerce detail framing",
+      "editorial close shot from collarbone to upper thighs, torso slightly angled to show garment drape and fabric texture, relaxed shoulders square to camera, hands relaxed below the shoulder line and away from product details, soft directional studio light, premium ecommerce detail framing",
   },
   {
     id: "angle-three-quarter",
     label: "Полуоборот",
     hint: "Фото под углом 45°",
     prompt:
-      "three-quarter full or mid-length shot, body turned about 30–40 degrees with organic S-curve posture, chin gently toward camera, one hip shifted, arms in natural asymmetric relaxed position, modern editorial catalog energy, soft light studio background",
+      "three-quarter full or mid-length shot, body turned about 30–40 degrees with organic posture, chin gently toward camera, one hip lightly shifted, arms relaxed naturally along the body with hands below the shoulder line, both shoulders kept square enough to camera for clean virtual try-on, modern editorial catalog energy, soft light studio background",
   },
   {
     id: "front-hands-side",
     label: "Спереди",
     hint: "Руки по бокам",
     prompt:
-      "front-facing mid-full shot from head to mid-thigh, approachable editorial stance with personality, arms along body with soft elbow bend or one hand lightly on outer thigh, weight on back leg, relaxed confident expression, clean off-white studio background",
+      "front-facing mid-full shot from head to mid-thigh, approachable editorial stance with personality, both shoulders square to camera, arms along body with soft elbow bend, hands below the shoulder line, one hand may rest lightly on the outer thigh, weight on back leg, relaxed confident expression, clean off-white studio background",
   },
   {
     id: "back-view",
     label: "Сзади",
     hint: "Вид со спины",
     prompt:
-      "back or back three-quarter view, natural spine curve and relaxed shoulders, medium full framing showing garment back and fit, hair styled away from garment, subtle head turn if needed, editorial catalog not rigid parade-rest stance",
+      "back or back three-quarter view, natural spine curve and relaxed shoulders, arms relaxed along the body with hands below the shoulder line, medium full framing showing garment back and fit, hair styled away from garment, subtle head turn if needed, editorial catalog not rigid parade-rest stance",
   },
   {
     id: "seated-lifestyle",
     label: "Сидя, в кадре",
     hint: "Дополнительное lifestyle-фото",
     prompt:
-      "seated lifestyle editorial pose on minimal studio stool or block, relaxed asymmetric posture with knees angled naturally, torso slightly turned toward camera, calm confident expression, modern premium fashion catalog mood, garment clearly visible",
+      "seated lifestyle editorial pose on minimal studio stool or block, relaxed posture with knees angled naturally, torso slightly turned toward camera, hands resting on the lap or sides with arms kept below the shoulder line, both shoulders square enough to camera for clean virtual try-on, calm confident expression, modern premium fashion catalog mood, garment clearly visible",
   },
 ];
 
@@ -141,7 +141,7 @@ export function resolveSelectedModelAngles(
     resolved.push({
       key: `custom:${custom.id}`,
       label: text,
-      prompt: `${text}, natural editorial camera angle and framing with relaxed believable body language, premium fashion catalog aesthetic`,
+      prompt: `${text}, natural editorial camera angle and framing with relaxed believable body language, both shoulders square to camera, arms relaxed below the shoulder line for clean virtual try-on, premium fashion catalog aesthetic`,
     });
   }
 

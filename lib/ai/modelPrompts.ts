@@ -179,6 +179,15 @@ function professionalModelLookGuidance(
   );
 }
 
+function tryOnPoseNegatives(input: GenerateModelRequest): string {
+  // Jewelry models never enter FASHN — keep editorial freedom there.
+  if (input.categoryContext === "jewelry") return "";
+  return (
+    ", arms raised above shoulders, hand behind head, hand on neck, hand in hair, " +
+    "arms above head, raised-arm Vogue pose, runway raised-arm pose, hands crossing garment area"
+  );
+}
+
 function safetyNegatives(input: GenerateModelRequest): string {
   const modelAge = input.modelAge;
   if (isAdultModelAge(modelAge)) {
@@ -190,12 +199,14 @@ function safetyNegatives(input: GenerateModelRequest): string {
       input.categoryContext === "lingerie"
         ? ", boyshorts, high-waist underwear shorts, biker shorts, long-leg underwear to mid-thigh, seated pose compressing underwear"
         : "";
+    const tryOnExtras = tryOnPoseNegatives(input);
     return (
       "Do not generate: child, teen, explicit nudity, sexualized pose, watermark, text, logo, distorted hands, extra limbs, bad anatomy, blurry image, " +
       "visible cellulite, orange-peel skin, lumpy thigh or hip dimpling, rough bumpy skin on legs or arms, " +
       "very pale untanned porcelain skin, bare face without makeup, unkempt unstyled appearance" +
       femaleExtras +
       lingerieExtras +
+      tryOnExtras +
       ", " +
       modelAgeNegativePhrase(modelAge) +
       "."
@@ -229,8 +240,8 @@ export function buildModelGenerationPrompt(
     input.categoryContext === "lingerie"
       ? [
           neutralBase
-            ? `Realistic full-body studio photo of a ${ageLabel} ${input.gender} fashion model${nationalityClause(input)} for virtual lingerie try-on, ${bodyType}, ${crop}, ${pose}, ${lighting}, ${expression}, ${lingerieNeutralBaseOutfitGuidance()}, natural editorial posture with subtle weight shift and relaxed asymmetric arms, visible torso and hips, ${backdrop}, believable human presence, no sunglasses, no heavy jewelry, no props, no text, no watermark, no logo, non-explicit, not sexualized.`
-            : `Realistic full-body studio photo of a ${ageLabel} ${input.gender} fashion model${nationalityClause(input)} for premium lingerie catalog try-on, ${bodyType}, ${crop}, ${pose}, ${lighting}, ${expression}, ${lingerieCatalogOutfitGuidance()}, natural editorial posture with subtle weight shift and relaxed asymmetric arms, visible torso and hips, ${backdrop}, believable human presence, no sunglasses, no heavy jewelry, no props, no text, no watermark, no logo, non-explicit, not sexualized, suitable for virtual try-on.`,
+            ? `Realistic full-body studio photo of a ${ageLabel} ${input.gender} fashion model${nationalityClause(input)} for virtual lingerie try-on, ${bodyType}, ${crop}, ${pose}, ${lighting}, ${expression}, ${lingerieNeutralBaseOutfitGuidance()}, natural editorial posture with subtle weight shift, arms relaxed naturally along the body, hands below the shoulder line, both shoulders square to camera, visible torso and hips, ${backdrop}, believable human presence, no sunglasses, no heavy jewelry, no props, no text, no watermark, no logo, non-explicit, not sexualized.`
+            : `Realistic full-body studio photo of a ${ageLabel} ${input.gender} fashion model${nationalityClause(input)} for premium lingerie catalog try-on, ${bodyType}, ${crop}, ${pose}, ${lighting}, ${expression}, ${lingerieCatalogOutfitGuidance()}, natural editorial posture with subtle weight shift, arms relaxed naturally along the body, hands below the shoulder line, both shoulders square to camera, visible torso and hips, ${backdrop}, believable human presence, no sunglasses, no heavy jewelry, no props, no text, no watermark, no logo, non-explicit, not sexualized, suitable for virtual try-on.`,
         ]
       : [
           `Realistic premium e-commerce studio photo of a ${ageLabel} ${input.gender} fashion model${nationalityClause(input)}, ${bodyType}, ${crop}, ${pose}, ${lighting}, ${expression}, relaxed natural body language, ${backdrop}, modern DTC catalog photography, realistic proportions, high detail, no text, no watermark, no logo.`,
@@ -340,12 +351,12 @@ export function buildModelGenerationPrompt(
   if (input.cameraAnglePrompt?.trim()) {
     parts.push(
       isFullBodyCrop(input)
-        ? "Follow the specified body orientation and pose only — do not tighten crop; keep mandatory full head-to-toe framing. Natural editorial posture, hands not blocking garment areas."
-        : "Follow the specified camera angle, body orientation, and framing. Keep posture natural and editorial — subtle weight shift, relaxed shoulders, asymmetric hand placement; avoid rigid mannequin stance. Hands must not block garment areas needed for try-on."
+        ? "Follow the specified body orientation and pose only — do not tighten crop; keep mandatory full head-to-toe framing. Natural editorial posture, hands relaxed below the shoulder line, both shoulders square to camera, hands not blocking garment areas."
+        : "Follow the specified camera angle, body orientation, and framing. Keep posture natural and editorial — subtle weight shift, relaxed shoulders square to camera, hands relaxed below the shoulder line, no raised-arm pose; avoid rigid mannequin stance. Hands must not block garment areas needed for try-on."
     );
   } else {
     parts.push(
-      "Model should face the camera clearly with natural relaxed posture suitable for virtual clothing try-on, hands not covering torso, no oversized clothing, no complex props, no sunglasses."
+      "Model should face the camera clearly with natural relaxed posture suitable for virtual clothing try-on, hands relaxed below the shoulder line, both shoulders square to camera, hands not covering torso, no oversized clothing, no complex props, no sunglasses."
     );
   }
 

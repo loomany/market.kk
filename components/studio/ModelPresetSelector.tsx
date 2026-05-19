@@ -45,6 +45,14 @@ type ModelPresetSelectorProps = {
   onSettingsChange: (settings: ModelGenerationSettings) => void;
   outputSize: Partial<ModelOutputSizeSelection>;
   onOutputSizeChange: (patch: Partial<ModelOutputSizeSelection>) => void;
+  /**
+   * Same string that the advanced "Ваше дополнение" textarea edits — surfaced
+   * here as the SaaS "Сцена и стиль фото" textarea so users don't need to
+   * open advanced settings to describe the scene/lighting/atmosphere.
+   * Empty string = no scene direction (= identical to previous behaviour).
+   */
+  modelDescription?: string;
+  onModelDescriptionChange?: (value: string) => void;
   /** Locks gender/body/crop while SaaS pipeline generates a model */
   settingsLocked?: boolean;
   /** Shown over parameters while locked (e.g. product vision analysis) */
@@ -356,6 +364,8 @@ export function ModelPresetSelector({
   onSettingsChange,
   outputSize,
   onOutputSizeChange,
+  modelDescription,
+  onModelDescriptionChange,
   settingsLocked = false,
   settingsLockMessage,
 }: ModelPresetSelectorProps) {
@@ -424,6 +434,34 @@ export function ModelPresetSelector({
           Параметры съёмки
         </span>
         <div className="flex flex-col gap-4">
+          {onModelDescriptionChange ? (
+            <SettingField
+              label="Сцена и стиль фото"
+              description="Опишите, где и как должна выглядеть модель. AI учтёт это при создании модели, а товар будет надет отдельно."
+            >
+              <textarea
+                value={modelDescription ?? ""}
+                onChange={(event) =>
+                  onModelDescriptionChange(event.target.value.slice(0, 500))
+                }
+                rows={4}
+                maxLength={500}
+                disabled={isPromptLocked}
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="Например: у большого окна, мягкий дневной свет, дорогой интерьер, чистый студийный фон, пляжный кадр"
+                className={cn(
+                  "min-h-[96px] w-full resize-y rounded-[12px] border border-border bg-white px-3 py-2.5 text-sm leading-6 text-slate-900 outline-none transition",
+                  "hover:border-slate-300 focus:border-teal-400 focus:ring-2 focus:ring-teal-100",
+                  "disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-600"
+                )}
+              />
+              <p className="mt-2 px-0.5 text-[11px] leading-snug text-slate-500">
+                Для лучшей примерки выбирайте фронтальную позу с опущенными руками. Поднятые руки могут ухудшить посадку одежды.
+              </p>
+            </SettingField>
+          ) : null}
           {!isLingerieScenario ? (
             <SelectField
               label="Пол модели"
