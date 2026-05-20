@@ -1,6 +1,7 @@
 import type { GenerateModelRequest } from "@/lib/ai/modelGenerationSchemas";
 import { isFullBodyCrop } from "@/lib/ai/modelFraming";
 import { isAdultModelAge } from "@/lib/ai/modelAge";
+import { hasSourceProductZoneFraming } from "@/lib/ai/sourceFramingGuidance";
 
 const FOOTWEAR_OVERRIDE_PATTERN =
   /barefoot|bare\s*feet|no\s+heels?|without\s+heels?|sneakers?|trainers?|flats?|босиком|без\s+обуви|кроссовк/i;
@@ -26,6 +27,7 @@ export function shouldApplyLingerieFullBodyHeels(
   request: GenerateModelRequest
 ): boolean {
   if (request.categoryContext !== "lingerie") return false;
+  if (hasSourceProductZoneFraming(request.sourceFramingGuidanceEn)) return false;
   if (!isAdultModelAge(request.modelAge)) return false;
   if (!isFullBodyCrop(request)) return false;
   if (userOverridesFootwear(request.customDescription)) return false;

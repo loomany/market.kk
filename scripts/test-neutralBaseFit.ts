@@ -21,11 +21,15 @@
  */
 import assert from "node:assert/strict";
 
+import { deriveBottomSilhouetteFromAnalysis } from "../lib/ai/bottomSilhouette.ts";
 import {
   NEUTRAL_BASE_FIT_GUIDANCE_MAX_LEN,
+  PLAIN_SOLID_BLACK_NEUTRAL_BASE_PHRASE,
   deriveNeutralBaseFitGuidance,
+  scrubAllowedColorPhrases,
   type FitAwareCategoryContext,
 } from "../lib/ai/neutralBaseFitGuidance.ts";
+import { deriveSourceFramingGuidance } from "../lib/ai/sourceFramingGuidance.ts";
 import type { ProductDescriptionAnalysis } from "../lib/ai/productDescriptionAnalysisSchemas.ts";
 import { buildModelGenerationPrompt } from "../lib/ai/modelPrompts.ts";
 import { MODEL_GENERATION_NO_GARMENT_COPY_RULE } from "../lib/ai/modelIdentityPipeline.ts";
@@ -160,8 +164,9 @@ const FORBIDDEN_TOKENS: ReadonlyArray<readonly [string, RegExp]> = [
 ];
 
 function assertNoForbiddenTokens(text: string, label: string) {
+  const scrubbed = scrubAllowedColorPhrases(text);
   for (const [name, re] of FORBIDDEN_TOKENS) {
-    assertAbsent(text, re, name, label);
+    assertAbsent(scrubbed, re, name, label);
   }
 }
 
@@ -170,24 +175,56 @@ function assertNoForbiddenTokens(text: string, label: string) {
 // ---------------------------------------------------------------------------
 
 function caseHighWaistFullCupWide() {
+  const analysis = baseAnalysis();
+  const silhouette = deriveBottomSilhouetteFromAnalysis(analysis);
   const result = deriveNeutralBaseFitGuidance({
-    analysis: baseAnalysis(),
+    analysis,
     categoryContext: "lingerie",
   });
 
   assert.equal(result.applied, true, "case 1: applied should be true");
   if (!result.applied) return;
 
+  assert.equal(silhouette.waistHeight, "high_waist", "case 1 bottomSilhouette waist");
+  assert.equal(silhouette.sideCoverage, "wide_side_panel", "case 1 bottomSilhouette side");
+  assert.equal(silhouette.frontCoverage, "full_front", "case 1 bottomSilhouette front");
+  assert.equal(silhouette.briefType, "brief", "case 1 bottomSilhouette briefType");
+  assert.equal(silhouette.dominantBaseTone, "black_dark", "case 1 bottomSilhouette tone");
+
   assertContains(
     result.text,
-    /high-waist neutral brief silhouette/i,
-    "high-waist neutral brief silhouette",
+    /plain smooth solid black neutral base/i,
+    "black neutral base phrase",
     "case 1"
   );
   assertContains(
     result.text,
-    /full-cup neutral bra shape/i,
-    "full-cup neutral bra shape",
+    /high-waist full-brief bottom/i,
+    "high-waist full-brief bottom",
+    "case 1"
+  );
+  assertContains(
+    result.text,
+    /wide side coverage/i,
+    "wide side coverage",
+    "case 1"
+  );
+  assertContains(
+    result.text,
+    /full front coverage/i,
+    "full front coverage",
+    "case 1"
+  );
+  assertContains(
+    result.text,
+    /medium-to-low leg opening/i,
+    "medium-to-low leg opening",
+    "case 1"
+  );
+  assertContains(
+    result.text,
+    /supportive full-cup bra shape/i,
+    "supportive full-cup bra shape",
     "case 1"
   );
   assertContains(
@@ -198,28 +235,21 @@ function caseHighWaistFullCupWide() {
   );
   assertContains(
     result.text,
-    /structured supportive bra silhouette/i,
-    "structured supportive bra silhouette",
-    "case 1"
-  );
-  assertContains(
-    result.text,
-    /Match silhouette geometry only/i,
+    /Match fit geometry only/i,
     "negative tail anchor",
     "case 1"
   );
 
-  // Strict ban list — no SKU design tokens may leak
+  assert.equal(result.fitAwareBottom, true, "case 1: fitAwareBottom");
+  assert.equal(result.useBlackNeutralBase, true, "case 1: useBlackNeutralBase");
   assertNoForbiddenTokens(result.text, "case 1 helper output");
 
-  // Inputs match what we derived
   assert.equal(result.inputs.bra?.cupCoverage, "full_cup");
   assert.equal(result.inputs.bra?.strapWidth, "wide");
   assert.equal(result.inputs.bra?.supportLevel, "structured");
-  assert.equal(result.inputs.bottom?.waistHeight, "high_waist");
-  assert.equal(result.inputs.bottom?.backCoverage, "brief");
+  assert.equal(result.bottomSilhouette.waistHeight, "high_waist");
 
-  console.log("[ok] case 1: high-waist + full-cup + wide straps");
+  console.log("[ok] case 1: black high-waist full-brief + full-cup + wide straps");
 }
 
 // ---------------------------------------------------------------------------
@@ -229,13 +259,14 @@ function caseHighWaistFullCupWide() {
 function caseLowRise() {
   const result = deriveNeutralBaseFitGuidance({
     analysis: baseAnalysis({
+      shortAiSummaryEn: "on-model lingerie set, low-rise bikini brief",
       bottoms: { present: true, style: "bikini brief", rise: "low-rise" },
       bra: { present: true, style: "soft cup", cupShape: "triangle", straps: "thin" },
       fitNotes: ["preserve the low-rise silhouette"],
+      mustPreserve: ["soft cup shape", "thin straps"],
       baseColor: "white",
       accentColors: [],
       pattern: null,
-      mustPreserve: ["soft cup shape", "thin straps"],
     }),
     categoryContext: "lingerie",
   });
@@ -245,8 +276,14 @@ function caseLowRise() {
 
   assertContains(
     result.text,
-    /low-rise neutral brief silhouette/i,
-    "low-rise neutral brief silhouette",
+    /low-rise bikini bottom/i,
+    "low-rise bikini bottom",
+    "case 2"
+  );
+  assertAbsent(
+    result.text,
+    /plain smooth solid black neutral base/i,
+    "no forced black base on white SKU",
     "case 2"
   );
   assertContains(
@@ -280,6 +317,8 @@ function caseLowRise() {
 function caseUnknownFit() {
   const result = deriveNeutralBaseFitGuidance({
     analysis: baseAnalysis({
+      shortAiSummaryEn: "on-model lingerie set, unknown garment silhouette",
+      baseColor: null,
       bra: { present: true, style: null, cupShape: null, straps: null },
       bottoms: { present: true, style: null, rise: null },
       fitNotes: [],
@@ -416,13 +455,13 @@ function caseAdversarialAnalysis() {
   // The silhouette signals were still correctly extracted.
   assertContains(
     result.text,
-    /high-waist neutral brief silhouette/i,
+    /high-waist full-brief bottom/i,
     "high-waist signal survived adversarial input",
     "case 8"
   );
   assertContains(
     result.text,
-    /full-cup neutral bra shape/i,
+    /supportive full-cup bra shape/i,
     "full-cup signal survived adversarial input",
     "case 8"
   );
@@ -509,7 +548,7 @@ function caseBraOnlyAndBottomsOnly() {
   assert.equal(braOnly.applied, true, "case 11a: bra-only applied");
   if (braOnly.applied) {
     assert.equal(
-      braOnly.inputs.bottom,
+      braOnly.inputs.bottomSilhouette,
       undefined,
       "case 11a: no bottom inputs"
     );
@@ -521,7 +560,7 @@ function caseBraOnlyAndBottomsOnly() {
     );
     assertContains(
       braOnly.text,
-      /full-cup neutral bra shape/i,
+      /supportive full-cup bra shape/i,
       "bra signal present",
       "case 11a"
     );
@@ -543,7 +582,7 @@ function caseBraOnlyAndBottomsOnly() {
     );
     assertContains(
       bottomsOnly.text,
-      /high-waist neutral brief silhouette/i,
+      /high-waist full-brief bottom/i,
       "brief signal present",
       "case 11b"
     );
@@ -644,11 +683,13 @@ function checkHighWaistSilhouetteReachesFinalPrompt() {
   );
 
   for (const re of [
-    /high-waist neutral brief silhouette/i,
-    /full-cup neutral bra shape/i,
+    /plain smooth solid black neutral base/i,
+    /high-waist full-brief bottom/i,
+    /wide side coverage/i,
+    /full front coverage/i,
+    /supportive full-cup bra shape/i,
     /wider shoulder straps/i,
-    /structured supportive bra silhouette/i,
-    /Match silhouette geometry only/i,
+    /Match fit geometry only/i,
   ]) {
     assertContains(wired, re, re.source, "case 12b wired prompt");
   }
@@ -695,8 +736,14 @@ function checkProductAnalysisShimEmitsFitGuidance() {
   );
   assertContains(
     productGen.neutralBaseFitGuidanceEn!,
-    /high-waist neutral brief silhouette/i,
-    "shim output carries high-waist signal",
+    /high-waist full-brief bottom/i,
+    "shim output carries high-waist bottom signal",
+    "case 14"
+  );
+  assertContains(
+    productGen.neutralBaseFitGuidanceEn!,
+    /plain smooth solid black neutral base/i,
+    "shim output carries black base strategy",
     "case 14"
   );
   assertNoForbiddenTokens(
@@ -850,7 +897,7 @@ function checkClothingPromptIgnoresFitGuidance() {
   );
   assertAbsent(
     wired,
-    /high-waist neutral brief silhouette/i,
+    /high-waist full-brief bottom/i,
     "lingerie-specific silhouette",
     "case 18 clothing prompt"
   );
@@ -984,6 +1031,164 @@ function caseAllEnumPhrasesAreClean() {
 }
 
 // ---------------------------------------------------------------------------
+// case A–H — bottom-aware neutral base regression (user spec)
+// ---------------------------------------------------------------------------
+
+function caseLightNudeProductNoBlackBase() {
+  const result = deriveNeutralBaseFitGuidance({
+    analysis: baseAnalysis({
+      baseColor: "nude",
+      accentColors: [],
+      pattern: null,
+      materials: [],
+      bottoms: { present: true, style: "brief", rise: "mid-rise" },
+      fitNotes: ["preserve mid-rise silhouette"],
+    }),
+    categoryContext: "lingerie",
+  });
+  assert.equal(result.applied, true, "light/nude: applied");
+  if (!result.applied) return;
+  assertAbsent(
+    result.text,
+    /plain smooth solid black neutral base/i,
+    "no black on nude SKU",
+    "light/nude"
+  );
+  assertContains(
+    result.text,
+    /plain smooth neutral nude-beige base/i,
+    "nude fallback base",
+    "light/nude"
+  );
+  console.log("[ok] light/nude product does not force black base");
+}
+
+function caseUnknownDominantToneUsesNudeFallback() {
+  const result = deriveNeutralBaseFitGuidance({
+    analysis: baseAnalysis({ baseColor: null }),
+    categoryContext: "lingerie",
+  });
+  assert.equal(result.applied, true, "unknown tone: applied");
+  if (!result.applied) return;
+  assertContains(
+    result.text,
+    /plain smooth neutral nude-beige base/i,
+    "nude fallback",
+    "unknown tone"
+  );
+  assert.equal(result.useBlackNeutralBase, false, "unknown tone: not black");
+  console.log("[ok] unknown dominant tone falls back to nude-beige base phrase");
+}
+
+function caseFinalPromptFitAndFramingTogether() {
+  const analysis = baseAnalysis({
+    sourcePresentation: "on-model",
+    sourceModel: {
+      bodyType: "curvy",
+      sizeClass: "curvy",
+      pose: "front-facing standing",
+      poseRu: "стоя фронтально",
+      crop: "upper-thigh",
+      cameraAngle: "straight-on",
+      handsPosition: "relaxed at sides",
+      framing: "product-focused crop",
+      bodyVisibility: "torso through upper thighs",
+      descriptionRu: "Модель стоит, кадр до верхней части бёдер.",
+      promptEn:
+        "Similar curvy proportions, standing front-facing, product-focused framing. Do not copy face or identity.",
+    },
+  });
+  const productGen = productAnalysisForModelGeneration(
+    analysis,
+    { categoryContext: "lingerie" },
+    "",
+    false
+  );
+  const framing = deriveSourceFramingGuidance({
+    analysis,
+    categoryContext: "lingerie",
+  });
+  assert.equal(framing.applied, true, "framing applied for on-model lingerie");
+
+  const wired = buildModelGenerationPrompt(
+    baseRequest({
+      neutralBaseFitGuidanceEn: productGen.neutralBaseFitGuidanceEn,
+      sourceFramingGuidanceEn: framing.applied ? framing.text : undefined,
+    }),
+    { neutralBaseForTryOn: true }
+  );
+
+  assertContains(
+    wired,
+    /high-waist full-brief bottom/i,
+    "bottom-aware guidance",
+    "fit + framing prompt"
+  );
+  assertContains(
+    wired,
+    /tight product-zone crop/i,
+    "source framing",
+    "fit + framing prompt"
+  );
+  const noCopyAt = wired.indexOf(MODEL_GENERATION_NO_GARMENT_COPY_RULE);
+  const fitAt = wired.indexOf(productGen.neutralBaseFitGuidanceEn ?? "");
+  assert.ok(noCopyAt >= 0 && fitAt > noCopyAt, "no-copy before fit guidance");
+  console.log("[ok] final prompt carries bottom-aware guidance + source framing");
+}
+
+function caseNoBikiniConflictWhenFitAware() {
+  const helperResult = deriveNeutralBaseFitGuidance({
+    analysis: baseAnalysis(),
+    categoryContext: "lingerie",
+  });
+  assert.equal(helperResult.applied, true, "fit helper applied");
+  if (!helperResult.applied) return;
+  assert.equal(helperResult.fitAwareBottom, true, "confident bottom silhouette");
+
+  const wired = buildModelGenerationPrompt(
+    baseRequest({ neutralBaseFitGuidanceEn: helperResult.text }),
+    { neutralBaseForTryOn: true }
+  );
+
+  assertAbsent(
+    wired,
+    /minimal low-profile classic bikini brief sitting flat against the body/i,
+    "no bikini brief conflict when fit-aware",
+    "no-bikini-conflict"
+  );
+  assertContains(
+    wired,
+    /not a minimal low-profile bikini brief/i,
+    "explicit bikini override",
+    "no-bikini-conflict"
+  );
+  console.log(
+    "[ok] neutralBaseMinimalBriefGuidance suppressed when bottom silhouette is confident"
+  );
+}
+
+function caseBlackOnlyViaControlledPhrase() {
+  const result = deriveNeutralBaseFitGuidance({
+    analysis: baseAnalysis(),
+    categoryContext: "lingerie",
+  });
+  assert.equal(result.applied, true, "black phrase case");
+  if (!result.applied) return;
+  assert.ok(
+    result.text.includes(PLAIN_SOLID_BLACK_NEUTRAL_BASE_PHRASE),
+    "exact controlled black phrase present"
+  );
+  const withoutAllowed = scrubAllowedColorPhrases(result.text);
+  assertAbsent(
+    withoutAllowed,
+    /\bblack\b/i,
+    "no stray black token outside allowlist",
+    "controlled black phrase"
+  );
+  console.log("[ok] black allowed only as controlled plain neutral base phrase");
+}
+
+// ---------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------
 
@@ -1008,6 +1213,11 @@ function main() {
   checkFitGuidanceCoexistsWithSafetyLayers();
   checkClothingPromptIgnoresFitGuidance();
   checkComposeModelPromptSourceCarriesWiring();
+  caseLightNudeProductNoBlackBase();
+  caseUnknownDominantToneUsesNudeFallback();
+  caseFinalPromptFitAndFramingTogether();
+  caseNoBikiniConflictWhenFitAware();
+  caseBlackOnlyViaControlledPhrase();
 
   console.log("\nAll neutral-base-fit regression checks passed.");
 }

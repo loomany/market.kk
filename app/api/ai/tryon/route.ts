@@ -14,6 +14,11 @@ import { effectiveProductDescriptionRu } from "@/lib/ai/productAnalysisPipeline"
 import { runTryOnJudge } from "@/lib/ai/tryOnJudge";
 import { runTryOnRepair } from "@/lib/ai/tryOnRepair";
 import { uploadImageToFalStorage } from "@/lib/ai/falUpload";
+import { prepareGarmentForTryOn } from "@/lib/ai/prepareGarmentForTryOn";
+import { shouldRunPremiumGarmentPrep } from "@/lib/ai/fashnEditSchemas";
+import { resolveTryOnEngine } from "@/lib/ai/tryOnEngine";
+import { buildTryOnPipelineDebug } from "@/lib/ai/tryOnPipelineDebug";
+import type { QualityMode } from "@/components/studio/types";
 import { getMockTryOnResults } from "@/lib/ai/mockResults";
 import {
   assertPaidAiAllowed,
@@ -196,6 +201,7 @@ async function runTryOn(
   options?: {
     payload?: TryOnFormPayload;
     guard?: PaidAiGuardInput;
+    premiumGarmentEdit?: import("@/lib/ai/fashnEditSchemas").PremiumGarmentEditDebug;
   }
 ) {
   if (isMockMode()) {
@@ -271,6 +277,10 @@ async function runTryOn(
       qualityMeta = piped.qualityMeta;
     }
 
+    const selectedQualityMode = (data.mode ?? "balanced") as QualityMode;
+    const garmentPrepMode = options?.payload?.garmentPrepMode ?? "fast";
+    const tryOnEngine = resolveTryOnEngine(selectedQualityMode);
+
     return NextResponse.json({
       ok: true,
       provider: "fal",
@@ -278,7 +288,29 @@ async function runTryOn(
       images,
       requestId: result.requestId,
       ...(inputSource ? { inputSource } : {}),
+      ...(options?.premiumGarmentEdit
+        ? {
+            premiumGarmentEdit: options.premiumGarmentEdit,
+            tryOn: {
+              requestId: result.requestId,
+              finalImageUrl: images[0]?.url,
+              garmentImageUrl: data.productImageUrl,
+            },
+          }
+        : {}),
       ...(qualityMeta ? { quality: qualityMeta } : {}),
+      ...(productAnalysis
+        ? {
+            debug: buildTryOnPipelineDebug({
+              productAnalysis,
+              tryOnRequest: data,
+              selectedQualityMode,
+              tryOnEngine,
+              garmentPrepMode,
+              premiumGarmentEdit: options?.premiumGarmentEdit,
+            }),
+          }
+        : {}),
     });
   } catch (error) {
     return handleTryOnError(error);
@@ -380,13 +412,40 @@ async function processFormPayload(payload: TryOnFormPayload) {
       seed: payload.seed,
     };
 
-    const data = tryOnParamsToRequest(
-      productImageUrl,
-      modelImageUrl,
-      params
-    );
+    let garmentImageUrl = productImageUrl;
+    let premiumGarmentEdit:
+      | import("@/lib/ai/fashnEditSchemas").PremiumGarmentEditDebug
+      | undefined;
 
-    return runTryOn(data, payload.inputSource, { payload, guard });
+    if (shouldRunPremiumGarmentPrep(payload.garmentPrepMode)) {
+      const prep = await prepareGarmentForTryOn({
+        productImageUrl,
+        garmentPrepMode: payload.garmentPrepMode,
+        garmentPhotoType: payload.garmentPhotoType,
+        guard,
+        mockMode,
+      });
+      if (!prep.ok) {
+        return NextResponse.json(
+          {
+            ok: false,
+            errorCode: prep.errorCode,
+            message: prep.message,
+          },
+          { status: prep.errorCode === "FASHN_API_KEY_MISSING" ? 500 : 502 }
+        );
+      }
+      garmentImageUrl = prep.garmentImageUrl;
+      premiumGarmentEdit = prep.premiumGarmentEdit;
+    }
+
+    const data = tryOnParamsToRequest(garmentImageUrl, modelImageUrl, params);
+
+    return runTryOn(data, payload.inputSource, {
+      payload,
+      guard,
+      premiumGarmentEdit,
+    });
   } catch (error) {
     return handleTryOnError(error);
   }

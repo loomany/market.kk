@@ -123,8 +123,8 @@ function coerceGenerationSettings(
   const bodyType =
     readEnum(raw.bodyType, MODEL_BODY_TYPE_IDS) ?? "standard";
   const pose =
-    readEnum(raw.pose, ["front", "slight-angle", MODEL_PARAM_CUSTOM] as const) ??
-    "front";
+    readEnum(raw.pose, ["auto", "front", "slight-angle", MODEL_PARAM_CUSTOM] as const) ??
+    "auto";
   const crop =
     readEnum(raw.crop, [
       "full-body",

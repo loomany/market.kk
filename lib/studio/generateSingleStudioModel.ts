@@ -2,7 +2,7 @@ import type { GenerateModelResponse } from "@/lib/ai/modelGenerationSchemas";
 import type { ResolvedModelAngle } from "@/lib/ai/modelAngles";
 import type { PromptLocale } from "@/lib/ai/promptLocaleSchema";
 import type { ModelOutputSizeSelection } from "@/lib/ai/modelOutputSizes";
-import { productAnalysisForModelGeneration } from "@/lib/ai/productAnalysisShared";
+import { buildStudioModelGenerationFields } from "@/lib/ai/productGenerationContext";
 import type { ProductDescriptionAnalysis } from "@/lib/ai/productDescriptionAnalysisSchemas";
 import { productPoseDescriptionForGeneration } from "@/lib/ai/productPoseSummary";
 import type { ModelGenerationSettings } from "@/components/studio/types";
@@ -22,12 +22,13 @@ export async function fetchGenerateSingleStudioModel(input: {
   cameraAnglePromptOverride?: string;
   signal?: AbortSignal;
 }): Promise<{ url: string; response: GenerateModelResponse }> {
-  const productGen = productAnalysisForModelGeneration(
-    input.productAnalysis,
-    { categoryContext: input.settings.categoryContext },
-    input.productDescription,
-    input.userEditedProductDescription
-  );
+  const fields = buildStudioModelGenerationFields({
+    analysis: input.productAnalysis,
+    overrides: { categoryContext: input.settings.categoryContext },
+    settings: input.settings,
+    userDescriptionRu: input.productDescription,
+    userEditedProductDescription: input.userEditedProductDescription,
+  });
 
   const res = await fetch("/api/ai/generate-model", {
     method: "POST",
@@ -36,19 +37,24 @@ export async function fetchGenerateSingleStudioModel(input: {
       buildGenerateModelRequestBody({
         settings: {
           ...input.settings,
-          categoryContext: productGen.categoryContext,
+          categoryContext: fields.categoryContext,
         },
         outputSize: input.outputSize,
         modelDescription: input.modelDescription,
-        shortAiSummaryEn: productGen.shortAiSummaryEn,
-        productSetType: productGen.productSetType,
-        productSourcePresentation: productGen.productSourcePresentation,
-        neutralBaseFitGuidanceEn: productGen.neutralBaseFitGuidanceEn,
-        sourceModelPromptEn: productGen.sourceModelPromptEn,
-        sourceModelSizeClass: productGen.sourceModelSizeClass,
-        sourceModelPose: productGen.sourceModelPose,
-        sourceModelCameraAngle: productGen.sourceModelCameraAngle,
-        sourceModelHandsPosition: productGen.sourceModelHandsPosition,
+        shortAiSummaryEn: fields.shortAiSummaryEn,
+        productSetType: fields.productSetType,
+        productSourcePresentation: fields.productSourcePresentation,
+        neutralBaseFitGuidanceEn: fields.neutralBaseFitGuidanceEn,
+        sourceFramingGuidanceEn: fields.sourceFramingGuidanceEn,
+        sourceModelPromptEn: fields.sourceModelPromptEn,
+        sourceModelSizeClass: fields.sourceModelSizeClass,
+        sourceModelPose: fields.sourceModelPose,
+        sourceModelCrop: fields.sourceModelCrop,
+        sourceModelCameraAngle: fields.sourceModelCameraAngle,
+        sourceModelHandsPosition: fields.sourceModelHandsPosition,
+        sourceModelFraming: fields.sourceModelFraming,
+        productView: fields.productView,
+        resolvedModelPose: fields.resolvedModelPose,
         cameraAnglePromptOverride: input.cameraAnglePromptOverride,
         promptLocale: input.promptLocale,
         seed: input.seed,

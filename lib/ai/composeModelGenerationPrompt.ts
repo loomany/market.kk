@@ -23,9 +23,31 @@ import {
   lingerieModelPoseGuidance,
   MODEL_GENERATION_NO_GARMENT_COPY_RULE,
 } from "@/lib/ai/modelIdentityPipeline";
+import { hasSourceProductZoneFraming } from "@/lib/ai/sourceFramingGuidance";
+import { LINGERIE_FULL_HEAD_FACE_MANDATORY_EN } from "@/lib/ai/modelHeadFraming";
+import { productZoneVerticalAspectGuidance } from "@/lib/ai/productZoneAspectRatio";
+import {
+  PRODUCT_ZONE_BOTTOM_CROP_ANCHOR_EN,
+  PRODUCT_ZONE_HEAD_HANDS_ADD_EN,
+} from "@/lib/ai/sourceProductZoneBottomCrop";
+import { effectiveResolvedModelPoseFromRequest } from "@/lib/ai/productViewResolver";
+import {
+  resolvedModelPoseNegativesEn,
+  resolvedModelPosePromptEn,
+  shouldAvoidSquareShouldersToCamera,
+} from "@/lib/ai/resolvedModelPosePrompts";
+import {
+  deriveSourceModelOrientationFromRequest,
+  isUnsafeTryOnPosePhrase,
+  productZoneMatchMerchantOrientationEn,
+  sourceModelOrientationPoseEn,
+} from "@/lib/ai/sourceModelOrientation";
 import {
   SOURCE_MODEL_GENERATION_RULE,
+  SOURCE_MODEL_GENERATION_RULE_WITH_FRAMING,
   SOURCE_MODEL_LINGERIE_NEUTRAL_BASE_RULE,
+  SOURCE_PRODUCT_ZONE_CROP_OVERRIDE_RULE,
+  SOURCE_TRY_ON_SAFE_POSE_WINS_RULE,
 } from "@/lib/ai/sourceModelPromptRules";
 
 const ROUTE_ID = "/api/ai/generate-model";
@@ -140,24 +162,56 @@ function hardRulesFor(
   // collapse because the base model's hand sat in front of the abdomen
   // during the previous generation). Hence the explicit positive direction
   // (hands near outer thighs only) AND the explicit negatives below.
+  const resolvedPose = effectiveResolvedModelPoseFromRequest(request);
+  rules.push(
+    `Mandatory model orientation (${resolvedPose}, highest priority for FASHN try-on base): ${resolvedModelPosePromptEn(resolvedPose)}`
+  );
+  rules.push(`Orientation negatives: ${resolvedModelPoseNegativesEn(resolvedPose)}.`);
+
   if (request.categoryContext !== "jewelry") {
+    const shouldersRule = shouldAvoidSquareShouldersToCamera(resolvedPose)
+      ? "torso aligned with merchant back or side orientation — do not square shoulders to front camera"
+      : "shoulders square to camera when front-facing";
     rules.push(
-      "Try-on safe pose: both arms relaxed and held below the shoulder line, arms drop straight down along the outer sides of the body, hands rest near the outer thighs only, hands not above shoulders, hands not behind head or neck, hands not in front of the abdomen, waist, stomach, briefs, hips, bra band, straps, or any garment zone, fingers must not overlap the product area, shoulders square to camera, no Vogue pose, no runway raised-arm pose, no dynamic editorial raised-arm pose, no hand-on-hip pose, no arms akimbo, no hand resting on the waistband or stomach. Keep chest, waist, hips, straps, and garment zones clear for virtual try-on. Full torso, waist, hips, bra band, and brief area must stay fully visible and unobstructed."
+      `Try-on safe pose: both arms relaxed and held below the shoulder line, arms drop straight down along the outer sides of the body, hands rest near the outer thighs only when front-facing, hands not above shoulders, hands not behind head or neck, hands not in front of the abdomen, waist, stomach, briefs, hips, bra band, straps, or any garment zone, fingers must not overlap the product area, ${shouldersRule}, no Vogue pose, no runway raised-arm pose, no dynamic editorial raised-arm pose, no hand-on-hip pose, no arms akimbo, no hand resting on the waistband or stomach. Keep chest, waist, hips, straps, and garment zones clear for virtual try-on. Full torso, waist, hips, bra band, and brief area must stay fully visible and unobstructed. Never use “face the camera clearly” when resolved orientation is back_view or side_view.`
     );
   }
 
-  if (isFullBodyCrop(request)) {
+  const sourceProductZoneFraming = hasSourceProductZoneFraming(
+    request.sourceFramingGuidanceEn
+  );
+
+  if (request.categoryContext === "lingerie" && !sourceProductZoneFraming) {
+    rules.push(LINGERIE_FULL_HEAD_FACE_MANDATORY_EN);
+  }
+
+  if (sourceProductZoneFraming) {
     rules.push(
-      "Mandatory full head-to-toe framing: entire head, face, hair, and feet visible — never portrait-only or cropped forehead/feet."
+      productZoneMatchMerchantOrientationEn(
+        deriveSourceModelOrientationFromRequest(request)
+      )
     );
-  } else if (request.crop === "upper-thigh") {
-    rules.push(
-      "Mandatory lingerie catalog framing: full head and face visible, entire bra and brief in frame, crop ends around upper-mid thigh — not full-body, not waist-only, never crop bra, briefs, forehead, or chin."
-    );
-  } else if (request.crop === "upper-body") {
-    rules.push(
-      "Mandatory waist-up / torso-to-upper-thigh framing: full head, full face, forehead, hair, shoulders, torso, waist and hips visible — never crop eyes, forehead, top of head, chin, hands, waist, hips, or garment areas."
-    );
+    rules.push(PRODUCT_ZONE_BOTTOM_CROP_ANCHOR_EN);
+    const tallAspect = productZoneVerticalAspectGuidance(request.aspectRatio);
+    if (tallAspect) {
+      rules.push(tallAspect);
+    }
+  }
+
+  if (!sourceProductZoneFraming) {
+    if (isFullBodyCrop(request)) {
+      rules.push(
+        "Mandatory full head-to-toe framing: entire head, face, hair, and feet visible — never portrait-only or cropped forehead/feet."
+      );
+    } else if (request.crop === "upper-thigh") {
+      rules.push(
+        "Mandatory lingerie catalog framing: full head and face visible, entire bra and brief in frame, crop ends around upper-mid thigh — not full-body, not waist-only, never crop bra, briefs, forehead, or chin."
+      );
+    } else if (request.crop === "upper-body") {
+      rules.push(
+        "Mandatory waist-up / torso-to-upper-thigh framing: full head, full face, forehead, hair, shoulders, torso, waist and hips visible — never crop eyes, forehead, top of head, chin, hands, waist, hips, or garment areas."
+      );
+    }
   }
 
   const neutralBase = options?.neutralBaseForTryOn ?? false;
@@ -180,22 +234,61 @@ function hardRulesFor(
     rules.push(`Product set type: ${request.productSetType}.`);
   }
 
-  if (request.sourceModelPromptEn?.trim()) {
+  if (sourceProductZoneFraming) {
+    rules.push(SOURCE_MODEL_GENERATION_RULE_WITH_FRAMING);
+    rules.push(SOURCE_TRY_ON_SAFE_POSE_WINS_RULE);
+  } else if (request.sourceModelPromptEn?.trim()) {
     rules.push(SOURCE_MODEL_GENERATION_RULE);
-    rules.push(`Source body/pose reference: ${request.sourceModelPromptEn.trim()}`);
+  }
+
+  if (request.sourceModelPromptEn?.trim()) {
+    rules.push(
+      sourceProductZoneFraming
+        ? `Source body reference (proportions only — never copy unsafe pose): ${request.sourceModelPromptEn.trim()}`
+        : `Source body/pose reference: ${request.sourceModelPromptEn.trim()}`
+    );
     if (options?.neutralBaseForTryOn && request.categoryContext === "lingerie") {
       rules.push(SOURCE_MODEL_LINGERIE_NEUTRAL_BASE_RULE);
     }
-  } else if (request.productSourcePresentation === "on-model") {
+  } else if (
+    !sourceProductZoneFraming &&
+    request.productSourcePresentation === "on-model"
+  ) {
     rules.push(
       "Source product photo shows garment worn on a body — generate model suitable for try-on transfer."
     );
   }
 
-  if (request.cameraAnglePrompt?.trim()) {
-    rules.push(
-      `Honor camera/pose instruction: ${request.cameraAnglePrompt.trim()}`
+  if (sourceProductZoneFraming) {
+    const orientation = deriveSourceModelOrientationFromRequest(request);
+    rules.push(productZoneMatchMerchantOrientationEn(orientation));
+    const unsafe = isUnsafeTryOnPosePhrase(
+      [
+        request.sourceModelPose,
+        request.sourceModelCameraAngle,
+        request.sourceModelPromptEn,
+        request.cameraAnglePrompt,
+      ]
+        .filter(Boolean)
+        .join(" ")
     );
+    if (request.cameraAnglePrompt?.trim()) {
+      if (unsafe) {
+        rules.push(
+          `Honor merchant orientation (${sourceModelOrientationPoseEn(orientation)}) but block seated, reclining, or hand-on-chest — angle hint: ${request.cameraAnglePrompt.trim()}`
+        );
+      } else {
+        rules.push(
+          `Honor camera/pose with merchant orientation: ${sourceModelOrientationPoseEn(orientation)}; ${request.cameraAnglePrompt.trim()}`
+        );
+      }
+    } else if (request.sourceModelCameraAngle?.trim()) {
+      rules.push(
+        `Merchant camera angle: ${request.sourceModelCameraAngle.trim()} — keep ${sourceModelOrientationPoseEn(orientation)}`
+      );
+    }
+  } else if (request.cameraAnglePrompt?.trim()) {
+    rules.push(`Honor camera/pose instruction: ${request.cameraAnglePrompt.trim()}`);
   }
 
   if (shouldApplyLingerieFullBodyHeels(request)) {
@@ -219,6 +312,14 @@ function hardRulesFor(
       const fitGuidance = request.neutralBaseFitGuidanceEn?.trim();
       if (fitGuidance) {
         rules.push(`Neutral base fit guidance (silhouette only, never design): ${fitGuidance}`);
+      }
+      const framingGuidance = request.sourceFramingGuidanceEn?.trim();
+      if (framingGuidance) {
+        rules.push(
+          `Source framing guidance (match crop/framing only, never design): ${framingGuidance}`
+        );
+        rules.push(SOURCE_PRODUCT_ZONE_CROP_OVERRIDE_RULE);
+        rules.push(SOURCE_TRY_ON_SAFE_POSE_WINS_RULE);
       }
     } else {
       rules.push(

@@ -75,14 +75,18 @@ export function resolveSourceModelBodyTypeSettings(
   return { bodyType: SAAS_DEFAULT_BODY_TYPE, bodyTypeCustom: "" };
 }
 
+/** Only when user chose custom pose — never override auto (productView resolver owns pose). */
 function mapPose(
-  sourceModel: ProductSourceModel
+  sourceModel: ProductSourceModel,
+  settings: ModelGenerationSettings
 ): Pick<ModelGenerationSettings, "pose" | "poseCustom"> | null {
+  if (settings.pose === "auto") return null;
+  if (settings.pose !== MODEL_PARAM_CUSTOM) return null;
   const poseText = sourceModel.pose?.trim();
   if (!poseText) return null;
   return {
     pose: MODEL_PARAM_CUSTOM,
-    poseCustom: poseText,
+    poseCustom: settings.poseCustom.trim() || poseText,
   };
 }
 
@@ -104,7 +108,7 @@ export function mapSourceModelToGenerationSettings(input: {
 
   next = { ...next, ...resolveSourceModelBodyTypeSettings(sourceModel) };
 
-  const pose = mapPose(sourceModel);
+  const pose = mapPose(sourceModel, input.settings);
   if (pose) {
     next = { ...next, ...pose };
   }

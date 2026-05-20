@@ -150,7 +150,11 @@ export type ModelBodyType = (typeof MODEL_BODY_TYPES)[number]["id"];
 export const MODEL_BODY_TYPE_IDS = MODEL_BODY_TYPES.map(
   (item) => item.id
 ) as [ModelBodyType, ...ModelBodyType[]];
-export type ModelPose = "front" | "slight-angle" | typeof MODEL_PARAM_CUSTOM;
+export type ModelPose =
+  | "auto"
+  | "front"
+  | "slight-angle"
+  | typeof MODEL_PARAM_CUSTOM;
 export type ModelCrop =
   | "full-body"
   | "upper-body"
@@ -196,7 +200,7 @@ export const DEFAULT_MODEL_GENERATION_SETTINGS: ModelGenerationSettings = {
   bodyType: "standard",
   bodyTypeCustom: "",
   modelAge: DEFAULT_MODEL_AGE,
-  pose: "front",
+  pose: "auto",
   poseCustom: "",
   crop: "full-body",
   cropCustom: "",

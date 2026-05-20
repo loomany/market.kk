@@ -46,25 +46,38 @@ export function lingerieModelPoseGuidance(): string {
   );
 }
 
+export type LingerieNeutralBaseOutfitOptions = {
+  /** Server fit guidance active — do not force low-profile bikini brief. */
+  fitAwareBottom?: boolean;
+  /** Dark SKU — plain solid black smooth neutral base only (controlled phrase). */
+  useBlackNeutralBase?: boolean;
+};
+
 /**
  * Plain studio base for lingerie try-on — SKU colors/pattern come from FASHN only.
  *
- * The pose clause is FASHN-safe by design: raised arms / arms behind head /
- * Vogue editorial stances AND hands-in-front-of-the-garment-area stances
- * are explicitly forbidden because FASHN cannot reliably transfer bra
- * straps, cup shape, and high-waist briefs when the base model's hand
- * sits over the abdomen, waist, or briefs.
- *
- * Brief description switched from `lingerieBottomCutGuidance` to
- * `neutralBaseMinimalBriefGuidance` so the base waistband does not compete
- * with marketplace garment silhouettes during FASHN transfer.
+ * When `fitAwareBottom` is true, the brief clause defers to
+ * `neutralBaseFitGuidanceEn` instead of `neutralBaseMinimalBriefGuidance`.
  */
-export function lingerieNeutralBaseOutfitGuidance(): string {
+export function lingerieNeutralBaseOutfitGuidance(
+  options?: LingerieNeutralBaseOutfitOptions
+): string {
+  const fitAwareBottom = options?.fitAwareBottom ?? false;
+  const useBlackNeutralBase = options?.useBlackNeutralBase ?? false;
+
+  const fabricClause = useBlackNeutralBase
+    ? "plain smooth solid black neutral bra and brief set, simple smooth fabric, "
+    : "plain seamless neutral bra and brief set, simple smooth fabric, nude beige or solid black only, ";
+
+  const briefClause = fitAwareBottom
+    ? "plain smooth neutral base bottom matching the derived product fit silhouette when available, with structured waist height, side coverage, and leg opening as specified in fit guidance, not a minimal low-profile bikini brief, "
+    : `${neutralBaseMinimalBriefGuidance()}, `;
+
   return (
-    "plain seamless neutral bra and brief set, simple smooth fabric, nude beige or solid black only, " +
+    `${fabricClause}` +
     "no lace, no prints, no decorative straps, no floral pattern, no turquoise or green accents, " +
     "no logos, no product design recreation, " +
-    `${neutralBaseMinimalBriefGuidance()}, ${lingerieModelPoseGuidance()}, ` +
+    `${briefClause}${lingerieModelPoseGuidance()}, ` +
     "arms must stay relaxed at the sides or slightly away from the body, " +
     "arms drop straight down along the outer sides of the body, " +
     "hands rest near the outer thighs only, " +

@@ -18,6 +18,7 @@ import {
   PRODUCT_POSE_DESCRIPTION_RU_MAX,
 } from "@/lib/ai/modelCustomParams";
 import { MODEL_LIGHTING_PRESET_IDS } from "@/lib/ai/modelLighting";
+import { SOURCE_FRAMING_GUIDANCE_MAX_LEN } from "@/lib/ai/sourceFramingGuidance";
 
 export const generateModelRequestSchema = z
   .object({
@@ -31,8 +32,21 @@ export const generateModelRequestSchema = z
     .max(MODEL_AGE_MAX)
     .default(DEFAULT_MODEL_AGE),
   pose: z
-    .enum(["front", "slight-angle", MODEL_PARAM_CUSTOM])
-    .default("front"),
+    .enum(["auto", "front", "slight-angle", MODEL_PARAM_CUSTOM])
+    .default("auto"),
+  /** Server-resolved from product analysis + UI pose (see productViewResolver). */
+  productView: z
+    .enum(["front", "back", "side", "three_quarter", "unknown"])
+    .optional(),
+  resolvedModelPose: z
+    .enum([
+      "front",
+      "back_view",
+      "side_view",
+      "three_quarter",
+      "safe_front",
+    ])
+    .optional(),
   poseCustom: z.string().trim().max(MODEL_CUSTOM_TEXT_MAX).optional(),
   crop: z
     .enum(["full-body", "upper-body", "upper-thigh", MODEL_PARAM_CUSTOM])
@@ -97,6 +111,18 @@ export const generateModelRequestSchema = z
    * See `lib/ai/neutralBaseFitGuidance.ts`.
    */
   neutralBaseFitGuidanceEn: z.string().trim().max(700).optional(),
+  /**
+   * Server-derived English source framing guidance for on-model lingerie try-on.
+   * Always English (helper output uses whitelisted phrase constants), never
+   * user-typed — not translated by `translateModelGenerationTextFields`.
+   * Pushed after `neutralBaseFitGuidanceEn` in the lingerie + neutral-base
+   * branch. See `lib/ai/sourceFramingGuidance.ts`.
+   */
+  sourceFramingGuidanceEn: z
+    .string()
+    .trim()
+    .max(SOURCE_FRAMING_GUIDANCE_MAX_LEN)
+    .optional(),
   /** On-model reference: body/pose/framing only (from product analysis) */
   sourceModelPromptEn: z.string().trim().max(900).optional(),
   sourceModelSizeClass: z.string().trim().max(40).optional(),
@@ -166,6 +192,30 @@ export type GenerateModelImage = {
   height?: number;
 };
 
+export type ModelGenerationDebugInfo = {
+  analysis?: {
+    detectedProductView?: string;
+    detectedProductViewConfidence?: number | null;
+    sourcePresentation?: string;
+    sourceModelPose?: string;
+    sourceModelCameraAngle?: string;
+    sourceModelCrop?: string;
+  };
+  resolver?: {
+    resolvedModelPose?: string;
+    poseSource?: string;
+    reason?: string;
+    warnings?: string[];
+  };
+  generation?: {
+    promptPreview?: string;
+    promptComposer?: string;
+    aspectRatio?: string;
+    resolution?: string;
+    selectedQualityMode?: string;
+  };
+};
+
 export type GenerateModelSuccessResponse = {
   ok: true;
   provider: string;
@@ -177,6 +227,7 @@ export type GenerateModelSuccessResponse = {
   /** How the Fal prompt was built */
   promptComposer?: "openai" | "template";
   openAiPromptModel?: string;
+  debug?: ModelGenerationDebugInfo;
 };
 
 export type GenerateModelErrorResponse = {

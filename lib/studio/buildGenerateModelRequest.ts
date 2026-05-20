@@ -20,6 +20,7 @@ export function buildGenerateModelRequestBody(input: {
   productMustPreserve?: GenerateModelRequest["productMustPreserve"];
   productFitNotes?: GenerateModelRequest["productFitNotes"];
   neutralBaseFitGuidanceEn?: string;
+  sourceFramingGuidanceEn?: string;
   sourceModelPromptEn?: string;
   sourceModelSizeClass?: string;
   sourceModelPose?: string;
@@ -28,6 +29,8 @@ export function buildGenerateModelRequestBody(input: {
   sourceModelHandsPosition?: string;
   sourceModelFraming?: string;
   cameraAnglePromptOverride?: string;
+  productView?: GenerateModelRequest["productView"];
+  resolvedModelPose?: GenerateModelRequest["resolvedModelPose"];
 }): GenerateModelRequest {
   const {
     settings,
@@ -45,6 +48,7 @@ export function buildGenerateModelRequestBody(input: {
     productMustPreserve,
     productFitNotes,
     neutralBaseFitGuidanceEn,
+    sourceFramingGuidanceEn,
     sourceModelPromptEn,
     sourceModelSizeClass,
     sourceModelPose,
@@ -53,6 +57,8 @@ export function buildGenerateModelRequestBody(input: {
     sourceModelHandsPosition,
     sourceModelFraming,
     cameraAnglePromptOverride,
+    productView,
+    resolvedModelPose,
   } = input;
 
   return {
@@ -91,6 +97,9 @@ export function buildGenerateModelRequestBody(input: {
     productMustPreserve,
     productFitNotes,
     neutralBaseFitGuidanceEn: neutralBaseFitGuidanceEn?.trim() || undefined,
+    sourceFramingGuidanceEn: sourceFramingGuidanceEn?.trim() || undefined,
+    productView,
+    resolvedModelPose,
     referenceImageUrl: referenceImageUrl ?? undefined,
     promptLocale,
   };

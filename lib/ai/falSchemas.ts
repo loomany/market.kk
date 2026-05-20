@@ -1,4 +1,6 @@
 import { z } from "zod";
+import type { PremiumGarmentEditDebug } from "@/lib/ai/fashnEditSchemas";
+import type { TryOnPipelineDebug } from "@/lib/ai/tryOnPipelineDebug";
 import { validateImageFile } from "@/lib/ai/imageConstraints";
 import {
   FAL_MODEL_RESOLUTIONS,
@@ -47,6 +49,12 @@ export type TryOnSuccessResponse = {
   images: TryOnImage[];
   requestId: string;
   inputSource?: TryOnInputSource;
+  premiumGarmentEdit?: PremiumGarmentEditDebug;
+  tryOn?: {
+    requestId: string;
+    finalImageUrl?: string;
+    garmentImageUrl: string;
+  };
   quality?: {
     judged: boolean;
     repaired: boolean;
@@ -56,6 +64,7 @@ export type TryOnSuccessResponse = {
     repairSucceeded?: boolean;
     repairErrorReason?: string;
   };
+  debug?: TryOnPipelineDebug;
 };
 
 export type TryOnErrorResponse = {
@@ -123,6 +132,8 @@ export type TryOnFormPayload = {
   userDescriptionRu?: string;
   userEditedProductDescription?: boolean;
   modelResolution?: FalModelResolution;
+  /** fast = original product ref; premium = FASHN Edit before try-on (feature-flagged). */
+  garmentPrepMode?: "fast" | "premium";
 };
 
 function parseModelResolutionFormValue(
@@ -197,7 +208,15 @@ export function buildTryOnFormPayload(formData: FormData): TryOnFormPayload {
     modelResolution: parseModelResolutionFormValue(
       formData.get("modelResolution")
     ),
+    garmentPrepMode: parseGarmentPrepModeFormValue(formData.get("garmentPrepMode")),
   };
+}
+
+function parseGarmentPrepModeFormValue(
+  value: FormDataEntryValue | null
+): "fast" | "premium" {
+  const normalized = normalizeTryOnFormValue(value);
+  return normalized === "premium" ? "premium" : "fast";
 }
 
 export function getProductAnalysisFromPayload(

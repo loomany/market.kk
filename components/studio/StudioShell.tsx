@@ -58,7 +58,10 @@ import {
   withLingerieModelDefaults,
 } from "@/lib/studio/lingerieTryOnDefaults";
 import { applyDefaultLingerieCrop } from "@/lib/studio/lingerieCropDefaults";
-import { productAnalysisForModelGeneration } from "@/lib/ai/productAnalysisShared";
+import { buildStudioModelGenerationFields } from "@/lib/ai/productGenerationContext";
+import { isSourceProductZoneFramingActive } from "@/lib/ai/productAnalysisShared";
+import type { ModelGenerationDebugInfo } from "@/lib/ai/modelGenerationSchemas";
+import type { TryOnPipelineDebug } from "@/lib/ai/tryOnPipelineDebug";
 import {
   mapApiImagesToStudioResults,
   mapProductShotStudioResults,
@@ -282,6 +285,14 @@ export function StudioShell({
   const [modelSettings, setModelSettings] = useState<ModelGenerationSettings>(
     DEFAULT_MODEL_GENERATION_SETTINGS
   );
+  const sourceProductZoneFramingActive = useMemo(
+    () =>
+      isSourceProductZoneFramingActive(
+        productAnalysis,
+        modelSettings.categoryContext
+      ),
+    [productAnalysis, modelSettings.categoryContext]
+  );
   const [modelDescription, setModelDescription] = useState("");
   const [productShotSettings, setProductShotSettings] =
     useState<ProductShotSettings>(DEFAULT_PRODUCT_SHOT_SETTINGS);
@@ -306,6 +317,10 @@ export function StudioShell({
   const [modelGenerateProgress, setModelGenerateProgress] = useState<
     string | null
   >(null);
+  const [pipelineDebug, setPipelineDebug] = useState<{
+    model?: ModelGenerationDebugInfo;
+    tryOn?: TryOnPipelineDebug;
+  } | null>(null);
   const [productSampleAngles, setProductSampleAngles] = useState<
     ResolvedModelAngle[] | null
   >(null);
@@ -1102,12 +1117,13 @@ export function StudioShell({
           requestTimeoutMs
         );
 
-        const productGen = productAnalysisForModelGeneration(
-          productAnalysis,
-          { categoryContext: modelSettings.categoryContext },
-          productDescription,
-          userEditedProductDescription
-        );
+        const genFields = buildStudioModelGenerationFields({
+          analysis: productAnalysis,
+          overrides: { categoryContext: modelSettings.categoryContext },
+          settings: modelSettings,
+          userDescriptionRu: productDescription,
+          userEditedProductDescription,
+        });
 
         let res: Response;
         try {
@@ -1118,14 +1134,24 @@ export function StudioShell({
               buildGenerateModelRequestBody({
                 settings: {
                   ...modelSettings,
-                  categoryContext: productGen.categoryContext,
+                  categoryContext: genFields.categoryContext,
                 },
                 outputSize: modelOutputSize,
                 modelDescription,
-                shortAiSummaryEn: productGen.shortAiSummaryEn,
-                productSetType: productGen.productSetType,
-                productSourcePresentation: productGen.productSourcePresentation,
-                neutralBaseFitGuidanceEn: productGen.neutralBaseFitGuidanceEn,
+                shortAiSummaryEn: genFields.shortAiSummaryEn,
+                productSetType: genFields.productSetType,
+                productSourcePresentation: genFields.productSourcePresentation,
+                neutralBaseFitGuidanceEn: genFields.neutralBaseFitGuidanceEn,
+                sourceFramingGuidanceEn: genFields.sourceFramingGuidanceEn,
+                sourceModelPromptEn: genFields.sourceModelPromptEn,
+                sourceModelSizeClass: genFields.sourceModelSizeClass,
+                sourceModelPose: genFields.sourceModelPose,
+                sourceModelCrop: genFields.sourceModelCrop,
+                sourceModelCameraAngle: genFields.sourceModelCameraAngle,
+                sourceModelHandsPosition: genFields.sourceModelHandsPosition,
+                sourceModelFraming: genFields.sourceModelFraming,
+                productView: genFields.productView,
+                resolvedModelPose: genFields.resolvedModelPose,
                 promptLocale,
                 seed: useSeed,
                 angle,
@@ -1194,6 +1220,10 @@ export function StudioShell({
           setModelGenerateProgress(
             `Ракурс ${index + 1} из ${angles.length}: ${angle.label} (отдельная генерация, то же лицо по промпту)`
           );
+        }
+
+        if (data.debug) {
+          setPipelineDebug((prev) => ({ ...prev, model: data.debug }));
         }
 
         const url = data.images[0]?.url;
@@ -1372,6 +1402,10 @@ export function StudioShell({
       if (!data.ok) {
         setError(friendlyAiError(data.errorCode, data.message));
         return;
+      }
+
+      if (data.debug) {
+        setPipelineDebug((prev) => ({ ...prev, tryOn: data.debug }));
       }
 
       const mappedResults = mapApiImagesToStudioResults(data.images, angle.label, {
@@ -1884,6 +1918,9 @@ export function StudioShell({
                                 ? "Идёт AI-анализ товара. Настройки модели откроются после завершения."
                                 : undefined
                             }
+                            sourceProductZoneFramingActive={
+                              sourceProductZoneFramingActive
+                            }
                           />
                           <div className="relative mt-6">
                             {productAnalyzing ? (
@@ -2043,6 +2080,16 @@ export function StudioShell({
                             <p className="text-center text-xs font-medium tabular-nums text-slate-500">
                               {formatSaasPipelineCostKztRange()}
                             </p>
+                            {showDevControls && pipelineDebug ? (
+                              <details className="rounded-[12px] border border-slate-200 bg-slate-50 p-3 text-left text-xs text-slate-700">
+                                <summary className="cursor-pointer font-medium text-slate-900">
+                                  Pipeline debug (view / pose / quality)
+                                </summary>
+                                <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed">
+                                  {JSON.stringify(pipelineDebug, null, 2)}
+                                </pre>
+                              </details>
+                            ) : null}
                             {productAnalysis?.sourcePresentation === "on-model" &&
                             isSourceModelPopulated(productAnalysis.sourceModel) ? (
                               <p className="text-center text-xs leading-5 text-teal-900">

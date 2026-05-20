@@ -1,58 +1,32 @@
 /**
  * Garment fit-aware neutral-base guidance helper.
  *
- * Pure, browser- and server-safe: depends only on the analysis schema types,
- * no `server-only` import, no I/O, no env access. Designed to be wired into
- * `composeModelGenerationPrompt` / `buildModelGenerationPrompt` in a follow-up
- * PR; this PR introduces only the helper + tests and is intentionally NOT
- * called from any runtime path.
- *
- * Goal
- *  Today the lingerie neutral-base prompt forces a low-profile bikini brief
- *  (`neutralBaseMinimalBriefGuidance` in `modelIdentityPipeline.ts`) regardless
- *  of the marketplace SKU's silhouette. For high-waist briefs this leaves
- *  FASHN repainting a much taller brief over bare abdomen — the high-waist
- *  shape, central front panel, and side panels regularly collapse.
- *
- *  This helper turns the existing structured analysis fields
- *  (`bra.cupShape`, `bra.straps`, `bottoms.rise`, `bottoms.style`, plus
- *  `fitNotes`) into a short whitelisted English sentence that describes only
- *  the *fit silhouette* the neutral base should match (cup coverage, strap
- *  width, underband placement, brief waist height, side coverage, leg opening,
- *  back coverage) — never colour, lace, embroidery, pattern, or any
- *  SKU-specific design vocabulary.
- *
- * Safety contract (enforced by `scripts/test-neutralBaseFit.ts`)
- *  - Helper is gated on `categoryContext === "lingerie"`. Any other context
- *    (`clothing`, `general`, `jewelry`) returns `applied: false` with an empty
- *    `text`, so non-lingerie flows are not affected.
- *  - Helper is gated on `analysis.confidence >= PRODUCT_ANALYSIS_CONFIDENCE_THRESHOLD`
- *    (0.75). Low-confidence analyses fall back to the existing neutral base.
- *  - Helper never reads free-text from `analysis` into the output. Every
- *    rendered phrase is a hardcoded English constant selected by mapping
- *    Vision strings into a closed enum via regex.
- *  - Helper output is asserted to be free of decorative-design vocabulary
- *    (`lace`, `emerald`, `turquoise`, `floral`, `black base`, `scalloped`)
- *    by both an internal defence-in-depth check and the regression script.
- *  - Helper output is capped at `NEUTRAL_BASE_FIT_GUIDANCE_MAX_LEN` (700)
- *    so it cannot blow the `GENERATION_PROMPT_MAX` (3500) budget downstream.
+ * Pure, browser- and server-safe. Turns product analysis + derived
+ * `bottomSilhouette` into whitelisted English guidance for generate-model.
+ * Never echoes Vision free-text; black is allowed only via frozen constants.
  */
 
+import {
+  type BottomSilhouette,
+  bottomSilhouetteHasBottomSignal,
+  deriveBottomSilhouetteFromAnalysis,
+  hasConfidentBottomSilhouette,
+  type DominantBaseTone,
+} from "@/lib/ai/bottomSilhouette";
 import {
   PRODUCT_ANALYSIS_CONFIDENCE_THRESHOLD,
   type ProductDescriptionAnalysis,
 } from "@/lib/ai/productDescriptionAnalysisSchemas";
 
-/** Hard cap on the produced English sentence so it never starves the
- *  downstream prompt budget (`GENERATION_PROMPT_MAX` = 3500 in
- *  `composeModelGenerationPrompt.ts`). */
 export const NEUTRAL_BASE_FIT_GUIDANCE_MAX_LEN = 700;
 
-/** Lingerie is the only context where FASHN actually needs a fit-matched
- *  base today (`shouldUseNeutralBaseModelGeneration` in
- *  `modelIdentityPipeline.ts` returns true only for `"lingerie"`). The other
- *  enum members are listed so callers stay type-safe; they always yield
- *  `applied: false`. */
+/** Controlled allowlist phrase — black only via this constant, never free-text. */
+export const PLAIN_SOLID_BLACK_NEUTRAL_BASE_PHRASE =
+  "plain smooth solid black neutral base";
+
+export const PLAIN_NEUTRAL_NUDE_BASE_PHRASE =
+  "plain smooth neutral nude-beige base";
+
 export type FitAwareCategoryContext =
   | "lingerie"
   | "clothing"
@@ -73,40 +47,16 @@ export type StrapWidth =
   | "strapless"
   | "unknown";
 
-export type UnderbandPlacement = "standard" | "longline" | "unknown";
-
 export type SupportLevel = "structured" | "soft" | "unknown";
-
-export type BriefWaistHeight =
-  | "high_waist"
-  | "mid_rise"
-  | "low_rise"
-  | "unknown";
-
-export type BriefSideCoverage = "wide" | "medium" | "thin" | "unknown";
-
-export type BriefLegOpening = "high_cut" | "medium_cut" | "low_cut" | "unknown";
-
-export type BriefBackCoverage =
-  | "full"
-  | "cheeky"
-  | "brief"
-  | "thong"
-  | "unknown";
 
 export type DerivedNeutralBaseFitInputs = {
   bra?: {
     cupCoverage: BraCupCoverage;
     strapWidth: StrapWidth;
-    underbandPlacement: UnderbandPlacement;
     supportLevel: SupportLevel;
   };
-  bottom?: {
-    waistHeight: BriefWaistHeight;
-    sideCoverage: BriefSideCoverage;
-    legOpening: BriefLegOpening;
-    backCoverage: BriefBackCoverage;
-  };
+  bottomSilhouette?: BottomSilhouette;
+  dominantBaseTone?: DominantBaseTone;
 };
 
 export type NeutralBaseFitGuidance =
@@ -114,12 +64,18 @@ export type NeutralBaseFitGuidance =
       applied: true;
       text: string;
       inputs: DerivedNeutralBaseFitInputs;
+      bottomSilhouette: BottomSilhouette;
+      fitAwareBottom: boolean;
+      useBlackNeutralBase: boolean;
       reason: string;
     }
   | {
       applied: false;
       text: "";
       inputs?: undefined;
+      bottomSilhouette?: undefined;
+      fitAwareBottom?: false;
+      useBlackNeutralBase?: false;
       reason: string;
     };
 
@@ -128,256 +84,13 @@ export type DeriveNeutralBaseFitInput = {
   categoryContext: FitAwareCategoryContext;
 };
 
-// ---------------------------------------------------------------------------
-// Whitelisted phrase constants
-// ---------------------------------------------------------------------------
-// Every phrase is a hardcoded English string. The helper never substitutes
-// free-text from the analysis into the output — it only selects which of the
-// frozen phrases below to concatenate, based on enum values derived from the
-// Vision strings.
-//
-// Words explicitly avoided (decorative-design tokens, forbidden by the
-// regression test): `lace`, `emerald`, `turquoise`, `floral`, `scalloped`,
-// `embroidery`, `decorative`, `print`, `pattern`, `colour`/`color`, any
-// concrete colour name, "black base".
-// ---------------------------------------------------------------------------
-
-const BRA_CUP_PHRASES: Record<BraCupCoverage, string> = {
-  full_cup:
-    "supportive full-cup neutral bra shape with rounded smooth cups",
-  balconette:
-    "balconette-style neutral bra shape with a horizontal cup line",
-  triangle:
-    "soft triangle-style neutral bra shape",
-  sports:
-    "sports-style neutral bra shape with compressed support",
-  unknown: "",
-};
-
-const STRAP_PHRASES: Record<StrapWidth, string> = {
-  wide: "wider shoulder straps",
-  medium: "standard-width shoulder straps",
-  thin: "thinner shoulder straps",
-  strapless: "strapless silhouette without shoulder straps",
-  unknown: "",
-};
-
-const UNDERBAND_PHRASES: Record<UnderbandPlacement, string> = {
-  standard: "standard underband placement at the natural under-bust line",
-  longline: "longline neutral band extending toward the lower ribs",
-  unknown: "",
-};
-
-const SUPPORT_PHRASES: Record<SupportLevel, string> = {
-  structured: "structured supportive bra silhouette",
-  soft: "soft unstructured bra silhouette",
-  unknown: "",
-};
-
-const BRIEF_WAIST_PHRASES: Record<BriefWaistHeight, string> = {
-  high_waist:
-    "high-waist neutral brief silhouette with the waistband sitting between the navel and the lower ribs",
-  mid_rise:
-    "mid-rise neutral brief silhouette with the waistband sitting at the natural waistline",
-  low_rise:
-    "low-rise neutral brief silhouette with the waistband sitting on the hips",
-  unknown: "",
-};
-
-const BRIEF_SIDE_COVERAGE_PHRASES: Record<BriefSideCoverage, string> = {
-  wide: "wider side coverage on the briefs",
-  medium: "standard side coverage on the briefs",
-  thin: "narrower side coverage on the briefs",
-  unknown: "",
-};
-
-const BRIEF_LEG_OPENING_PHRASES: Record<BriefLegOpening, string> = {
-  high_cut: "higher leg opening shape on the briefs",
-  medium_cut: "standard leg opening shape on the briefs",
-  low_cut: "lower leg opening shape on the briefs",
-  unknown: "",
-};
-
-const BRIEF_BACK_COVERAGE_PHRASES: Record<BriefBackCoverage, string> = {
-  full: "full back coverage on the briefs",
-  cheeky: "cheeky back coverage on the briefs",
-  brief: "standard brief back coverage",
-  thong: "thong-shape back coverage on the briefs",
-  unknown: "",
-};
-
-/** Fixed intro — does NOT mention colour or fabric. The existing
- *  `lingerieNeutralBaseOutfitGuidance` already pins nude-beige; this helper
- *  only contributes silhouette guidance and must not redefine colour. */
-const INTRO =
-  "Use a plain seamless neutral base set that matches only the product fit silhouette:";
-
-/** Fixed negative tail. Deliberately written so that NONE of the forbidden
- *  decorative-design tokens (lace, emerald, turquoise, floral, scalloped,
- *  embroidery, decorative, pattern, print, colour, concrete colour names,
- *  "black base") appear — neither as positive nor as negative wording.
- *  The existing `lingerieNeutralBaseOutfitGuidance` and
- *  `MODEL_GENERATION_NO_GARMENT_COPY_RULE` already carry the detailed
- *  "no lace / no floral / no turquoise" negatives in the prompt; this
- *  helper only needs to reinforce "match silhouette, never surface design". */
 const NEGATIVE_TAIL =
-  "Do not recreate the product's surface design or apply any garment-specific accents on the base; keep the base plain and design-neutral. Match silhouette geometry only.";
+  "Do not recreate product surface design or SKU-specific accents on the base; keep the base plain and design-neutral. Match fit geometry only.";
 
-// ---------------------------------------------------------------------------
-// Vision-string → enum mapping
-// ---------------------------------------------------------------------------
-// All regexes are anchored to silhouette/shape vocabulary only. They never
-// match colour names or pattern names, so even if Vision returned a polluted
-// string like "supportive black lace bra" the mapping returns at most a
-// silhouette enum ("full_cup") — colour/lace tokens cannot escape into the
-// output, because we never echo the source string itself.
-// ---------------------------------------------------------------------------
-
-function lc(value: string | null | undefined): string {
-  return (value ?? "").toLowerCase();
-}
-
-function mapBraCupCoverage(
-  cupShape: string | null | undefined,
-  braStyle: string | null | undefined
-): BraCupCoverage {
-  const t = `${lc(cupShape)} ${lc(braStyle)}`;
-  if (/\bfull[\s-]?cup\b|\bfull\s+coverage\b|\bmolded\s+cup\b/.test(t)) {
-    return "full_cup";
-  }
-  if (/\bbalconette\b|\bbalcony\b|\bdemi[\s-]?cup\b/.test(t)) {
-    return "balconette";
-  }
-  if (/\btriangle\b|\bbralette\b|\bsoft\s+cup\b|\bunlined\b/.test(t)) {
-    return "triangle";
-  }
-  if (/\bsports?\s*bra\b|\bathletic\s+bra\b|\bcompression\s+bra\b/.test(t)) {
-    return "sports";
-  }
-  // "supportive" alone is too generic to choose a cup shape — let the
-  // support-level signal carry it instead.
-  return "unknown";
-}
-
-function mapStrapWidth(
-  straps: string | null | undefined
-): StrapWidth {
-  const t = lc(straps);
-  if (!t) return "unknown";
-  if (/\bstrapless\b|\bbandeau\b/.test(t)) return "strapless";
-  if (/\bwide\b|\bthick\b|\bbroad\b/.test(t)) return "wide";
-  if (/\bthin\b|\bnarrow\b|\bspaghetti\b|\bstring\s*strap/.test(t)) {
-    return "thin";
-  }
-  if (/\bmedium\b|\bstandard\b|\bregular\b/.test(t)) return "medium";
-  return "unknown";
-}
-
-function mapBriefWaistHeight(
-  rise: string | null | undefined,
-  style: string | null | undefined,
-  fitText: string
-): BriefWaistHeight {
-  const t = `${lc(rise)} ${lc(style)} ${fitText}`;
-  if (/\bhigh[\s-]?waist(?:ed)?\b|\bhigh[\s-]?rise\b|\bretro\s+waist\b|\bcontrol\s+waist\b/.test(t)) {
-    return "high_waist";
-  }
-  if (/\bmid[\s-]?(?:rise|waist)\b|\bnatural\s+waist(?:line)?\b/.test(t)) {
-    return "mid_rise";
-  }
-  if (/\blow[\s-]?(?:rise|waist)\b|\bhipster\b|\bhip[\s-]?hugger\b/.test(t)) {
-    return "low_rise";
-  }
-  return "unknown";
-}
-
-function mapBriefBackCoverage(
-  style: string | null | undefined,
-  fitText: string
-): BriefBackCoverage {
-  const t = `${lc(style)} ${fitText}`;
-  if (/\bthong\b|\bg[\s-]?string\b/.test(t)) return "thong";
-  if (/\bcheeky\b|\bbrazilian\s+cut\b/.test(t)) return "cheeky";
-  if (/\bfull\s+coverage\b|\bfull\s+brief\b|\bfull\s+back\b/.test(t)) {
-    return "full";
-  }
-  if (/\bbrief\b|\bhipster\b|\bbikini\s+(?:cut|brief)\b/.test(t)) {
-    return "brief";
-  }
-  return "unknown";
-}
-
-function detectBriefSideCoverage(fitText: string): BriefSideCoverage {
-  if (/\bwide\s+side|\bbroad\s+side|\bfull\s+side\s+(?:panel|coverage)/.test(fitText)) {
-    return "wide";
-  }
-  if (/\bthin\s+side|\bnarrow\s+side\b/.test(fitText)) {
-    return "thin";
-  }
-  if (/\bmedium\s+side|\bstandard\s+side\b/.test(fitText)) {
-    return "medium";
-  }
-  return "unknown";
-}
-
-function detectBriefLegOpening(fitText: string): BriefLegOpening {
-  if (/\bhigh[\s-]?cut\s+leg\b|\bhigh\s+leg\s+(?:line|opening)\b/.test(fitText)) {
-    return "high_cut";
-  }
-  if (/\blow[\s-]?cut\s+leg\b|\blow\s+leg\s+(?:line|opening)\b/.test(fitText)) {
-    return "low_cut";
-  }
-  if (/\bmedium\s+(?:cut\s+)?leg\b|\bstandard\s+leg\b/.test(fitText)) {
-    return "medium_cut";
-  }
-  return "unknown";
-}
-
-function detectUnderbandPlacement(fitText: string): UnderbandPlacement {
-  if (/\blongline\b|\blong[\s-]?line\b|\blong\s+band\b/.test(fitText)) {
-    return "longline";
-  }
-  if (/\bstandard\s+(?:band|underband)\b|\bnatural\s+underbust\b/.test(fitText)) {
-    return "standard";
-  }
-  return "unknown";
-}
-
-function detectSupportLevel(
-  braStyle: string | null | undefined,
-  fitText: string
-): SupportLevel {
-  const t = `${lc(braStyle)} ${fitText}`;
-  if (/\bsupportive\b|\bstructured\b|\bunderwire\b|\bmolded\b|\bpadded\b/.test(t)) {
-    return "structured";
-  }
-  if (/\bsoft\s+cup\b|\bunlined\b|\bwireless\b|\bwire[\s-]?free\b|\blightly\s+lined\b/.test(t)) {
-    return "soft";
-  }
-  return "unknown";
-}
-
-function collectFitText(analysis: ProductDescriptionAnalysis): string {
-  return [
-    analysis.bra.style,
-    analysis.bra.cupShape,
-    analysis.bra.straps,
-    analysis.bottoms.style,
-    analysis.bottoms.rise,
-    ...analysis.fitNotes,
-  ]
-    .filter((v): v is string => typeof v === "string" && v.length > 0)
-    .join(" ")
-    .toLowerCase();
-}
-
-// ---------------------------------------------------------------------------
-// Defence-in-depth: forbidden decorative-design tokens
-// ---------------------------------------------------------------------------
-// The phrase constants above are hand-curated to be silhouette-only. If a
-// future edit accidentally adds a colour / pattern / lace token, the helper
-// returns `applied: false` rather than leak it into the prompt. The
-// regression script asserts the same list externally.
+const ALLOWED_COLOR_PHRASES: readonly string[] = [
+  PLAIN_SOLID_BLACK_NEUTRAL_BASE_PHRASE,
+  PLAIN_NEUTRAL_NUDE_BASE_PHRASE,
+];
 
 const FORBIDDEN_DESIGN_TOKENS: readonly RegExp[] = [
   /\bcolou?r\b/i,
@@ -405,11 +118,214 @@ const FORBIDDEN_DESIGN_TOKENS: readonly RegExp[] = [
   /\bprinted\b/i,
   /\blogo\b/i,
   /\bSKU-specific design\b/i,
+  /\bgreen accents\b/i,
+  /\bdecorative panels\b/i,
 ];
 
-// ---------------------------------------------------------------------------
-// Public helper
-// ---------------------------------------------------------------------------
+function lc(value: string | null | undefined): string {
+  return (value ?? "").toLowerCase();
+}
+
+function collectBraSignalText(analysis: ProductDescriptionAnalysis): string {
+  return [
+    analysis.bra.style,
+    analysis.bra.cupShape,
+    analysis.bra.straps,
+    ...analysis.fitNotes,
+  ]
+    .filter((v): v is string => typeof v === "string" && v.length > 0)
+    .join(" ")
+    .toLowerCase();
+}
+
+function mapBraCupCoverage(
+  cupShape: string | null | undefined,
+  braStyle: string | null | undefined
+): BraCupCoverage {
+  const t = `${lc(cupShape)} ${lc(braStyle)}`;
+  if (/\bfull[\s-]?cup\b|\bfull\s+coverage\b|\bmolded\s+cup\b/.test(t)) {
+    return "full_cup";
+  }
+  if (/\bbalconette\b|\bbalcony\b|\bdemi[\s-]?cup\b/.test(t)) {
+    return "balconette";
+  }
+  if (/\btriangle\b|\bbralette\b|\bsoft\s+cup\b|\bunlined\b/.test(t)) {
+    return "triangle";
+  }
+  if (/\bsports?\s*bra\b|\bathletic\s+bra\b|\bcompression\s+bra\b/.test(t)) {
+    return "sports";
+  }
+  return "unknown";
+}
+
+function mapStrapWidth(straps: string | null | undefined): StrapWidth {
+  const t = lc(straps);
+  if (!t) return "unknown";
+  if (/\bstrapless\b|\bbandeau\b/.test(t)) return "strapless";
+  if (/\bwide\b|\bthick\b|\bbroad\b/.test(t)) return "wide";
+  if (/\bthin\b|\bnarrow\b|\bspaghetti\b|\bstring\s*strap/.test(t)) {
+    return "thin";
+  }
+  if (/\bmedium\b|\bstandard\b|\bregular\b/.test(t)) return "medium";
+  return "unknown";
+}
+
+function detectSupportLevel(
+  braStyle: string | null | undefined,
+  fitText: string
+): SupportLevel {
+  const t = `${lc(braStyle)} ${fitText}`;
+  if (/\bsupportive\b|\bstructured\b|\bunderwire\b|\bmolded\b|\bpadded\b/.test(t)) {
+    return "structured";
+  }
+  if (/\bsoft\s+cup\b|\bunlined\b|\bwireless\b|\bwire[\s-]?free\b|\blightly\s+lined\b/.test(t)) {
+    return "soft";
+  }
+  return "unknown";
+}
+
+export function scrubAllowedColorPhrases(text: string): string {
+  let scrubbed = text;
+  for (const phrase of ALLOWED_COLOR_PHRASES) {
+    scrubbed = scrubbed.split(phrase).join("");
+  }
+  return scrubbed;
+}
+
+export function containsForbiddenDesignTokens(text: string): boolean {
+  const scrubbed = scrubAllowedColorPhrases(text);
+  return FORBIDDEN_DESIGN_TOKENS.some((re) => re.test(scrubbed));
+}
+
+function composeBottomPhrase(silhouette: BottomSilhouette): string {
+  const waistLabel =
+    silhouette.waistHeight === "high_waist"
+      ? "high-waist"
+      : silhouette.waistHeight === "mid_rise"
+        ? "mid-rise"
+        : silhouette.waistHeight === "low_rise"
+          ? "low-rise"
+          : "";
+
+  const briefLabel =
+    silhouette.briefType === "brief"
+      ? "full-brief"
+      : silhouette.briefType === "bikini"
+        ? "bikini"
+        : silhouette.briefType === "hipster"
+          ? "hipster"
+          : silhouette.briefType === "thong"
+            ? "thong"
+            : silhouette.briefType === "shorts"
+              ? "short-style"
+              : "brief";
+
+  const parts: string[] = [];
+  if (waistLabel) {
+    parts.push(`${waistLabel} ${briefLabel} bottom`);
+  } else if (silhouette.briefType !== "unknown") {
+    parts.push(`${briefLabel} bottom`);
+  }
+
+  if (silhouette.sideCoverage === "wide_side_panel") {
+    parts.push("wide side coverage");
+  } else if (silhouette.sideCoverage === "medium_side") {
+    parts.push("standard side coverage");
+  } else if (silhouette.sideCoverage === "thin_side") {
+    parts.push("narrow side coverage");
+  }
+
+  if (silhouette.frontCoverage === "full_front") {
+    parts.push("full front coverage");
+  } else if (silhouette.frontCoverage === "medium_front") {
+    parts.push("medium front coverage");
+  } else if (silhouette.frontCoverage === "minimal_front") {
+    parts.push("minimal front coverage");
+  }
+
+  if (
+    silhouette.legOpening === "medium_cut" ||
+    silhouette.legOpening === "low_cut"
+  ) {
+    parts.push("medium-to-low leg opening");
+  } else if (silhouette.legOpening === "high_cut") {
+    parts.push("higher leg opening");
+  }
+
+  if (silhouette.waistHeight !== "unknown") {
+    parts.push("similar waist height");
+  }
+
+  return parts.join(", ");
+}
+
+function composeBraPhrase(inputs: NonNullable<DerivedNeutralBaseFitInputs["bra"]>): string {
+  const parts: string[] = [];
+  if (inputs.cupCoverage === "full_cup") {
+    parts.push("supportive full-cup bra shape");
+  } else if (inputs.cupCoverage === "balconette") {
+    parts.push("balconette-style neutral bra shape");
+  } else if (inputs.cupCoverage === "triangle") {
+    parts.push("soft triangle-style neutral bra shape");
+  } else if (inputs.cupCoverage === "sports") {
+    parts.push("sports-style neutral bra shape");
+  } else if (inputs.supportLevel === "structured") {
+    parts.push("supportive neutral bra shape");
+  }
+
+  if (inputs.strapWidth === "wide") {
+    parts.push("wider shoulder straps");
+  } else if (inputs.strapWidth === "medium") {
+    parts.push("standard-width shoulder straps");
+  } else if (inputs.strapWidth === "thin") {
+    parts.push("thinner shoulder straps");
+  } else if (inputs.strapWidth === "strapless") {
+    parts.push("strapless silhouette");
+  }
+
+  return parts.join(" with ");
+}
+
+function selectBaseColorPhrase(tone: DominantBaseTone): string {
+  if (tone === "black_dark") return PLAIN_SOLID_BLACK_NEUTRAL_BASE_PHRASE;
+  return PLAIN_NEUTRAL_NUDE_BASE_PHRASE;
+}
+
+function composeGuidanceText(
+  inputs: DerivedNeutralBaseFitInputs,
+  bottomSilhouette: BottomSilhouette
+): string {
+  const colorPhrase = selectBaseColorPhrase(
+    inputs.dominantBaseTone ?? bottomSilhouette.dominantBaseTone
+  );
+  const segments: string[] = [];
+
+  if (inputs.bra) {
+    const braPhrase = composeBraPhrase(inputs.bra);
+    if (braPhrase) segments.push(braPhrase);
+  }
+
+  if (inputs.bottomSilhouette && bottomSilhouetteHasBottomSignal(bottomSilhouette)) {
+    const bottomPhrase = composeBottomPhrase(bottomSilhouette);
+    if (bottomPhrase) segments.push(bottomPhrase);
+  }
+
+  const middle = segments.join("; ");
+  const composed = `Use a ${colorPhrase} set matching only the product fit silhouette: ${middle}. ${NEGATIVE_TAIL}`;
+
+  if (composed.length <= NEUTRAL_BASE_FIT_GUIDANCE_MAX_LEN) {
+    return composed;
+  }
+
+  const tail = ` ${NEGATIVE_TAIL}`;
+  const budget = NEUTRAL_BASE_FIT_GUIDANCE_MAX_LEN - tail.length;
+  const head = `Use a ${colorPhrase} set matching only the product fit silhouette: ${middle}.`;
+  if (head.length > budget) {
+    const truncatedHead = head.slice(0, budget - 1).replace(/[,;\s]+$/, "");
+    return `${truncatedHead}…${tail}`;
+  }
+  return `${head}${tail}`;
+}
 
 export function deriveNeutralBaseFitGuidance(
   input: DeriveNeutralBaseFitInput
@@ -430,8 +346,22 @@ export function deriveNeutralBaseFitGuidance(
     );
   }
 
-  const fitText = collectFitText(analysis);
-  const inputs: DerivedNeutralBaseFitInputs = {};
+  const bottomSilhouette = analysis.bottoms.present
+    ? deriveBottomSilhouetteFromAnalysis(analysis)
+    : {
+        waistHeight: "unknown",
+        sideCoverage: "unknown",
+        frontCoverage: "unknown",
+        legOpening: "unknown",
+        briefType: "unknown",
+        dominantBaseTone: "unknown",
+        confidence: 0,
+      } satisfies BottomSilhouette;
+
+  const braSignalText = collectBraSignalText(analysis);
+  const inputs: DerivedNeutralBaseFitInputs = {
+    dominantBaseTone: bottomSilhouette.dominantBaseTone,
+  };
   let hasSignal = false;
 
   if (analysis.bra.present) {
@@ -440,50 +370,20 @@ export function deriveNeutralBaseFitGuidance(
       analysis.bra.style
     );
     const strapWidth = mapStrapWidth(analysis.bra.straps);
-    const underbandPlacement = detectUnderbandPlacement(fitText);
-    const supportLevel = detectSupportLevel(analysis.bra.style, fitText);
+    const supportLevel = detectSupportLevel(analysis.bra.style, braSignalText);
     if (
       cupCoverage !== "unknown" ||
       strapWidth !== "unknown" ||
-      underbandPlacement !== "unknown" ||
       supportLevel !== "unknown"
     ) {
-      inputs.bra = {
-        cupCoverage,
-        strapWidth,
-        underbandPlacement,
-        supportLevel,
-      };
+      inputs.bra = { cupCoverage, strapWidth, supportLevel };
       hasSignal = true;
     }
   }
 
-  if (analysis.bottoms.present) {
-    const waistHeight = mapBriefWaistHeight(
-      analysis.bottoms.rise,
-      analysis.bottoms.style,
-      fitText
-    );
-    const sideCoverage = detectBriefSideCoverage(fitText);
-    const legOpening = detectBriefLegOpening(fitText);
-    const backCoverage = mapBriefBackCoverage(
-      analysis.bottoms.style,
-      fitText
-    );
-    if (
-      waistHeight !== "unknown" ||
-      sideCoverage !== "unknown" ||
-      legOpening !== "unknown" ||
-      backCoverage !== "unknown"
-    ) {
-      inputs.bottom = {
-        waistHeight,
-        sideCoverage,
-        legOpening,
-        backCoverage,
-      };
-      hasSignal = true;
-    }
+  if (analysis.bottoms.present && bottomSilhouetteHasBottomSignal(bottomSilhouette)) {
+    inputs.bottomSilhouette = bottomSilhouette;
+    hasSignal = true;
   }
 
   if (!hasSignal) {
@@ -492,20 +392,23 @@ export function deriveNeutralBaseFitGuidance(
     );
   }
 
-  const text = composeGuidanceText(inputs);
+  const useBlackNeutralBase = bottomSilhouette.dominantBaseTone === "black_dark";
+  const fitAwareBottom = hasConfidentBottomSilhouette(bottomSilhouette);
+  const text = composeGuidanceText(inputs, bottomSilhouette);
 
-  for (const re of FORBIDDEN_DESIGN_TOKENS) {
-    if (re.test(text)) {
-      return notApplied(
-        `internal sanitizer: forbidden decorative-design token ${re} appeared in the derived text — refusing to emit`
-      );
-    }
+  if (containsForbiddenDesignTokens(text)) {
+    return notApplied(
+      "internal sanitizer: forbidden decorative-design token appeared in derived text — refusing to emit"
+    );
   }
 
   return {
     applied: true,
     text,
     inputs,
+    bottomSilhouette,
+    fitAwareBottom,
+    useBlackNeutralBase,
     reason: "lingerie + confident analysis + fit signal present",
   };
 }
@@ -514,41 +417,5 @@ function notApplied(reason: string): NeutralBaseFitGuidance {
   return { applied: false, text: "", reason };
 }
 
-function composeGuidanceText(inputs: DerivedNeutralBaseFitInputs): string {
-  const parts: string[] = [];
-
-  if (inputs.bra) {
-    const braParts = [
-      BRA_CUP_PHRASES[inputs.bra.cupCoverage],
-      STRAP_PHRASES[inputs.bra.strapWidth],
-      UNDERBAND_PHRASES[inputs.bra.underbandPlacement],
-      SUPPORT_PHRASES[inputs.bra.supportLevel],
-    ].filter((s) => s.length > 0);
-    parts.push(...braParts);
-  }
-
-  if (inputs.bottom) {
-    const bottomParts = [
-      BRIEF_WAIST_PHRASES[inputs.bottom.waistHeight],
-      BRIEF_SIDE_COVERAGE_PHRASES[inputs.bottom.sideCoverage],
-      BRIEF_LEG_OPENING_PHRASES[inputs.bottom.legOpening],
-      BRIEF_BACK_COVERAGE_PHRASES[inputs.bottom.backCoverage],
-    ].filter((s) => s.length > 0);
-    parts.push(...bottomParts);
-  }
-
-  const middle = parts.join(", ");
-  const composed = `${INTRO} ${middle}. ${NEGATIVE_TAIL}`;
-
-  if (composed.length > NEUTRAL_BASE_FIT_GUIDANCE_MAX_LEN) {
-    const tail = ` ${NEGATIVE_TAIL}`;
-    const budget = NEUTRAL_BASE_FIT_GUIDANCE_MAX_LEN - tail.length;
-    const head = `${INTRO} ${middle}.`;
-    if (head.length > budget) {
-      const truncatedHead = head.slice(0, budget - 1).replace(/[,;\s]+$/, "");
-      return `${truncatedHead}…${tail}`;
-    }
-    return `${head}${tail}`;
-  }
-  return composed;
-}
+export { deriveBottomSilhouetteFromAnalysis, hasConfidentBottomSilhouette };
+export type { BottomSilhouette };

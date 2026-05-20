@@ -26,6 +26,7 @@ import { dirname, resolve as pathResolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { buildModelGenerationPrompt } from "../lib/ai/modelPrompts.ts";
+import { deriveSourceFramingGuidance } from "../lib/ai/sourceFramingGuidance.ts";
 import { lingerieNeutralBaseOutfitGuidance } from "../lib/ai/modelIdentityPipeline.ts";
 import {
   MODEL_ANGLE_PRESETS,
@@ -306,12 +307,87 @@ function checkComposeModelHardRuleSourceContainsTryOnSafePose() {
   );
 }
 
+function checkProductZoneIgnoresUnsafeSourcePose() {
+  const helper = deriveSourceFramingGuidance({
+    analysis: {
+      descriptionRu: "x".repeat(25),
+      shortAiSummaryEn: "on-model lingerie set",
+      categoryContext: "lingerie",
+      productCategory: "auto",
+      sourcePresentation: "on-model",
+      garmentPhotoType: "model",
+      setType: "bra_brief_set",
+      baseColor: null,
+      accentColors: [],
+      pattern: null,
+      materials: [],
+      bra: { present: true, style: null, cupShape: null, straps: null },
+      bottoms: { present: true, style: null, rise: "high-waist" },
+      mustPreserve: [],
+      fitNotes: [],
+      warnings: [],
+      confidence: 0.92,
+      sourceModel: {
+        bodyType: "curvy",
+        sizeClass: "curvy",
+        pose: "seated on sofa, hand on chest",
+        poseRu: "сидя",
+        crop: "upper-thigh",
+        cameraAngle: "seated angled",
+        handsPosition: "hand on chest",
+        framing: "tight crop",
+        bodyVisibility: "torso only",
+        descriptionRu: "сидя",
+        promptEn:
+          "Match similar seated pose with hand on chest. Do not copy face.",
+      },
+    },
+    categoryContext: "lingerie",
+  });
+  assert.equal(helper.applied, true, "product-zone helper applied");
+
+  const prompt = buildModelGenerationPrompt(
+    {
+      ...baseRequest({ categoryContext: "lingerie", crop: "upper-thigh" }),
+      sourceFramingGuidanceEn: helper.text,
+      sourceModelPromptEn:
+        "Match similar seated pose with hand on chest. Do not copy face.",
+      cameraAnglePrompt: "seated on sofa, hand resting on chest",
+    },
+    { neutralBaseForTryOn: true }
+  );
+
+  assertContains(
+    prompt,
+    /entire head and full face (?:must )?always (?:remain )?visible|Non-negotiable head framing/i,
+    "full head required",
+    "product-zone unsafe source"
+  );
+  assertContains(
+    prompt,
+    /standing try-on-safe|Honor merchant orientation/i,
+    "standing / merchant orientation",
+    "product-zone unsafe source"
+  );
+  assertContains(
+    prompt,
+    /seated|hand-on-chest/i,
+    "unsafe pose blocked",
+    "product-zone unsafe source"
+  );
+  assertAbsent(prompt, /\blower face\b/i, "lower face crop", "product-zone unsafe source");
+  console.log(
+    "[ok] product-zone framing ignores seated/hand-on-chest source pose hints"
+  );
+}
+
 function main() {
   checkLingerieNeutralBaseGuidance();
   checkAnglePresetsHaveNoAsymmetricArms();
   checkCustomAngleHasTryOnSafeFallback();
   checkLingerieSentenceHasNoAsymmetricArms();
   checkComposeModelHardRuleSourceContainsTryOnSafePose();
+  checkProductZoneIgnoresUnsafeSourcePose();
 
   for (const ctx of ["lingerie", "clothing", "general", "jewelry"] as const) {
     checkPromptForContext(ctx);

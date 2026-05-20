@@ -1,6 +1,7 @@
 import type { ProductDescriptionAnalysis } from "@/lib/ai/productDescriptionAnalysisSchemas";
 import type { FalModelResolution } from "@/lib/ai/modelOutputSizes";
 import { tryOnQualityModeFromResolution } from "@/lib/studio/tryOnQuality";
+import { resolveGarmentPrepMode } from "@/lib/studio/resolveGarmentPrepMode";
 import { resolveStudioTryOnSettings } from "@/lib/studio/resolveStudioTryOnSettings";
 import type {
   GarmentPhotoType,
@@ -57,9 +58,11 @@ export function appendStudioTryOnFields(
     String(input.userEditedProductDescription)
   );
 
+  const qualityMode = tryOnQualityModeFromResolution(input.modelResolution);
+  formData.append("mode", qualityMode);
   formData.append(
-    "mode",
-    tryOnQualityModeFromResolution(input.modelResolution)
+    "garmentPrepMode",
+    resolveGarmentPrepMode(qualityMode)
   );
   formData.append("modelResolution", input.modelResolution);
   formData.append("moderationLevel", "permissive");

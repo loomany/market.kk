@@ -7,6 +7,7 @@ import type {
 } from "@/components/studio/types";
 import { mapCategoryForTryOn } from "@/lib/ai/falSchemas";
 import { deriveNeutralBaseFitGuidance } from "@/lib/ai/neutralBaseFitGuidance";
+import { deriveSourceFramingGuidance } from "@/lib/ai/sourceFramingGuidance";
 
 export type ProductAnalysisUiOverrides = {
   categoryContext?: ModelCategoryContext;
@@ -74,10 +75,16 @@ export function mapFashnCategoryForTryOn(input: {
 
 /** Pose/category context only — no colors, lace, or mustPreserve (try-on owns fidelity). */
 export function modelSafeProductSummaryEn(
-  analysis: ProductDescriptionAnalysis
+  analysis: ProductDescriptionAnalysis,
+  categoryContext?: ModelCategoryContext
 ): string {
+  const ctx = categoryContext ?? analysis.categoryContext ?? "clothing";
+  const productKind =
+    ctx === "lingerie"
+      ? `${analysis.setType} lingerie set`
+      : `${analysis.setType} apparel item`;
   const parts = [
-    `${analysis.setType} lingerie set`,
+    productKind,
     analysis.sourcePresentation === "on-model"
       ? "merchant photo shows garment on body"
       : "flat product photo",
@@ -105,6 +112,7 @@ export function productAnalysisForModelGeneration(
   sourceModelCameraAngle?: string;
   sourceModelHandsPosition?: string;
   neutralBaseFitGuidanceEn?: string;
+  sourceFramingGuidanceEn?: string;
 } {
   const sourceModel =
     analysis?.sourcePresentation === "on-model" ? analysis.sourceModel : null;
@@ -120,10 +128,19 @@ export function productAnalysisForModelGeneration(
     categoryContext,
   });
 
+  // On-model lingerie source crop/framing — whitelisted English sentence from
+  // `sourceModel.crop` only; never free-text from Vision. Gated internally.
+  const sourceFraming = deriveSourceFramingGuidance({
+    analysis,
+    categoryContext,
+    sourcePresentation: analysis?.sourcePresentation,
+    confidence: analysis?.confidence,
+  });
+
   return {
     categoryContext,
     shortAiSummaryEn: analysis
-      ? modelSafeProductSummaryEn(analysis)
+      ? modelSafeProductSummaryEn(analysis, categoryContext)
       : undefined,
     productSetType: analysis?.setType,
     productSourcePresentation: analysis?.sourcePresentation,
@@ -145,5 +162,19 @@ export function productAnalysisForModelGeneration(
     ...(neutralBaseFit.applied
       ? { neutralBaseFitGuidanceEn: neutralBaseFit.text }
       : {}),
+    ...(sourceFraming.applied
+      ? { sourceFramingGuidanceEn: sourceFraming.text }
+      : {}),
   };
+}
+
+/** UI: server will adapt generate-model framing to the uploaded product photo. */
+export function isSourceProductZoneFramingActive(
+  analysis: ProductDescriptionAnalysis | null | undefined,
+  categoryContext: ModelCategoryContext
+): boolean {
+  return deriveSourceFramingGuidance({
+    analysis,
+    categoryContext,
+  }).applied;
 }

@@ -14,6 +14,10 @@ import {
 } from "@/lib/ai/modelAge";
 import { withLingerieModelDefaults } from "@/lib/studio/lingerieTryOnDefaults";
 import {
+  getLingerieCropDescription,
+  getLingerieCropSelectLabel,
+} from "@/lib/studio/lingerieCropUiCopy";
+import {
   FAL_MODEL_ASPECT_RATIO_OPTIONS,
   FAL_MODEL_RESOLUTION_OPTIONS,
   isModelOutputSizeComplete,
@@ -57,6 +61,8 @@ type ModelPresetSelectorProps = {
   settingsLocked?: boolean;
   /** Shown over parameters while locked (e.g. product vision analysis) */
   settingsLockMessage?: string;
+  /** Server will adapt framing to the uploaded on-model product photo */
+  sourceProductZoneFramingActive?: boolean;
 };
 
 export type ModelAdvancedControlsProps = {
@@ -90,10 +96,12 @@ export type ModelAdvancedControlsProps = {
 function SettingField({
   label,
   description,
+  notice,
   children,
 }: {
   label: string;
   description?: string;
+  notice?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -105,6 +113,7 @@ function SettingField({
         {description ? (
           <p className="text-xs leading-5 text-slate-500">{description}</p>
         ) : null}
+        {notice}
       </div>
       {children}
     </div>
@@ -114,6 +123,7 @@ function SettingField({
 function SelectField<T extends string>({
   label,
   description,
+  notice,
   value,
   options,
   onChange,
@@ -122,6 +132,7 @@ function SelectField<T extends string>({
 }: {
   label: string;
   description?: string;
+  notice?: ReactNode;
   value?: T;
   options: {
     id: T;
@@ -134,7 +145,7 @@ function SelectField<T extends string>({
   disabled?: boolean;
 }) {
   return (
-    <SettingField label={label} description={description}>
+    <SettingField label={label} description={description} notice={notice}>
       <Select
         triggerClassName="rounded-[12px] font-medium"
         placeholder={placeholder}
@@ -244,6 +255,7 @@ function CustomParamInput({
 function SelectWithCustomField<T extends string>({
   label,
   description,
+  descriptionNotice,
   value,
   customText,
   options,
@@ -255,6 +267,7 @@ function SelectWithCustomField<T extends string>({
 }: {
   label: string;
   description?: string;
+  descriptionNotice?: ReactNode;
   value?: T;
   customText: string;
   options: {
@@ -276,6 +289,7 @@ function SelectWithCustomField<T extends string>({
       <SelectField
         label={label}
         description={description}
+        notice={descriptionNotice}
         placeholder={placeholder}
         value={value}
         options={options}
@@ -368,6 +382,7 @@ export function ModelPresetSelector({
   onModelDescriptionChange,
   settingsLocked = false,
   settingsLockMessage,
+  sourceProductZoneFramingActive = false,
 }: ModelPresetSelectorProps) {
   const patch = (partial: Partial<ModelGenerationSettings>) =>
     onSettingsChange(
@@ -388,8 +403,29 @@ export function ModelPresetSelector({
     settings.crop === MODEL_PARAM_CUSTOM
       ? settings.cropCustom.trim() || MODEL_CUSTOM_SELECT_OPTION.hint
       : isLingerieScenario
-        ? hintForOption(LINGERIE_CROP_OPTIONS, settings.crop)
+        ? getLingerieCropDescription({
+            crop: settings.crop,
+            cropCustom: settings.cropCustom,
+            sourceProductZoneFramingActive,
+            customEmptyHint: MODEL_CUSTOM_SELECT_OPTION.hint,
+          })
         : hintForOption(CROP_OPTIONS, settings.crop);
+
+  const lingerieCropSelectOptions = useMemo(() => {
+    if (!isLingerieScenario) return null;
+    return LINGERIE_CROP_OPTIONS.map((item) => ({
+      id: item.id,
+      label: getLingerieCropSelectLabel({
+        crop: item.id,
+        defaultLabel: item.label,
+        sourceProductZoneFramingActive,
+      }),
+      shortHint:
+        item.id === MODEL_PARAM_CUSTOM
+          ? MODEL_CUSTOM_SELECT_OPTION.shortHint
+          : undefined,
+    }));
+  }, [isLingerieScenario, sourceProductZoneFramingActive]);
 
   const isPromptLocked = settingsLocked;
 
@@ -511,16 +547,17 @@ export function ModelPresetSelector({
             placeholder="Выберите кадр"
             value={settings.crop}
             customText={settings.cropCustom}
-            options={(isLingerieScenario ? LINGERIE_CROP_OPTIONS : CROP_OPTIONS).map(
-              (item) => ({
+            options={
+              lingerieCropSelectOptions ??
+              CROP_OPTIONS.map((item) => ({
                 id: item.id,
                 label: item.label,
                 shortHint:
                   item.id === MODEL_PARAM_CUSTOM
                     ? MODEL_CUSTOM_SELECT_OPTION.shortHint
                     : undefined,
-              })
-            )}
+              }))
+            }
             customPlaceholder="Например: по колено, модель на стуле"
             disabled={isPromptLocked}
             onChange={(crop) => patch({ crop, cropCustom: "" })}

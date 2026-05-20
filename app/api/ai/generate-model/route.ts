@@ -24,6 +24,11 @@ import {
 } from "@/lib/ai/falErrorMessage";
 
 import { shouldUseNeutralBaseModelGeneration } from "@/lib/ai/modelIdentityPipeline";
+import { buildModelGenerationDebug } from "@/lib/ai/modelGenerationDebug";
+import {
+  deriveProductViewFromRequest,
+  resolveModelPose,
+} from "@/lib/ai/productViewResolver";
 import { runFalModelGeneration } from "@/lib/ai/runFalModelGeneration";
 
 import {
@@ -171,7 +176,20 @@ export async function POST(request: Request) {
 
   const promptPreview = prompt.slice(0, 300);
 
+  const viewResolver = resolveModelPose({
+    uiPose: generationInput.pose,
+    poseCustom: generationInput.poseCustom,
+    productView:
+      generationInput.productView ??
+      deriveProductViewFromRequest(generationInput),
+  });
 
+  const generationDebug = buildModelGenerationDebug({
+    request: generationInput,
+    promptPreview,
+    promptComposer,
+    resolver: viewResolver,
+  });
 
   if (isMockMode()) {
 
@@ -189,6 +207,7 @@ export async function POST(request: Request) {
 
       promptPreview,
       promptComposer,
+      debug: generationDebug,
     });
 
   }
@@ -260,6 +279,8 @@ export async function POST(request: Request) {
       usedAngleEditFallback,
 
       identityPipeline: neutralBaseForTryOn ? "neutral-base-tryon" : "direct",
+
+      debug: generationDebug,
 
     });
 
