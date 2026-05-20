@@ -20,14 +20,6 @@ export function StudioModeSelector({
   onChange,
 }: StudioModeSelectorProps) {
   return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-xl font-semibold text-slate-950">Выберите режим</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-600">
-          Каждый режим решает свою задачу. Если сомневаетесь, начните с
-          описания товара.
-        </p>
-      </div>
       <div className="grid gap-3 md:grid-cols-3">
         {STUDIO_MODES.map((mode) => {
           const Icon = modeIcons[mode.id];
@@ -71,6 +63,5 @@ export function StudioModeSelector({
           );
         })}
       </div>
-    </div>
   );
 }

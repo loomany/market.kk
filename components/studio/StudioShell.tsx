@@ -121,12 +121,7 @@ import {
   ClothingPreviewPanel,
   type ClothingPreviewTabId,
 } from "./ClothingPreviewPanel";
-import {
-  PreviewImageCarousel,
-  type PreviewCarouselItem,
-} from "./PreviewImageCarousel";
-
-import { PreviewCard } from "./PreviewCard";
+import type { PreviewCarouselItem } from "./PreviewImageCarousel";
 import type { ProductMaskApplyResult } from "./ProductMaskEditor";
 import { ProductSelectionPanel } from "./ProductSelectionPanel";
 import { StudioWorkflowRail } from "./StudioWorkflowRail";
@@ -2327,25 +2322,6 @@ export function StudioShell({
                   onStartOver={handleStartOver}
                 />
               ) : (
-                <>
-                  <PreviewCard
-                    title="Товар"
-                    url={
-                      productCarouselItems.length === 1
-                        ? (productCarouselItems[0]?.url ?? null)
-                        : null
-                    }
-                    empty="Загрузите фото"
-                    content={
-                      productCarouselItems.length > 1 ? (
-                      <PreviewImageCarousel
-                        items={productCarouselItems}
-                        showDownloadActions={false}
-                        className="min-h-[260px]"
-                      />
-                    ) : undefined
-                  }
-                  />
                   <div className="lg:sticky lg:top-6 lg:z-10">
                     <GenerationResultGrid
                       results={results}
@@ -2359,7 +2335,6 @@ export function StudioShell({
                       embedded
                     />
                   </div>
-                </>
               )}
             </div>
           </section>
