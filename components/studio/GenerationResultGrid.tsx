@@ -12,10 +12,16 @@ import {
   PreviewImageCarousel,
   type PreviewCarouselItem,
 } from "./PreviewImageCarousel";
+import type { FalModelAspectRatio } from "@/lib/ai/modelOutputSizes";
+import type { PreviewAspectState } from "@/lib/studio/previewImageAspect";
+import { PreviewCard } from "./PreviewCard";
+import { ProductCardDualExportPanel } from "./ProductCardDualExportPanel";
 import {
-  PreviewCard,
-  ResultCompareSkeleton,
-} from "./PreviewCard";
+  ProductCardSaaSPreviewLayout,
+  productCardPreviewPropsFor,
+  previewAspectFromShotRatio,
+} from "./ProductCardPreviewPanel";
+import { STUDIO_PRODUCT_CARD_RESULT_COUNTDOWN_SEC } from "@/lib/studio/clothingTryOnEstimates";
 import { Button } from "@/components/ui/Button";
 import { downloadImageFile } from "@/lib/studio/downloadImages";
 import { TryOnResultActions } from "@/components/studio/TryOnResultActions";
@@ -30,6 +36,13 @@ type GenerationResultGridProps = {
   embedded?: boolean;
   productPreviewUrl?: string | null;
   productPreviewItems?: PreviewCarouselItem[];
+  /** Обратный отсчёт в колонке «Результат» (товарная карточка) */
+  resultCountdownSeconds?: number;
+  resultCountdownStartedAt?: number | null;
+  resultCountdownLabel?: string;
+  /** Макет как в примерке: табы «Товар» / «Результат» и бейдж формата */
+  saasPreviewChrome?: boolean;
+  previewAspect?: FalModelAspectRatio;
   onStartOver: () => void;
 };
 
@@ -42,9 +55,13 @@ function ResultCompareGrid({ children }: { children: ReactNode }) {
 function ProductCompareColumn({
   productPreviewUrl,
   productPreviewItems = [],
+  saasPreviewChrome = false,
+  previewAspectState = null,
 }: {
   productPreviewUrl: string | null | undefined;
   productPreviewItems?: PreviewCarouselItem[];
+  saasPreviewChrome?: boolean;
+  previewAspectState?: PreviewAspectState | null;
 }) {
   const items =
     productPreviewItems.length > 0
@@ -59,11 +76,17 @@ function ProductCompareColumn({
           ]
         : [];
 
+  const saasProps =
+    saasPreviewChrome && previewAspectState
+      ? productCardPreviewPropsFor(previewAspectState)
+      : null;
+
   return (
     <PreviewCard
       title="Товар"
       url={items.length === 1 ? (items[0]?.url ?? null) : null}
-      empty="Загрузите фото товара"
+      empty={saasPreviewChrome ? "Загрузите фото" : "Загрузите фото товара"}
+      {...(saasProps ?? {})}
       content={
         items.length > 1 ? (
           <PreviewImageCarousel
@@ -77,13 +100,41 @@ function ProductCompareColumn({
   );
 }
 
-const checkerboardStyle = {
-  backgroundImage:
-    "linear-gradient(45deg, #e2e8f0 25%, transparent 25%), linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e2e8f0 75%), linear-gradient(-45deg, transparent 75%, #e2e8f0 75%)",
-  backgroundColor: "#f8fafc",
-  backgroundSize: "12px 12px",
-  backgroundPosition: "0 0, 6px 6px",
-} as const;
+function wrapProductCardPreview(
+  saasPreviewChrome: boolean,
+  previewAspectState: PreviewAspectState | null,
+  productReady: boolean,
+  resultReady: boolean,
+  productNode: ReactNode,
+  resultNode: ReactNode
+) {
+  if (saasPreviewChrome && previewAspectState) {
+    return (
+      <ProductCardSaaSPreviewLayout
+        previewAspect={previewAspectState}
+        productReady={productReady}
+        resultReady={resultReady}
+        productPanel={productNode}
+        resultPanel={resultNode}
+      />
+    );
+  }
+
+  return (
+    <ResultCompareGrid>
+      {productNode}
+      {resultNode}
+    </ResultCompareGrid>
+  );
+}
+
+function productCardResultPreviewProps(
+  previewAspectState: PreviewAspectState | null,
+  saasPreviewChrome: boolean
+) {
+  if (!saasPreviewChrome || !previewAspectState) return {};
+  return productCardPreviewPropsFor(previewAspectState);
+}
 
 function getExportPreviewSize(
   width: number,
@@ -124,33 +175,6 @@ function ExportSizeFrame({
     >
       {children}
     </div>
-  );
-}
-
-function ExactCardResultPanel({
-  title,
-  exportPreviewSize,
-  onDownload,
-  onStartOver,
-  children,
-}: {
-  title: string;
-  exportPreviewSize: { width: number; height: number };
-  onDownload: () => void;
-  onStartOver: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <article className="flex flex-col overflow-hidden rounded-[24px] border border-border bg-white p-4 shadow-xl shadow-slate-200/60">
-      <p className="text-sm font-semibold text-slate-900">{title}</p>
-      <div className="mt-3 flex w-full flex-col items-center">{children}</div>
-      <div
-        className="mt-4 w-full"
-        style={{ maxWidth: exportPreviewSize.width }}
-      >
-        <TryOnResultActions onDownload={onDownload} onStartOver={onStartOver} />
-      </div>
-    </article>
   );
 }
 
@@ -239,6 +263,11 @@ export function GenerationResultGrid({
   embedded = false,
   productPreviewUrl = null,
   productPreviewItems = [],
+  resultCountdownSeconds = STUDIO_PRODUCT_CARD_RESULT_COUNTDOWN_SEC,
+  resultCountdownStartedAt = null,
+  resultCountdownLabel,
+  saasPreviewChrome = false,
+  previewAspect,
   onStartOver,
 }: GenerationResultGridProps) {
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
@@ -246,6 +275,12 @@ export function GenerationResultGrid({
   const markImageFailed = (imageKey: string) => {
     setFailedImages((prev) => ({ ...prev, [imageKey]: true }));
   };
+
+  const previewAspectState = previewAspect
+    ? previewAspectFromShotRatio(previewAspect)
+    : null;
+  const hasProductPreview =
+    Boolean(productPreviewUrl) || productPreviewItems.length > 0;
 
   const clothingEmbedded = embedded && isClothingTryOnMode;
 
@@ -267,16 +302,53 @@ export function GenerationResultGrid({
 
   if (loading) {
     if (embedded) {
+      const resultLoadingLabel =
+        resultCountdownLabel ?? loadingDetail ?? "Создаём карточку";
+      const productCol = (
+        <ProductCompareColumn
+          productPreviewUrl={productPreviewUrl}
+          productPreviewItems={productPreviewItems}
+          saasPreviewChrome={saasPreviewChrome}
+          previewAspectState={previewAspectState}
+        />
+      );
+      const resultCol = (
+        <PreviewCard
+          title="Результат"
+          url={null}
+          empty=""
+          loading
+          loadingVariant={isProductShotMode ? "countdown" : "spinner"}
+          countdownSeconds={
+            isProductShotMode ? resultCountdownSeconds : undefined
+          }
+          countdownLabel={isProductShotMode ? resultLoadingLabel : undefined}
+          countdownStartedAt={
+            isProductShotMode ? resultCountdownStartedAt : undefined
+          }
+          loadingDetail={
+            isProductShotMode
+              ? resultLoadingLabel
+              : (loadingDetail ?? "Создаём изображение…")
+          }
+          {...productCardResultPreviewProps(
+            previewAspectState,
+            saasPreviewChrome
+          )}
+        />
+      );
+
       return (
         <div>
-          {loadingBanner}
-          <ResultCompareGrid>
-            <ProductCompareColumn
-              productPreviewUrl={productPreviewUrl}
-              productPreviewItems={productPreviewItems}
-            />
-            <ResultCompareSkeleton />
-          </ResultCompareGrid>
+          {!isProductShotMode ? loadingBanner : null}
+          {wrapProductCardPreview(
+            saasPreviewChrome,
+            previewAspectState,
+            hasProductPreview,
+            false,
+            productCol,
+            resultCol
+          )}
         </div>
       );
     }
@@ -297,18 +369,30 @@ export function GenerationResultGrid({
     }
 
     if (embedded) {
-      return (
-        <ResultCompareGrid>
-          <ProductCompareColumn
-              productPreviewUrl={productPreviewUrl}
-              productPreviewItems={productPreviewItems}
-            />
-          <PreviewCard
-            title="Результат"
-            url={null}
-            empty="Здесь появится результат после генерации"
-          />
-        </ResultCompareGrid>
+      return wrapProductCardPreview(
+        saasPreviewChrome,
+        previewAspectState,
+        hasProductPreview,
+        false,
+        <ProductCompareColumn
+          productPreviewUrl={productPreviewUrl}
+          productPreviewItems={productPreviewItems}
+          saasPreviewChrome={saasPreviewChrome}
+          previewAspectState={previewAspectState}
+        />,
+        <PreviewCard
+          title="Результат"
+          url={null}
+          empty={
+            saasPreviewChrome
+              ? "Создайте карточку"
+              : "Здесь появится результат после генерации"
+          }
+          {...productCardResultPreviewProps(
+            previewAspectState,
+            saasPreviewChrome
+          )}
+        />
       );
     }
 
@@ -371,70 +455,29 @@ export function GenerationResultGrid({
                 result={result}
                 isClothingTryOnMode={isClothingTryOnMode}
               />
-              <ResultCompareGrid>
+              {wrapProductCardPreview(
+                saasPreviewChrome,
+                previewAspectState,
+                hasProductPreview,
+                true,
                 <ProductCompareColumn
-              productPreviewUrl={productPreviewUrl}
-              productPreviewItems={productPreviewItems}
-            />
-                <PreviewCard
-                  title="Готовая карточка"
-                  url={null}
-                  empty=""
-                  content={
-                    <div className="flex flex-1 items-center justify-center p-4">
-                      <ExportSizeFrame
-                        width={result.width}
-                        height={result.height}
-                        className="bg-white ring-1 ring-slate-200"
-                      >
-                        <ResultImage
-                          imageKey={`${result.id}:main`}
-                          url={result.url}
-                          alt={`${label}: готовая карточка`}
-                          className="block h-full w-full"
-                          failed={Boolean(failedImages[`${result.id}:main`])}
-                          onFail={markImageFailed}
-                        />
-                      </ExportSizeFrame>
-                    </div>
-                  }
-                  footer={resultActions}
+                  productPreviewUrl={productPreviewUrl}
+                  productPreviewItems={productPreviewItems}
+                  saasPreviewChrome={saasPreviewChrome}
+                  previewAspectState={previewAspectState}
+                />,
+                <ProductCardDualExportPanel
+                  cardUrl={result.url}
+                  cutoutUrl={removedUrl!}
+                  width={result.width}
+                  height={result.height}
+                  resultId={result.id}
+                  imageLabel={label}
+                  failedImages={failedImages}
+                  onImageFail={markImageFailed}
+                  onStartOver={onStartOver}
                 />
-              </ResultCompareGrid>
-              <PreviewCard
-                title="PNG без фона"
-                url={null}
-                empty=""
-                content={
-                  <div className="flex flex-1 items-center justify-center p-4">
-                    <ExportSizeFrame
-                      width={result.width}
-                      height={result.height}
-                      style={checkerboardStyle}
-                      className="bg-[length:12px_12px] bg-[position:0_0,6px_6px]"
-                    >
-                      <ResultImage
-                        imageKey={`${result.id}:removed`}
-                        url={removedUrl!}
-                        alt={`${label}: PNG без фона`}
-                        className="block h-full w-full"
-                        failed={Boolean(
-                          failedImages[`${result.id}:removed`]
-                        )}
-                        onFail={markImageFailed}
-                      />
-                    </ExportSizeFrame>
-                  </div>
-                }
-                footer={
-                  <TryOnResultActions
-                    onDownload={() =>
-                      void downloadImageFile(removedUrl!, `${result.id}-no-bg.png`)
-                    }
-                    onStartOver={onStartOver}
-                  />
-                }
-              />
+              )}
             </div>
           );
         }
@@ -502,53 +545,19 @@ export function GenerationResultGrid({
                   ли лишние предметы.
                 </div>
               )}
-              <ExactCardResultPanel
-                key={`${result.id}-card`}
-                title="Готовая карточка"
-                exportPreviewSize={exportPreviewSize}
-                onDownload={() => void downloadImageFile(result.url, `${result.id}.png`)}
-                onStartOver={onStartOver}
-              >
-                <ExportSizeFrame
+              <div key={`${result.id}-exports`} className="col-span-full lg:max-w-md">
+                <ProductCardDualExportPanel
+                  cardUrl={result.url}
+                  cutoutUrl={removedUrl!}
                   width={result.width}
                   height={result.height}
-                  className="bg-white ring-1 ring-slate-200"
-                >
-                  <ResultImage
-                    imageKey={`${result.id}:main`}
-                    url={result.url}
-                    alt={`${label}: готовая карточка`}
-                    className="block h-full w-full"
-                    failed={Boolean(failedImages[`${result.id}:main`])}
-                    onFail={markImageFailed}
-                  />
-                </ExportSizeFrame>
-              </ExactCardResultPanel>
-              <ExactCardResultPanel
-                key={`${result.id}-cutout`}
-                title="PNG без фона"
-                exportPreviewSize={exportPreviewSize}
-                onDownload={() =>
-                  void downloadImageFile(removedUrl!, `${result.id}-no-bg.png`)
-                }
-                onStartOver={onStartOver}
-              >
-                <ExportSizeFrame
-                  width={result.width}
-                  height={result.height}
-                  style={checkerboardStyle}
-                  className="bg-[length:12px_12px] bg-[position:0_0,6px_6px]"
-                >
-                  <ResultImage
-                    imageKey={`${result.id}:removed`}
-                    url={removedUrl!}
-                    alt={`${label}: PNG без фона`}
-                    className="block h-full w-full"
-                    failed={Boolean(failedImages[`${result.id}:removed`])}
-                    onFail={markImageFailed}
-                  />
-                </ExportSizeFrame>
-              </ExactCardResultPanel>
+                  resultId={result.id}
+                  imageLabel={label}
+                  failedImages={failedImages}
+                  onImageFail={markImageFailed}
+                  onStartOver={onStartOver}
+                />
+              </div>
             </Fragment>
           );
         }

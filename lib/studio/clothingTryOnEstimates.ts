@@ -24,6 +24,9 @@ export const ESTIMATED_SAAS_PIPELINE_COST_KZT = {
  */
 export const ESTIMATED_SAAS_PIPELINE_DURATION_SEC = { min: 60, max: 240 } as const;
 
+/** Товарная карточка: колонка «Результат» при сборке exact-card. */
+export const STUDIO_PRODUCT_CARD_RESULT_COUNTDOWN_SEC = 3 * 60;
+
 /**
  * UI countdown while nano-banana model image generates (the "Создаём AI-модель"
  * card). Soft target — keeps counting from this start value.

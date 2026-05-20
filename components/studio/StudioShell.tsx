@@ -48,7 +48,11 @@ import { validateModelCustomParams } from "@/lib/ai/modelGenerationValidation";
 import { buildGenerateModelRequestBody } from "@/lib/studio/buildGenerateModelRequest";
 import { validateImageFileClient } from "@/lib/ai/clientImageValidation";
 import { fitCutoutToShotSize, refineCutoutWithUserMask } from "@/lib/studio/cutoutImage";
-import { shotSizePresetToDimensions } from "@/lib/ai/productShotSchemas";
+import {
+  aspectRatioForShotSizePreset,
+  shotSizePresetToDimensions,
+} from "@/lib/ai/productShotSchemas";
+import { DEFAULT_PREVIEW_ASPECT } from "@/lib/studio/previewImageAspect";
 import {
   composeExactProductCard,
   scenePresetToExactBackground,
@@ -56,6 +60,7 @@ import {
 import {
   estimateTryOnOnlyCostUsd,
   formatSaasPipelineCostKztRange,
+  STUDIO_PRODUCT_CARD_RESULT_COUNTDOWN_SEC,
 } from "@/lib/studio/clothingTryOnEstimates";
 import { mapSourceModelToGenerationSettings } from "@/lib/studio/mapSourceModelToGenerationSettings";
 import { isSourceModelPopulated } from "@/lib/ai/sourceModelPostProcess";
@@ -336,6 +341,8 @@ export function StudioShell({
   const [clothingPipelineCountdownStartedAt, setClothingPipelineCountdownStartedAt] =
     useState<number | null>(null);
   const [modelGenerationCountdownStartedAt, setModelGenerationCountdownStartedAt] =
+    useState<number | null>(null);
+  const [productCardCountdownStartedAt, setProductCardCountdownStartedAt] =
     useState<number | null>(null);
   const [results, setResults] = useState<StudioResultImage[]>([]);
   const [sessionAssets, setSessionAssets] = useState<StudioSessionAsset[]>([]);
@@ -1078,6 +1085,15 @@ export function StudioShell({
     return size.aspectRatio;
   }, [modelOutputSize]);
 
+  const productCardPreviewAspect = useMemo((): FalModelAspectRatio => {
+    const ratio = aspectRatioForShotSizePreset(
+      productShotSettings.shotSizePreset
+    ) as FalModelAspectRatio;
+    return FAL_MODEL_ASPECT_RATIOS.includes(ratio)
+      ? ratio
+      : DEFAULT_PREVIEW_ASPECT;
+  }, [productShotSettings.shotSizePreset]);
+
   const handleModelSettingsChange = useCallback(
     (settings: ModelGenerationSettings) => {
       if (!skipCropOverrideMark.current) {
@@ -1572,6 +1588,7 @@ export function StudioShell({
       return;
     }
 
+    setProductCardCountdownStartedAt((prev) => prev ?? Date.now());
     setLoading(true);
     setError(null);
     setResults([]);
@@ -1651,6 +1668,7 @@ export function StudioShell({
       setError(message);
     } finally {
       setLoading(false);
+      setProductCardCountdownStartedAt(null);
     }
   };
 
@@ -1665,6 +1683,7 @@ export function StudioShell({
     }
     setResults([]);
     setError(null);
+    setProductCardCountdownStartedAt(null);
   }, [studioMode, handleReplaceModel]);
 
   const handleCreatePhotoOnModel = async () => {
@@ -2331,6 +2350,15 @@ export function StudioShell({
                       isClothingTryOnMode={false}
                       productPreviewUrl={effectiveProductPreviewUrl}
                       productPreviewItems={productCarouselItems}
+                      resultCountdownSeconds={
+                        STUDIO_PRODUCT_CARD_RESULT_COUNTDOWN_SEC
+                      }
+                      resultCountdownStartedAt={productCardCountdownStartedAt}
+                      resultCountdownLabel={
+                        tryOnProgress ?? "Создаём карточку"
+                      }
+                      saasPreviewChrome
+                      previewAspect={productCardPreviewAspect}
                       onStartOver={handleStartOver}
                       embedded
                     />
