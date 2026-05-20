@@ -1,34 +1,30 @@
 import type { MetadataRoute } from "next";
 import { blogTopics } from "@/data/seo/blogTopics";
 import { getArticleByTopicId } from "@/data/seo/blogArticles";
+import { getBlogPathByLocale } from "@/lib/blog/blogResolve";
 import { platformPages } from "@/data/seo/platforms";
 import { staticSeoPages } from "@/data/seo/staticPages";
 import { useCasePages } from "@/data/seo/useCases";
-import type { Locale } from "@/lib/i18n/localeConfig";
+import { indexableLocales, type Locale } from "@/lib/i18n/localeConfig";
 import { shouldIndexPage } from "@/lib/seo/qualityGate";
-import { absoluteUrl } from "@/lib/seo/site";
+import { absoluteUrl, buildLanguageAlternates } from "@/lib/seo/site";
 
-const indexableLocales: Locale[] = ["ru", "en"];
-const lastModified = new Date("2026-05-18T00:00:00.000Z");
+const lastModified = new Date();
 
-function alternates(pathByLocale: Record<Locale, string>) {
+function alternates(pathByLocale: Partial<Record<Locale, string>>) {
   return {
-    languages: {
-      ru: absoluteUrl(pathByLocale.ru),
-      en: absoluteUrl(pathByLocale.en),
-      "x-default": absoluteUrl(pathByLocale.ru),
-    },
+    languages: buildLanguageAlternates(pathByLocale),
   };
 }
 
 function entry(
   locale: Locale,
-  pathByLocale: Record<Locale, string>,
+  pathByLocale: Partial<Record<Locale, string>>,
   priority: number,
   changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"] = "weekly"
 ): MetadataRoute.Sitemap[number] {
   return {
-    url: absoluteUrl(pathByLocale[locale]),
+    url: absoluteUrl(pathByLocale[locale]!),
     lastModified,
     changeFrequency,
     priority,
@@ -36,37 +32,53 @@ function entry(
   };
 }
 
+function homePaths(): Partial<Record<Locale, string>> {
+  return Object.fromEntries(
+    indexableLocales.map((locale) => [locale, `/${locale}`])
+  ) as Partial<Record<Locale, string>>;
+}
+
+function sectionPaths(segment: string): Partial<Record<Locale, string>> {
+  return Object.fromEntries(
+    indexableLocales.map((locale) => [locale, `/${locale}/${segment}`])
+  ) as Partial<Record<Locale, string>>;
+}
+
+function staticPathsForPage(page: (typeof staticSeoPages)[number]): Partial<Record<Locale, string>> {
+  return Object.fromEntries(
+    indexableLocales
+      .filter((locale) => page.content[locale]?.slug)
+      .map((locale) => [locale, `/${locale}/${page.content[locale].slug}`])
+  ) as Partial<Record<Locale, string>>;
+}
+
 export default function sitemap(): MetadataRoute.Sitemap {
   const items: MetadataRoute.Sitemap = [];
 
+  const home = homePaths();
+  const features = sectionPaths("features");
+  const platforms = sectionPaths("platforms");
+  const useCases = sectionPaths("use-cases");
+  const blog = sectionPaths("blog");
+  const aiSummary = sectionPaths("ai-summary");
+  const cost = sectionPaths("cost");
+
   for (const locale of indexableLocales) {
-    items.push(
-      entry(locale, { ru: "/ru", en: "/en" } as Record<Locale, string>, 1, "weekly")
-    );
-    items.push(
-      entry(locale, { ru: "/ru/features", en: "/en/features" } as Record<Locale, string>, 0.85)
-    );
-    items.push(
-      entry(locale, { ru: "/ru/platforms", en: "/en/platforms" } as Record<Locale, string>, 0.8)
-    );
-    items.push(
-      entry(locale, { ru: "/ru/use-cases", en: "/en/use-cases" } as Record<Locale, string>, 0.8)
-    );
-    items.push(
-      entry(locale, { ru: "/ru/blog", en: "/en/blog" } as Record<Locale, string>, 0.75)
-    );
-    items.push(
-      entry(locale, { ru: "/ru/ai-summary", en: "/en/ai-summary" } as Record<Locale, string>, 0.65)
-    );
+    items.push(entry(locale, home, 1, "weekly"));
+    items.push(entry(locale, features, 0.85));
+    items.push(entry(locale, platforms, 0.8));
+    items.push(entry(locale, useCases, 0.8));
+    items.push(entry(locale, blog, 0.75));
+    items.push(entry(locale, aiSummary, 0.65));
+    items.push(entry(locale, cost, 0.72));
   }
 
   for (const page of staticSeoPages) {
-    const pathByLocale = {
-      ru: `/ru/${page.content.ru.slug}`,
-      en: `/en/${page.content.en.slug}`,
-    } as Record<Locale, string>;
+    const pathByLocale = staticPathsForPage(page);
 
     for (const locale of indexableLocales) {
+      if (!pathByLocale[locale]) continue;
+
       const content = page.content[locale];
       if (
         shouldIndexPage({
@@ -87,12 +99,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
   }
 
   for (const page of platformPages) {
-    const pathByLocale = {
-      ru: `/ru/platforms/${page.content.ru.slug}`,
-      en: `/en/platforms/${page.content.en.slug}`,
-    } as Record<Locale, string>;
+    const pathByLocale = Object.fromEntries(
+      indexableLocales
+        .filter((locale) => page.content[locale]?.slug)
+        .map((locale) => [locale, `/${locale}/platforms/${page.content[locale].slug}`])
+    ) as Partial<Record<Locale, string>>;
 
     for (const locale of indexableLocales) {
+      if (!pathByLocale[locale]) continue;
+
       const content = page.content[locale];
       if (
         shouldIndexPage({
@@ -113,12 +128,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
   }
 
   for (const page of useCasePages) {
-    const pathByLocale = {
-      ru: `/ru/use-cases/${page.content.ru.slug}`,
-      en: `/en/use-cases/${page.content.en.slug}`,
-    } as Record<Locale, string>;
+    const pathByLocale = Object.fromEntries(
+      indexableLocales
+        .filter((locale) => page.content[locale]?.slug)
+        .map((locale) => [locale, `/${locale}/use-cases/${page.content[locale].slug}`])
+    ) as Partial<Record<Locale, string>>;
 
     for (const locale of indexableLocales) {
+      if (!pathByLocale[locale]) continue;
+
       const content = page.content[locale];
       if (
         shouldIndexPage({
@@ -142,12 +160,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     const article = getArticleByTopicId(topic.id);
     if (!article) continue;
 
-    const pathByLocale = {
-      ru: `/ru/blog/${topic.slug.ru}`,
-      en: `/en/blog/${topic.slug.en}`,
-    } as Record<Locale, string>;
+    const pathByLocale = getBlogPathByLocale(topic.id);
+    if (!pathByLocale) continue;
 
     for (const locale of indexableLocales) {
+      if (!pathByLocale[locale]) continue;
+
       const localizedArticle = article.content[locale];
       if (!localizedArticle) continue;
 

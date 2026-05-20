@@ -221,14 +221,99 @@ const enLanding: LandingCopy = {
   },
 };
 
-const fallbackByLocale: Partial<Record<Locale, Partial<LandingCopy>>> = {
-  kk: {
-    translationStatus: "needs_review",
-    hero: {
-      ...enLanding.hero,
-      headline: "Маркетплейстерге арналған AI тауар фото және видео студиясы",
-    },
+const kkLanding: LandingCopy = {
+  translationStatus: "published",
+  nav: {
+    features: "Мүмкіндіктер",
+    audiences: "Кімге",
+    platforms: "Платформалар",
+    blog: "Блог",
+    studio: "Студия",
+    openStudio: "Студияны ашу",
   },
+  hero: {
+    badge: "Vitrina AI Studio",
+    headline: "Kaspi және маркетплейстерге арналған AI тауар фото студиясы",
+    subtitle:
+      "Киімді AI модельде көрсету, нақты тауар карточкасы, фон, Reels және қысқа видео — бір фотодан. Kaspi, Wildberries, Ozon сатушылары мен Instagram дүкендері үшін.",
+    primaryCta: "Студияны ашу",
+    secondaryCta: "Мүмкіндіктерді көру",
+  },
+  cards: [
+    { title: "Киім модельде", text: "Көйлек, костюм немесе іш киімді ересек AI модельде көрсету." },
+    { title: "Тауар карточкасы", text: "Таза product shot, фон және детальдарды тексеру." },
+    { title: "Фото және видео", text: "Бір исходниктен фон, қысқа клип және әлеуметтік желілерге нұсқалар." },
+  ],
+  how: {
+    title: "Қалай жұмыс істейді",
+    intro: "Сатушы үшін қарапайым жол: түпнұсқадан тексерілген файлыға.",
+    steps: [
+      { title: "Фото жүктеу", text: "Киім, аяқ киім, сөмке, әшекей немесе басқа тауардың нақты суреті." },
+      { title: "Режим таңдау", text: "Киім модельде, нақты карточка, креативті сцена немесе фонды алу." },
+      { title: "Фото немесе видео", text: "Демо-режим интерфейсті ақша алмай көрсетеді." },
+      { title: "Тексеру және жүктеу", text: "Жарияламас бұрын түс, пішін, өрнек, краяларды салыстырыңыз." },
+    ],
+  },
+  features: {
+    title: "Мүмкіндіктер",
+    intro: "Жол картасы көрінеді — шықпаған функциялар production-ready деп көрсетілмейді.",
+    items: [
+      { title: "Киім AI модельде", text: "Ересек коммерциялық каталог үшін виртуалды примерка.", status: "қолжетімді" },
+      { title: "Нақты карточка", text: "Фон, өлшем және тауарды сақтау.", status: "қолжетімді" },
+      { title: "Креативті сцена", text: "Әлеуметтік желілер мен жарнама үшін фон.", status: "демода" },
+      { title: "Фонды алу / ауыстыру", text: "Таза вырезка және PNG.", status: "қолжетімді" },
+      { title: "Фото → видео", text: "Қысқа клип.", status: "әзірленуде" },
+      { title: "Reels / Stories", text: "9:16 вертикаль.", status: "әзірленуде" },
+      { title: "Промпт күшейту", text: "Сипаттаманы жақсарту.", status: "әзірленуде" },
+      { title: "Файл тарихы", text: "Сақтау және қайта пайдалану.", status: "әзірленуде" },
+      { title: "Қолмен сапа тексеруі", text: "Тізім қате кадрды жарияламауға көмектеседі.", status: "қолжетімді" },
+    ],
+  },
+  audiences: {
+    title: "Кімге арналған",
+    intro: "Студиясыз жылдам тауар визуалы қажет шағын командаларға.",
+    items: [
+      "маркетплейс сатушылары",
+      "Kaspi дүкендері",
+      "киім сатушылары",
+      "әшекей сатушылары",
+      "жеткізушілер",
+      "шоурумдар",
+      "Instagram дүкендері",
+      "интернет-дүкендер",
+      "контент-менеджерлер",
+      "шағын ecommerce командалары",
+    ],
+  },
+  platforms: {
+    title: "Платформалар",
+    intro: "Карточка, каталог, әлеуметтік сауда және витрина үшін сурет.",
+    disclaimer:
+      "Vitrina AI Studio тәуелсіз құрал — тізімделген платформалардың ресми серіктесі емес.",
+  },
+  trust: {
+    title: "Сенім және қауіпсіздік",
+    items: [
+      "AI қателесе алады: әр тауарды қолмен тексеріңіз.",
+      "Баға генерация алдында көрсетілуі керек (қосылғанда).",
+      "Демо-режимде төлем жоқ.",
+      "Real AI сервер арқылы AI-провайдерлерді қолданады.",
+      "Маркетплейс қабылдауын немесе сатылым өсімін уәде етпейді.",
+    ],
+  },
+  modes: {
+    title: "Демо және real AI",
+    demo: "Демо қауіпсіз: интерфейсті ақша алмай көрсетеді.",
+    real: "Real AI режимі қосылғанда төлем болуы мүмкін.",
+  },
+  finalCta: {
+    title: "Vitrina AI Studio сынаңыз",
+    text: "Студияны ашып, фото жүктеп, демо workflow-ды тексеріңіз.",
+    button: "Студияны ашу",
+  },
+};
+
+const fallbackByLocale: Partial<Record<Locale, Partial<LandingCopy>>> = {
   ar: {
     translationStatus: "needs_review",
     nav: { ...enLanding.nav, openStudio: "افتح الاستوديو", studio: "الاستوديو" },
@@ -269,6 +354,7 @@ const fallbackStatus: Partial<Record<Locale, TranslationStatus>> = {
 export function getLandingCopy(locale: Locale): LandingCopy {
   if (locale === "ru") return ruLanding;
   if (locale === "en") return enLanding;
+  if (locale === "kk") return kkLanding;
 
   return {
     ...enLanding,

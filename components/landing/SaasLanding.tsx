@@ -331,7 +331,20 @@ export function SaasLanding({ locale }: { locale: Locale }) {
           href: `/${locale}/platforms/${page.content[locale].slug}`,
         }))}
         resourceLinks={[
+          {
+            label: locale === "ru" ? "Как работает" : locale === "kk" ? "Қалай жұмыс істейді" : "How it works",
+            href: `/${locale}/how-it-works`,
+          },
+          {
+            label: locale === "ru" ? "Качество AI" : locale === "kk" ? "AI сапасы" : "AI quality",
+            href: `/${locale}/quality`,
+          },
+          { label: "FAQ", href: `/${locale}/faq` },
           { label: copy.nav.blog, href: `/${locale}/blog` },
+          {
+            label: locale === "ru" ? "Тарифы" : locale === "kk" ? "Тарифтер" : "Pricing",
+            href: `/${locale}/cost`,
+          },
           { label: "llms.txt", href: "/llms.txt" },
         ]}
       />

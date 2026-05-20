@@ -71,6 +71,24 @@ export function StudioPreviewAspectBadge({ label }: { label: string }) {
   );
 }
 
+/** Шапка правой колонки до появления результата (как «Итог» + 1:1 в примерке). */
+export function StudioPreviewResultColumnHeader({
+  label = "Итог",
+  aspectLabel,
+}: {
+  label?: string;
+  aspectLabel: string;
+}) {
+  return (
+    <div className="mb-2 flex items-center gap-2">
+      <div className="flex min-w-0 flex-1 items-center justify-center rounded-lg bg-slate-100/90 px-2.5 py-1.5 ring-1 ring-slate-200/50">
+        <span className="text-xs font-semibold text-slate-800">{label}</span>
+      </div>
+      <StudioPreviewAspectBadge label={aspectLabel} />
+    </div>
+  );
+}
+
 export function StudioPreviewTabBar<T extends string>({
   tabs,
   activeTab,

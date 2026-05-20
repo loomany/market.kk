@@ -22,7 +22,10 @@ export type StaticRouteKey =
   | "terms"
   | "acceptableUse"
   | "dataDeletion"
-  | "aiSummary";
+  | "aiSummary"
+  | "howItWorks"
+  | "quality"
+  | "faq";
 
 type RouteSlugMap = Record<StaticRouteKey, Record<Locale, string>>;
 
@@ -93,6 +96,9 @@ export const routeSlugs: RouteSlugMap = {
   acceptableUse: sameSlug("acceptable-use"),
   dataDeletion: sameSlug("data-deletion"),
   aiSummary: sameSlug("ai-summary"),
+  howItWorks: sameSlug("how-it-works"),
+  quality: sameSlug("quality"),
+  faq: sameSlug("faq"),
 };
 
 export function getRouteSlug(locale: Locale, key: StaticRouteKey): string {

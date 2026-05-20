@@ -1,17 +1,30 @@
 import type { Metadata } from "next";
 import type { Locale } from "@/lib/i18n/localeConfig";
-import { buildLanguageAlternates, siteName, siteUrl } from "./site";
+import {
+  buildLanguageAlternates,
+  defaultOgImageUrl,
+  siteName,
+  siteUrl,
+} from "./site";
 import { getRobotsPolicy, type SeoQualityInput } from "./qualityGate";
 
 export type SeoMetadataInput = SeoQualityInput & {
   title: string;
   description: string;
-  pathByLocale: Record<Locale, string>;
+  pathByLocale: Partial<Record<Locale, string>> | Record<Locale, string>;
   images?: string[];
 };
 
+function resolveImages(images?: string[]): string[] {
+  if (images && images.length > 0) {
+    return images;
+  }
+  return [defaultOgImageUrl()];
+}
+
 export function createSeoMetadata(input: SeoMetadataInput): Metadata {
   const canonicalPath = input.pathByLocale[input.locale];
+  const images = resolveImages(input.images);
 
   return {
     metadataBase: new URL(siteUrl),
@@ -27,13 +40,13 @@ export function createSeoMetadata(input: SeoMetadataInput): Metadata {
       title: input.title,
       description: input.description,
       url: canonicalPath,
-      images: input.images,
+      images,
     },
     twitter: {
       card: "summary_large_image",
       title: input.title,
       description: input.description,
-      images: input.images,
+      images,
     },
     robots: getRobotsPolicy(input),
   };
@@ -57,4 +70,24 @@ export function createNoindexMetadata(
     hasCanonical: true,
     hasHreflang: true,
   });
+}
+
+export function createLayoutMetadata(): Metadata {
+  return {
+    openGraph: {
+      siteName,
+      images: [defaultOgImageUrl()],
+    },
+    twitter: {
+      card: "summary_large_image",
+      images: [defaultOgImageUrl()],
+    },
+    icons: {
+      icon: [
+        { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+        { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+      ],
+      apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    },
+  };
 }

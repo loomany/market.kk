@@ -302,7 +302,6 @@ export type ProductShotScenePreset =
   | "light-gray-studio"
   | ModelParamCustom;
 
-import type { FalModelResolution } from "@/lib/ai/modelOutputSizes";
 import type { ShotSizePreset } from "@/lib/ai/productShotSchemas";
 
 export type { ShotSizePreset };
@@ -313,14 +312,12 @@ export type ProductShotSettings = {
   scenePreset: ProductShotScenePreset;
   sceneCustomDescription: string;
   shotSizePreset: ShotSizePreset;
-  imageQuality: FalModelResolution;
 };
 
 export const DEFAULT_PRODUCT_SHOT_SETTINGS: ProductShotSettings = {
   scenePreset: "marketplace-clean",
   sceneCustomDescription: "",
   shotSizePreset: "square",
-  imageQuality: "1K",
 };
 
 export type ResultReviewStatus =
@@ -363,6 +360,7 @@ export type StudioResultImage = {
   selectedProductPreviewUrl?: string;
   manualMaskUsed?: boolean;
   exactCardWithoutMask?: boolean;
+  visionGarmentRefined?: boolean;
   backgroundRemoveError?: string;
   backgroundRemoveLoading?: boolean;
 };

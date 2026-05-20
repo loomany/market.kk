@@ -3,13 +3,12 @@
 import type { ReactNode } from "react";
 import { RotateCcw } from "lucide-react";
 import type { FalModelAspectRatio } from "@/lib/ai/modelOutputSizes";
-import { SAAS_MODEL_GENERATION_COUNTDOWN_SEC } from "@/lib/studio/clothingTryOnEstimates";
 import {
   DEFAULT_PREVIEW_ASPECT,
   previewAspectFromFal,
   type PreviewAspectState,
 } from "@/lib/studio/previewImageAspect";
-import { usePreviewImageAspect } from "@/lib/studio/usePreviewImageAspect";
+import { STUDIO_PIPELINE_COUNTDOWN_15_MIN_SEC } from "@/lib/studio/clothingTryOnEstimates";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import { PreviewCard } from "@/components/studio/PreviewCard";
@@ -17,6 +16,8 @@ import {
   PreviewImageCarousel,
   type PreviewCarouselItem,
 } from "@/components/studio/PreviewImageCarousel";
+import { ProductSetProgressRail } from "@/components/studio/ProductSetProgressRail";
+import type { ProductSetSlotProgress } from "@/lib/studio/productSetProgress";
 import { TryOnResultActions } from "@/components/studio/TryOnResultActions";
 
 export type ClothingPreviewTabId = "product" | "model" | "result";
@@ -48,9 +49,21 @@ type ClothingPreviewPanelProps = {
   modelCountdownStartedAt?: number | null;
   onReplaceModel: () => void;
   resultUrl: string | null;
+  resultCarouselItems?: PreviewCarouselItem[];
+  previewSlideIndex?: number;
+  onPreviewSlideIndexChange?: (index: number) => void;
   tryOnProgress: string | null;
   onDownloadResult: () => void;
+  onDownloadAllResults?: () => void;
+  onDownloadAllModels?: () => void;
   onStartOver: () => void;
+  /** Комплект 2+ фото: общий прогресс и таймер с первого шага */
+  productSetPipelineActive?: boolean;
+  productSetCountdownSeconds?: number;
+  productSetCountdownStartedAt?: number | null;
+  productSetCountdownLabel?: string;
+  productSetSlots?: ProductSetSlotProgress[];
+  productSetActiveIndex?: number;
 };
 
 function TabButton({
@@ -183,23 +196,33 @@ export function ClothingPreviewPanel({
   modelCountdownStartedAt,
   onReplaceModel,
   resultUrl,
+  resultCarouselItems = [],
+  previewSlideIndex = 0,
+  onPreviewSlideIndexChange,
   tryOnProgress,
   onDownloadResult,
+  onDownloadAllResults,
+  onDownloadAllModels,
   onStartOver,
+  productSetPipelineActive = false,
+  productSetCountdownSeconds,
+  productSetCountdownStartedAt,
+  productSetCountdownLabel,
+  productSetSlots = [],
+  productSetActiveIndex = 0,
 }: ClothingPreviewPanelProps) {
+  const syncCarousel =
+    productCarouselItems.length > 1 ||
+    modelCarouselItems.length > 1 ||
+    resultCarouselItems.length > 1;
+  const slideIndex = previewSlideIndex;
+  const setSlideIndex = onPreviewSlideIndexChange ?? (() => {});
   const defaultAspect = previewAspectFromFal(DEFAULT_PREVIEW_ASPECT);
+  /** Бейдж и viewport — всегда выбранный пользователем формат, не пиксели файла. */
   const outputAspect = previewAspectFromFal(modelOutputAspect);
-
-  const productAspect = usePreviewImageAspect(
-    productUrl,
-    DEFAULT_PREVIEW_ASPECT
-  );
-  const modelAspect = usePreviewImageAspect(modelUrl, modelOutputAspect);
-  const resultAspect = usePreviewImageAspect(resultUrl, modelOutputAspect);
-
-  const productPreviewAspect = productUrl ? productAspect : defaultAspect;
-  const modelPreviewAspect = modelUrl ? modelAspect : outputAspect;
-  const resultPreviewAspect = resultUrl ? resultAspect : outputAspect;
+  const productPreviewAspect = outputAspect;
+  const modelPreviewAspect = outputAspect;
+  const resultPreviewAspect = outputAspect;
 
   const desktopSourceTab: "product" | "model" =
     activeTab === "product" ? "product" : "model";
@@ -223,6 +246,8 @@ export function ClothingPreviewPanel({
           <PreviewImageCarousel
             items={productCarouselItems}
             showDownloadActions={false}
+            activeIndex={syncCarousel ? slideIndex : undefined}
+            onActiveIndexChange={syncCarousel ? setSlideIndex : undefined}
             className="h-full min-h-0"
             imageClassName="h-full w-full object-contain"
           />
@@ -230,6 +255,23 @@ export function ClothingPreviewPanel({
       }
     />
   );
+
+  const hasFirstModelPreview = modelCarouselItems.length > 0;
+  const modelPipelineLoading =
+    hasFirstModelPreview
+      ? false
+      : productSetPipelineActive && pipelineBusy
+        ? true
+        : modelGenerating;
+  const modelShowCountdown =
+    !hasFirstModelPreview &&
+    (modelPipelineLoading || (productSetPipelineActive && pipelineBusy));
+  const modelCountdownSec = STUDIO_PIPELINE_COUNTDOWN_15_MIN_SEC;
+  const modelCountdownStart =
+    productSetCountdownStartedAt ?? modelCountdownStartedAt;
+  const modelCountdownText =
+    productSetCountdownLabel ??
+    (productSetPipelineActive ? "Создаём комплект" : "Создаём AI-модель");
 
   const modelCard = (
     <PreviewCard
@@ -237,18 +279,25 @@ export function ClothingPreviewPanel({
       className={mobilePreviewCardClass}
       title="AI-модель"
       url={modelCarouselItems.length === 1 ? modelUrl : null}
-      empty="Появится после генерации"
-      loading={modelGenerating}
-      loadingVariant="countdown"
-      countdownSeconds={SAAS_MODEL_GENERATION_COUNTDOWN_SEC}
-      countdownLabel="Создаём AI-модель"
-      countdownStartedAt={modelCountdownStartedAt}
-      loadingSubdetail={modelLoadingSubdetail}
+      empty={
+        productSetPipelineActive && pipelineBusy
+          ? "Запускаем комплект…"
+          : "Появится после генерации"
+      }
+      loading={modelPipelineLoading}
+      loadingVariant={modelShowCountdown ? "countdown" : "spinner"}
+      countdownSeconds={modelShowCountdown ? modelCountdownSec : undefined}
+      countdownLabel={modelShowCountdown ? modelCountdownText : undefined}
+      countdownStartedAt={modelShowCountdown ? modelCountdownStart : undefined}
+      loadingSubdetail={modelLoadingSubdetail ?? tryOnProgress}
       content={
-        modelCarouselItems.length > 1 ? (
+        modelCarouselItems.length > 0 ? (
           <PreviewImageCarousel
             items={modelCarouselItems}
-            showDownloadActions={false}
+            showDownloadActions={modelCarouselItems.length > 1}
+            downloadFilenamePrefix="vitrina-ai-model"
+            activeIndex={syncCarousel ? slideIndex : undefined}
+            onActiveIndexChange={syncCarousel ? setSlideIndex : undefined}
             className="h-full min-h-0"
             imageClassName="h-full w-full object-contain"
           />
@@ -256,37 +305,78 @@ export function ClothingPreviewPanel({
       }
       footer={
         modelCarouselItems.length > 0 && !modelGenerating && !pipelineBusy ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 w-full text-xs"
-            onClick={onReplaceModel}
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            Заменить модель
-          </Button>
+          <div className="flex w-full flex-col gap-2">
+            {onDownloadAllModels && modelCarouselItems.length > 1 ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-9 w-full text-xs"
+                onClick={onDownloadAllModels}
+              >
+                Скачать все
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 w-full text-xs"
+              onClick={onReplaceModel}
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Сменить модель
+            </Button>
+          </div>
         ) : undefined
       }
     />
   );
+
+  const activeResultUrl =
+    resultCarouselItems.length > 1
+      ? (resultCarouselItems[slideIndex]?.url ?? resultUrl)
+      : resultUrl;
 
   const resultCard = (
     <PreviewCard
       {...previewPropsFor(resultPreviewAspect)}
       className={mobilePreviewCardClass}
       title="Итоговый результат"
-      url={resultUrl}
+      url={resultCarouselItems.length === 1 ? resultUrl : null}
       empty="Создайте фото на модели"
-      loading={pipelineBusy && !resultUrl}
+      loading={pipelineBusy && !activeResultUrl}
       loadingVariant="countdown"
-      countdownLabel="Создаём фото на модели"
-      countdownStartedAt={pipelineCountdownStartedAt}
+      countdownSeconds={
+        productSetCountdownSeconds ?? STUDIO_PIPELINE_COUNTDOWN_15_MIN_SEC
+      }
+      countdownLabel={
+        productSetPipelineActive
+          ? (tryOnProgress ?? "Создаём комплект")
+          : "Создаём фото на модели"
+      }
+      countdownStartedAt={
+        productSetCountdownStartedAt ?? pipelineCountdownStartedAt
+      }
       loadingDetail={tryOnProgress}
+      content={
+        resultCarouselItems.length > 1 ? (
+          <PreviewImageCarousel
+            items={resultCarouselItems}
+            downloadFilenamePrefix="vitrina-ai-tryon"
+            showDownloadActions={false}
+            activeIndex={syncCarousel ? slideIndex : undefined}
+            onActiveIndexChange={syncCarousel ? setSlideIndex : undefined}
+            className="h-full min-h-0"
+            imageClassName="h-full w-full object-contain"
+          />
+        ) : undefined
+      }
       footer={
-        resultUrl ? (
+        activeResultUrl ? (
           <TryOnResultActions
             onDownload={onDownloadResult}
+            onDownloadAll={onDownloadAllResults}
             onStartOver={onStartOver}
           />
         ) : undefined
@@ -299,8 +389,20 @@ export function ClothingPreviewPanel({
   else if (activeTab === "model") mobileCard = modelCard;
   else mobileCard = resultCard;
 
+  const progressRail =
+    productSetSlots.length > 1 ? (
+      <ProductSetProgressRail
+        slots={productSetSlots}
+        activeIndex={productSetActiveIndex}
+        detail={tryOnProgress}
+      />
+    ) : null;
+
   return (
     <>
+      {progressRail ? (
+        <div className="mb-4 w-full max-w-[656px]">{progressRail}</div>
+      ) : null}
       {/* Desktop: source 2-in-1 + result separate */}
       <div className="hidden w-full max-w-[656px] items-start gap-4 lg:flex">
         <div className="w-[320px] shrink-0">

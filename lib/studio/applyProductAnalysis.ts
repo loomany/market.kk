@@ -10,12 +10,14 @@ import type {
 export function applyConfidentProductAnalysis(input: {
   analysis: ProductDescriptionAnalysis;
   modelSettings: ModelGenerationSettings;
+  /** Не подтягивать силуэт/комплекцию с фото товара — identity уже закреплена. */
+  preserveModelIdentity?: boolean;
 }): {
   productCategory: ProductCategory;
   garmentPhotoType: GarmentPhotoType;
   modelSettings: ModelGenerationSettings;
 } {
-  const { analysis, modelSettings } = input;
+  const { analysis, modelSettings, preserveModelIdentity } = input;
   const categoryContext = analysis.categoryContext;
 
   let nextSettings: ModelGenerationSettings = {
@@ -24,6 +26,7 @@ export function applyConfidentProductAnalysis(input: {
   };
 
   if (
+    !preserveModelIdentity &&
     analysis.sourcePresentation === "on-model" &&
     isSourceModelPopulated(analysis.sourceModel)
   ) {

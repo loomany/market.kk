@@ -92,7 +92,8 @@ export function defringeCutoutImageData(imageData: ImageData): void {
     }
     const lum = (r + g + b) / 3;
     const sat = Math.max(r, g, b) - Math.min(r, g, b);
-    if (lum > 175 && sat < 50) {
+    // Only edge halos — opaque nude/beige fabric must stay (product card lingerie).
+    if (lum > 175 && sat < 50 && a < 220) {
       const whiteAmount = Math.min(1, (lum - 155) / 85);
       const edgeFactor = 1 - a / 255;
       const remove = whiteAmount * (0.45 + edgeFactor * 0.4);

@@ -11,7 +11,9 @@ import { downloadImageFile, previewImageFilename } from "@/lib/studio/downloadIm
 type ModelReadyCardProps = {
   previewItems: PreviewCarouselItem[];
   isSaved: boolean;
+  identityLocked?: boolean;
   onSave: () => void;
+  onLockForAllViews?: () => void;
   onStartOver: () => void;
 };
 
@@ -22,7 +24,9 @@ export function downloadModelImage(url: string, filename = "ai-model.png") {
 export function ModelReadyCard({
   previewItems,
   isSaved,
+  identityLocked = false,
   onSave,
+  onLockForAllViews,
   onStartOver,
 }: ModelReadyCardProps) {
   const hasMultiple = previewItems.length > 1;
@@ -68,9 +72,25 @@ export function ModelReadyCard({
         ) : null}
       </div>
       <div className="space-y-2 border-t border-border/70 p-3">
+        {onLockForAllViews && !identityLocked ? (
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            className="w-full"
+            onClick={onLockForAllViews}
+          >
+            Закрепить для всех ракурсов
+          </Button>
+        ) : null}
+        {identityLocked ? (
+          <p className="rounded-[10px] border border-teal-200 bg-teal-50/80 px-3 py-2 text-xs leading-5 text-teal-950">
+            Модель закреплена — при смене фото товара лицо и образ не меняются.
+          </p>
+        ) : null}
         <Button
           type="button"
-          variant="primary"
+          variant={onLockForAllViews && !identityLocked ? "secondary" : "primary"}
           size="sm"
           className="w-full"
           disabled={isSaved}

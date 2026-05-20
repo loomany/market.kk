@@ -3,11 +3,17 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { JsonLdScript } from "@/components/seo/JsonLd";
 import { blogTopics } from "@/data/seo/blogTopics";
-import { resolveBlogArticle, getBlogPathByLocale } from "@/lib/blog/blogResolve";
+import {
+  isBlogArticleViewable,
+  resolveBlogArticle,
+  getBlogPathByLocale,
+} from "@/lib/blog/blogResolve";
 import {
   assertLocale,
   getHtmlLanguage,
+  indexableLocales,
   supportedLocaleCodes,
+  type Locale,
 } from "@/lib/i18n/localeConfig";
 import { createSeoMetadata } from "@/lib/seo/metadata";
 import { articleJsonLd, breadcrumbJsonLd, faqJsonLd } from "@/lib/seo/jsonLd";
@@ -19,7 +25,7 @@ type PageProps = {
 export function generateStaticParams() {
   return supportedLocaleCodes.flatMap((locale) =>
     blogTopics
-      .filter((topic) => topic.status[locale] === "published")
+      .filter((topic) => isBlogArticleViewable(locale, topic.status[locale]))
       .map((topic) => ({ locale, slug: topic.slug[locale] ?? topic.slug.en ?? topic.id }))
   );
 }
@@ -30,21 +36,26 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!locale) return {};
 
   const resolved = resolveBlogArticle(locale, slug);
-  if (!resolved?.localizedArticle) return {};
-  const pathByLocale = getBlogPathByLocale(resolved.topic.id);
-  if (!pathByLocale) return {};
+  if (!resolved?.localizedArticle || !resolved.isViewable) return {};
+
+  const articleSlug = resolved.topic.slug[locale] ?? resolved.topic.slug.en ?? slug;
+  const articlePath = `/${locale}/blog/${articleSlug}`;
+  const pathByLocale =
+    getBlogPathByLocale(resolved.topic.id) ??
+    ({ [locale]: articlePath } as Partial<Record<Locale, string>>);
+  const hasHreflang = indexableLocales.some((l) => Boolean(pathByLocale[l]));
 
   return createSeoMetadata({
     locale,
     title: resolved.localizedArticle.title,
     description: resolved.localizedArticle.metaDescription,
     h1: resolved.localizedArticle.title,
-    status: resolved.isPublished ? "published" : "draft",
+    status: resolved.topic.status[locale],
     pathByLocale,
     sectionCount: resolved.localizedArticle.sections.length,
     internalLinkCount: resolved.localizedArticle.internalLinks.length,
     hasCanonical: true,
-    hasHreflang: true,
+    hasHreflang,
   });
 }
 
@@ -54,7 +65,7 @@ export default async function BlogArticlePage({ params }: PageProps) {
   if (!locale) notFound();
 
   const resolved = resolveBlogArticle(locale, slug);
-  if (!resolved?.localizedArticle || !resolved.article || !resolved.isPublished) {
+  if (!resolved?.localizedArticle || !resolved.article || !resolved.isViewable) {
     notFound();
   }
 

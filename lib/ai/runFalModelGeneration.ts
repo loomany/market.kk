@@ -80,10 +80,13 @@ export async function runFalModelGeneration(input: {
   referenceImageUrl?: string;
   /** Pre-composed text-to-image prompt (e.g. from GPT 5.5); edit path still uses angle template */
   generationPrompt?: string;
+  /** When true, never call nano-banana edit (multi-angle / product-set follow-up). */
+  skipAngleEdit?: boolean;
 }): Promise<RunFalModelGenerationResult> {
-  const { fal, generationInput, referenceImageUrl, generationPrompt } = input;
+  const { fal, generationInput, referenceImageUrl, generationPrompt, skipAngleEdit } =
+    input;
   const hasReference = Boolean(referenceImageUrl?.trim());
-  const useAngleEdit = hasReference;
+  const useAngleEdit = hasReference && !skipAngleEdit;
 
   if (useAngleEdit) {
     const editPrompt = buildModelAngleEditPrompt(generationInput);

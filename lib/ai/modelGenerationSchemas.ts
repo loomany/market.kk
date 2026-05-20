@@ -133,6 +133,19 @@ export const generateModelRequestSchema = z
   sourceModelFraming: z.string().trim().max(300).optional(),
   /** Hero image URL — when set, uses image edit to preserve face and outfit */
   referenceImageUrl: z.string().url().max(2048).optional(),
+  /**
+   * Follow-up angles in a product set / multi-angle run: skip nano-banana edit,
+   * use text-to-image with `modelIdentityLockEn` from step-1 settings.
+   */
+  preferTextOnlyAngleFollowUp: z.boolean().optional(),
+  /** Optional override; server builds from settings when omitted and preferTextOnly is true */
+  modelIdentityLockEn: z
+    .string()
+    .trim()
+    .max(900)
+    .optional(),
+  /** Hero model image URL — Vision extracts face/hair/skin to append to identity lock */
+  heroImageUrlForIdentity: z.string().url().max(2048).optional(),
   /** Locale of customDescription in the UI; server translates to English for Fal */
   promptLocale: promptLocaleSchema.optional(),
 })
@@ -227,6 +240,8 @@ export type GenerateModelSuccessResponse = {
   /** How the Fal prompt was built */
   promptComposer?: "openai" | "template";
   openAiPromptModel?: string;
+  /** Follow-up used OpenAI Vision on hero URL for identity lock */
+  usedVisionIdentity?: boolean;
   debug?: ModelGenerationDebugInfo;
 };
 

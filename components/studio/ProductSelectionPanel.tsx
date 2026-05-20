@@ -47,11 +47,12 @@ export function ProductSelectionPanel({
           Сначала загрузите фото товара
         </p>
         <p className="mx-auto mt-2 max-w-sm text-xs leading-6 text-slate-500">
-          На шаге 1 добавьте изображение. Здесь вы закрасите кистью только
-          товар — ветки, руки и лишний декор не попадут в карточку.
+          На шаге 1 добавьте изображение. На шаге 2 нарисуйте прямоугольник
+          вокруг товара — ИИ вырежет предмет внутри рамки (на модели: только
+          трусы/лиф, без всей фигуры).
         </p>
-        <p className="mt-4 text-[11px] font-medium uppercase tracking-wide text-slate-400">
-          Шаг необязательный · можно пропустить
+        <p className="mt-4 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+          Обязательный шаг после загрузки фото
         </p>
       </div>
     );
@@ -81,7 +82,7 @@ export function ProductSelectionPanel({
                 Выделение товара
               </p>
               <p className="mt-0.5 text-xs leading-5 text-slate-500">
-                Шаг 2 · уберите ветки и лишние предметы с карточки
+                Обязательный шаг · рамка вокруг товара
               </p>
             </div>
           </div>
@@ -92,7 +93,7 @@ export function ProductSelectionPanel({
             </Badge>
           ) : (
             <Badge variant="warning" className="shrink-0">
-              Рекомендуем
+              Нужно выделить
             </Badge>
           )}
         </div>
@@ -102,12 +103,12 @@ export function ProductSelectionPanel({
         {!hasSelectedProduct && (
           <>
             <p className="text-sm leading-6 text-slate-600">
-              Закрасьте кистью только товар на фото. Всё остальное не попадёт в
-              карточку.
+              Нарисуйте прямоугольник вокруг товара. ИИ вырежет предмет внутри
+              рамки — не весь прямоугольник целиком.
             </p>
             <div className="rounded-[16px] border border-amber-200/90 bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-950">
-              Без выделения AI может оставить ветки, руки или декор рядом с
-              товаром.
+              Без рамки карточку создать нельзя. Рамка должна обхватывать только
+              товар, не всю модель и фон.
             </div>
             <Button
               type="button"
@@ -117,7 +118,7 @@ export function ProductSelectionPanel({
               onClick={onOpenEditor}
             >
               <PencilLine className="h-4 w-4" />
-              Выделить товар на фото
+              Нарисовать рамку на фото
             </Button>
           </>
         )}
@@ -125,8 +126,8 @@ export function ProductSelectionPanel({
         {hasSelectedProduct && selectedProductPreviewUrl && (
           <>
             <p className="text-sm leading-6 text-slate-600">
-              Проверьте область на фото: в карточку попадёт только то, что внутри
-              вашего контура. Контур должен быть замкнутым, без разрывов.
+              Проверьте рамку: на карточке будет вырезка внутри неё. Если захватили
+              лишнее — измените рамку.
             </p>
 
             <div className="overflow-hidden rounded-[18px] border border-border">
@@ -156,7 +157,7 @@ export function ProductSelectionPanel({
                 onClick={onOpenEditor}
               >
                 <PencilLine className="h-4 w-4" />
-                Изменить выделение
+                Изменить рамку
               </Button>
               {onClearSelection && (
                 <Button

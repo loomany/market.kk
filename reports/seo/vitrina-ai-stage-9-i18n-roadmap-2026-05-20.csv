@@ -1,0 +1,8 @@
+locale,market_relevance,content_needed_estimate,seo_risk,translation_qa_risk,recommended_stage,index_policy_now,next_action
+ru,primary KZ/CIS sellers,40 more articles + 8 trust pages,low,low,ongoing,index,Wave 2 RU + examples
+en,export + EN marketplace,40 EN translations + trust,low,medium,ongoing,index,Wave 2 EN after RU QA
+kk,Kazakhstan Kaspi focus,10 published + 5-8 Wave 2 subset,medium,high,Stage 10-11,index approved only,QA glossary; no auto-index new
+uz,UZ market potential,5-10 foundation pages only,high,high,Stage 14+,noindex,Option B pilot — no index until native QA
+ky,Kyrgyzstan niche,3-5 pages if Kaspi-like demand,high,high,Stage 15+,noindex,Option C — defer
+tg,Tajikistan niche,3-5 pages,high,high,Stage 15+,noindex,Option C — defer
+global,international EN hub,avoid until en traction,high,low,defer,noindex,Do not open — EN covers global intent

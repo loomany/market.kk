@@ -1,8 +1,14 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { Languages } from "lucide-react";
 import { Select } from "@/components/ui/Select";
-import { supportedLocales, type Locale } from "@/lib/i18n/localeConfig";
+import {
+  indexableLocales,
+  supportedLocales,
+  type Locale,
+} from "@/lib/i18n/localeConfig";
+import { resolveLocaleSwitchPath } from "@/lib/i18n/switchLocalePath";
 import { cn } from "@/lib/utils";
 
 function localeAbbrev(code: Locale) {
@@ -22,6 +28,16 @@ export function LanguageSwitcher({
   abbreviated = variant === "select",
   className,
 }: LanguageSwitcherProps) {
+  const pathname = usePathname();
+  const switcherLocales = supportedLocales.filter((item) =>
+    (indexableLocales as readonly Locale[]).includes(item.code)
+  );
+
+  const navigate = (code: Locale) => {
+    const targetPath = resolveLocaleSwitchPath(pathname, code);
+    window.location.assign(targetPath);
+  };
+
   const optionLabel = (code: Locale) =>
     abbreviated
       ? localeAbbrev(code)
@@ -31,10 +47,11 @@ export function LanguageSwitcher({
     return (
       <div className={className}>
         <div className="flex flex-wrap gap-2">
-          {supportedLocales.map((item) => (
-            <a
+          {switcherLocales.map((item) => (
+            <button
               key={item.code}
-              href={`/${item.code}`}
+              type="button"
+              onClick={() => navigate(item.code)}
               className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
                 item.code === locale
                   ? "border-teal-300 bg-teal-50 text-teal-900"
@@ -42,7 +59,7 @@ export function LanguageSwitcher({
               }`}
             >
               {optionLabel(item.code)}
-            </a>
+            </button>
           ))}
         </div>
       </div>
@@ -60,14 +77,12 @@ export function LanguageSwitcher({
         align="end"
         triggerClassName="min-w-[4.75rem] font-semibold uppercase tracking-wide text-slate-700"
         menuClassName="z-[60] min-w-[11rem]"
-        options={supportedLocales.map((item) => ({
+        options={switcherLocales.map((item) => ({
           value: item.code,
           label: `${localeAbbrev(item.code)} · ${item.nativeLabel}`,
         }))}
         formatTriggerLabel={(option) => localeAbbrev(option.value as Locale)}
-        onChange={(code) => {
-          window.location.href = `/${code}`;
-        }}
+        onChange={(code) => navigate(code as Locale)}
       />
     </div>
   );

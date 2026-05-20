@@ -28,6 +28,7 @@ export type TranslationStatus =
   | "draft"
   | "machine_translated"
   | "needs_review"
+  | "ready_for_review"
   | "noindex";
 
 export type LocaleConfig = {

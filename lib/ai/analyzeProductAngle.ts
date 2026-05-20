@@ -173,8 +173,9 @@ async function requestVisionAngle(
               text: JSON.stringify({
                 task: "Extract ONLY how the body is posed and how the camera is framed — to recreate a similar shot with a different adult fashion model (lingerie/try-on catalog).",
                 rules: [
-                  "Do NOT describe garment color, lace pattern, fabric, brand, SKU, background props, or mannequin material.",
+                  "Do NOT describe garment color, lace pattern, fabric, brand, SKU, background props (flowers, furniture), or mannequin material.",
                   "DO describe: standing vs seated, torso angle (front, back, three-quarter), leg position, arm/hand placement, chin/head tilt, distance (full-length vs close).",
+                  "For virtual try-on: prefer standing catalog pose; hands near outer thighs, not on shoulder, chest, or waistband; no seated poses unless the sample is clearly seated.",
                   "If subject is seated, cameraPrompt must say seated and describe knee/hip angles clearly.",
                   "If sample is full-body catalog, cameraPrompt MUST require full head-to-toe framing (entire head and feet visible).",
                   "cameraPrompt: one dense English sentence for an image model; natural editorial posture; hands not blocking torso.",

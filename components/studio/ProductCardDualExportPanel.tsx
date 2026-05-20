@@ -208,7 +208,12 @@ export function ProductCardDualExportPanel({
           </div>
         }
         footer={
-          <TryOnResultActions onDownload={handleDownload} onStartOver={onStartOver} />
+          <TryOnResultActions
+            onDownload={handleDownload}
+            onStartOver={onStartOver}
+            startOverLabel="Создать ещё раз"
+            startOverTitle="Убрать готовую карточку. Фото, рамка и настройки останутся."
+          />
         }
       />
     </div>

@@ -1,0 +1,81 @@
+topic_id,topic_n,ru_slug,cluster,intent,catalog_priority,wave_action,target_locale,kk_scope,word_target,page_type,risk,notes
+blog_006,6,kak-ai-pomogaet-prodavtsam-marketpleysov,AI product photography basics,informational,P1,write_now,WAVE2,"ru,en",later,1100,blog,ok,Trust MOFU — Wave 2
+blog_007,7,oshibki-v-tovarnyh-foto,AI product photography basics,informational,P1,write_now,WAVE2,"ru,en",later,1000,blog,ok,Mistakes TOFU — Wave 2
+blog_009,9,pochemu-ai-mozhet-menyat-tovar,AI product photography basics,informational,P1,write_now,WAVE2,"ru,en",candidate,1100,blog,ok,Trust — Wave 2; kk after QA
+blog_010,10,kak-sohranit-tsvet-i-formu-tovara-v-ai-foto,AI product photography basics,how-to,P1,write_now,WAVE2,"ru,en",candidate,1100,blog,ok,Preservation — Wave 2
+blog_013,13,foto-platya-na-ai-modeli,clothing / fashion,commercial,P1,drop,DROP,"ru,en",no,0,blog,merge_clothing_cluster,Merge into #11/#12 hub
+blog_014,14,foto-futbolki-na-ai-modeli,clothing / fashion,commercial,P1,drop,DROP,"ru,en",no,0,blog,merge_clothing_cluster,Thin SKU duplicate
+blog_015,15,foto-kostyuma-na-ai-modeli,clothing / fashion,commercial,P1,drop,DROP,"ru,en",no,0,blog,merge_clothing_cluster,Thin SKU duplicate
+blog_017,17,foto-plus-size-modeli-dlya-odezhdy,clothing / fashion,commercial,P1,later,P1,"ru,en",later,950,blog,ok,Plus-size niche
+blog_018,18,kak-vybrat-pozu-ai-modeli,clothing / fashion,how-to,P1,later,P1,"ru,en",later,950,blog,ok,Pose guide
+blog_019,19,kak-sdelat-katalog-odezhdy-bez-fotosessii,clothing / fashion,how-to,P1,write_now,WAVE2,"ru,en",candidate,1200,blog,ok,Catalog BOFU — Wave 2
+blog_020,20,kak-podgotovit-foto-odezhdy-dlya-ai-primerki,clothing / fashion,how-to,P1,write_now,WAVE2,"ru,en",later,1100,blog,ok,Try-on prep — Wave 2
+blog_022,22,kak-sfotografirovat-sergi,accessories / jewelry,how-to,P1,later,P1,"ru,en",no,900,blog,ok,Jewelry wave 3
+blog_023,23,kak-sdelat-foto-koltsa-na-belom-fone,accessories / jewelry,how-to,P1,later,P1,"ru,en",no,900,blog,ok,Jewelry wave 3
+blog_024,24,kak-sdelat-foto-brasleta,accessories / jewelry,how-to,P1,later,P1,"ru,en",no,900,blog,ok,Jewelry wave 3
+blog_025,25,kak-ubrat-lishniy-fon-u-aksessuarov,accessories / jewelry,how-to,P1,later,P1,"ru,en",no,900,blog,ok,Links #64
+blog_026,26,pochemu-ai-menyaet-ukrasheniya,accessories / jewelry,informational,P1,later,P1,"ru,en",no,950,blog,ok,Trust jewelry
+blog_027,27,tochnaya-kartochka-bizhuterii,accessories / jewelry,how-to,P1,later,P1,"ru,en",no,950,blog,ok,Exact card jewelry
+blog_028,28,lifestyle-foto-ukrasheniy,accessories / jewelry,how-to,P1,later,P1,"ru,en",no,900,blog,ok,Lifestyle
+blog_029,29,kak-podgotovit-foto-sumki,accessories / jewelry,how-to,P0,write_now,WAVE2,"ru,en",later,1100,blog,ok,Bags P0 — Wave 2
+blog_034,34,foto-tovarov-dlya-ebay,marketplaces,platform,P0,write_now,WAVE2,"ru,en",no,1100,blog,thin_duplicate_platform_lp,Add depth vs LP — Wave 2
+blog_035,35,foto-tovarov-dlya-amazon,marketplaces,platform,P0,write_now,WAVE2,"ru,en",no,1100,blog,thin_duplicate_platform_lp,Wave 2
+blog_036,36,foto-tovarov-dlya-etsy,marketplaces,platform,P0,write_now,WAVE2,"ru,en",no,1100,blog,thin_duplicate_platform_lp,Wave 2
+blog_037,37,foto-tovarov-dlya-shopify,marketplaces,platform,P1,later,P2,"ru,en",no,850,blog,thin_duplicate_platform_lp,LP sufficient first
+blog_038,38,foto-tovarov-dlya-instagram-shop,marketplaces,platform,P1,later,P2,"ru,en",no,850,blog,thin_duplicate_platform_lp,Overlap #49
+blog_039,39,foto-tovarov-dlya-tiktok-shop,marketplaces,platform,P1,later,P2,"ru,en",no,850,blog,thin_duplicate_platform_lp,After Reels cluster
+blog_040,40,foto-tovarov-dlya-facebook-marketplace,marketplaces,platform,P1,drop,DROP,"ru,en",no,0,blog,low_cis_priority,Defer CIS
+blog_041,41,foto-tovarov-dlya-olx,marketplaces,platform,P1,drop,DROP,"ru,en",no,0,blog,low_cis_priority,OLX low priority
+blog_042,42,foto-tovarov-dlya-aliexpress,marketplaces,platform,P1,later,P2,"ru,en",no,850,blog,low_cis_priority,Supplier focus
+blog_043,43,foto-tovarov-dlya-temu,marketplaces,platform,P1,later,P2,"ru,en",no,850,blog,low_cis_priority,Supplier focus
+blog_044,44,format-1-1-dlya-kartochki-tovara,formats and social,how-to,P1,later,P2,"ru,en",no,800,blog,thin_format_duplicate,Merge formats guide
+blog_045,45,format-4-5-dlya-marketpleysa,formats and social,how-to,P1,later,P2,"ru,en",no,800,blog,thin_format_duplicate,Merge formats guide
+blog_046,46,format-9-16-dlya-reels-i-stories,formats and social,how-to,P1,later,P2,"ru,en",no,800,blog,thin_format_duplicate,Link #47
+blog_049,49,kak-podgotovit-foto-dlya-instagram,formats and social,how-to,P1,write_now,WAVE2,"ru,en",no,1050,blog,ok,Instagram — Wave 2
+blog_050,50,kak-sdelat-banner-tovara-dlya-reklamy,formats and social,how-to,P1,later,P1,"ru,en",no,950,blog,ok,Ads creative
+blog_051,51,kak-adaptirovat-foto-pod-raznye-ploshchadki,formats and social,how-to,P1,later,P2,"ru,en",no,900,blog,ok,Hub article P2
+blog_052,52,kak-sdelat-vertikalnoe-foto-tovara,formats and social,how-to,P1,later,P2,"ru,en",no,800,blog,thin_format_duplicate,Section in #51
+blog_053,53,kak-sdelat-gorizontalnoe-foto-tovara,formats and social,how-to,P1,later,P2,"ru,en",no,800,blog,thin_format_duplicate,Section in #51
+blog_054,54,kak-prodavtsu-bystro-podgotovit-katalog,workflow / SaaS / business,how-to,P1,later,P1,"ru,en",later,950,blog,ok,Seller workflow
+blog_055,55,kak-menedzheru-marketpleysa-uskorit-kontent,workflow / SaaS / business,how-to,P1,write_now,WAVE2,"ru,en",no,1050,blog,ok,B2B workflow — Wave 2
+blog_056,56,kak-shourumu-sdelat-foto-bez-fotografa,workflow / SaaS / business,how-to,P1,later,P1,"ru,en",no,900,blog,ok,Showroom
+blog_057,57,kak-postavshchiku-podgotovit-katalog,workflow / SaaS / business,how-to,P1,later,P1,"ru,en",no,900,blog,ok,Supplier
+blog_058,58,kak-malomu-biznesu-sdelat-kartochki,workflow / SaaS / business,how-to,P1,later,P1,"ru,en",no,900,blog,ok,SMB
+blog_059,59,kak-sekonomit-na-tovarnoy-fotosyomke,workflow / SaaS / business,informational,P1,later,P1,"ru,en",no,950,blog,ok,Cost savings
+blog_060,60,kogda-ai-foto-luchshe-fotosessii,workflow / SaaS / business,comparison,P1,write_now,WAVE2,"ru,en",no,1100,blog,ok,Compare table — Wave 2
+blog_061,61,kogda-ai-foto-ne-podhodit,workflow / SaaS / business,comparison,P1,write_now,WAVE2,"ru,en",no,1050,blog,ok,Trust limits — Wave 2
+blog_062,62,kak-organizovat-workflow-kontenta,workflow / SaaS / business,how-to,P1,later,P1,"ru,en",no,950,blog,ok,Ops guide
+blog_063,63,kak-proveryat-kachestvo-ai-kartochek,workflow / SaaS / business,how-to,P1,write_now,WAVE2,"ru,en",no,1050,blog,ok,QA — Wave 2
+blog_066,66,belyy-fon-ili-lifestyle-scena,background / cleanup,comparison,P1,later,P1,"ru,en",no,950,blog,ok,Compare #3 vs creative
+blog_067,67,kak-ubrat-lishnie-predmety-s-foto,background / cleanup,how-to,P0,write_now,WAVE2,"ru,en",no,1100,blog,ok,Cleanup P0 — Wave 2
+blog_068,68,kak-vydelit-tovar-na-foto,background / cleanup,how-to,P1,later,P1,"ru,en",no,900,blog,ok,Isolation
+blog_069,69,kak-sdelat-fon-dlya-tovara-na-ulitse,background / cleanup,how-to,P1,later,P1,"ru,en",no,900,blog,ok,Outdoor scene
+blog_070,70,kak-sdelat-studijnyy-fon,background / cleanup,how-to,P1,later,P1,"ru,en",no,900,blog,ok,Studio bg
+blog_071,71,kak-sdelat-luxury-fon,background / cleanup,how-to,P1,later,P1,"ru,en",no,900,blog,ok,Luxury
+blog_072,72,kak-ne-isportit-tovar-pri-zamene-fona,background / cleanup,how-to,P1,later,P1,"ru,en",later,1000,blog,ok,Accuracy — kk optional
+blog_073,73,kak-podgotovit-foto-s-plohim-fonom,background / cleanup,how-to,P1,later,P1,"ru,en",no,900,blog,ok,Bad source
+blog_075,75,product-shot-ili-odezhda-na-modeli,comparison,comparison,P1,write_now,WAVE2,"ru,en",no,1100,blog,ok,Compare table — Wave 2
+blog_076,76,belyy-fon-ili-kreativnaya-scena,comparison,comparison,P1,later,P1,"ru,en",no,900,blog,ok,Overlap #66
+blog_077,77,ai-model-ili-realnaya-model,comparison,comparison,P1,write_now,WAVE2,"ru,en",no,1100,blog,ok,Fashion compare — Wave 2
+blog_078,78,tochnaya-kartochka-ili-kreativnaya-scena,comparison,comparison,P1,later,P1,"ru,en",no,900,blog,ok,Intent split
+blog_079,79,foto-tovara-ili-video-tovara,comparison,comparison,P1,later,P1,"ru,en",no,900,blog,ok,Video honest
+blog_080,80,ruchnoe-vydelenie-ili-avtoudalenie-fona,comparison,comparison,P1,later,P1,"ru,en",no,900,blog,ok,Studio feature
+blog_081,81,chto-luchshe-1-1-ili-4-5,comparison,comparison,P2,drop,DROP,"ru,en",no,0,blog,thin_format_duplicate,Merge to formats hub
+blog_082,82,chto-luchshe-instagram-foto-ili-reels,comparison,comparison,P2,later,P2,"ru,en",no,850,blog,ok,After #47 live
+blog_083,83,pochemu-raznye-ploshchadki-trebuyut-formaty,comparison,informational,P2,drop,DROP,"ru,en",no,0,blog,thin_format_duplicate,Section in #51
+blog_084,84,kak-prodavat-na-raznyh-marketpleysah,localization / international sellers,informational,P2,later,P2,"ru,en",no,900,blog,low_cis_priority,International P3
+blog_085,85,foto-dlya-zarubezhnogo-rynka,localization / international sellers,how-to,P2,later,P2,"ru,en",no,900,blog,low_cis_priority,International P3
+blog_086,86,katalog-na-neskolkih-yazykah,localization / international sellers,how-to,P2,later,P2,"ru,en",no,900,blog,low_cis_priority,i18n ops
+blog_087,87,adaptirovat-kartochku-dlya-ebay,localization / international sellers,platform,P2,later,P2,"ru,en",no,850,blog,thin_duplicate_platform_lp,After #34
+blog_088,88,adaptirovat-kartochku-dlya-amazon,localization / international sellers,platform,P2,later,P2,"ru,en",no,850,blog,thin_duplicate_platform_lp,After #35
+blog_089,89,adaptirovat-foto-dlya-etsy,localization / international sellers,platform,P2,later,P2,"ru,en",no,850,blog,thin_duplicate_platform_lp,After #36
+blog_090,90,visual-dlya-shopify,localization / international sellers,platform,P2,later,P2,"ru,en",no,850,blog,thin_duplicate_platform_lp,EN-first
+blog_091,91,foto-dlya-lokalnogo-marketpleysa,localization / international sellers,how-to,P2,later,P2,"ru,en",later,900,blog,ok,Kaspi local angle
+blog_092,92,kak-ai-pomogaet-postavshchikam-sng,localization / international sellers,informational,P2,drop,DROP,"ru,en",no,0,blog,low_cis_priority,Overlap #6
+blog_093,93,kontent-dlya-mezhdunarodnyh-klientov,localization / international sellers,how-to,P2,later,P2,"ru,en",no,850,blog,low_cis_priority,B2B export
+blog_094,94,kak-napisat-prompt-dlya-tovarnogo-foto,AI prompt / advanced,how-to,P0,write_now,WAVE2,"ru,en",no,1050,blog,ok,Prompt — Wave 2
+blog_095,95,kak-uluchshit-prompt-dlya-ai-video,AI prompt / advanced,how-to,P2,later,P2,"ru,en",no,850,blog,ok,After video ships
+blog_096,96,kak-opisat-model-dlya-odezhdy,AI prompt / advanced,how-to,P1,write_now,WAVE2,"ru,en",no,1050,blog,ok,Model prompt — Wave 2
+blog_097,97,ai-fon-bez-izmeneniya-tovara,AI prompt / advanced,how-to,P1,later,P1,"ru,en",later,950,blog,ok,Background accuracy
+blog_099,99,kak-proverit-chto-ai-ne-izmenil-tovar,AI prompt / advanced,how-to,P1,later,P1,"ru,en",later,950,blog,ok,Pairs #8
+blog_100,100,kak-ispolzovat-vitrina-ai-dlya-kontent-plana,AI prompt / advanced,how-to,P2,later,P2,"ru,en",no,900,blog,ok,Onboarding not lead SEO

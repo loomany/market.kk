@@ -14,5 +14,8 @@ export const MODEL_CUSTOM_TEXT_MAX = 300;
 /** Preset angle prompts (server-side); longer than user custom fields */
 export const MODEL_CAMERA_ANGLE_PROMPT_MAX = 512;
 
+/** Studio identity bible for multi-angle t2i follow-ups */
+export const MODEL_IDENTITY_LOCK_MAX = 900;
+
 /** Full Russian pose description from product photo analysis (UI). */
 export const PRODUCT_POSE_DESCRIPTION_RU_MAX = 400;

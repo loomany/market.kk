@@ -2,7 +2,12 @@ import type { Locale } from "@/lib/i18n/localeConfig";
 import { supportedLocaleCodes } from "@/lib/i18n/localeConfig";
 import type { FaqItem } from "./platforms";
 
-export type BlogTopicStatus = "published" | "draft" | "noindex" | "needs_review";
+export type BlogTopicStatus =
+  | "published"
+  | "draft"
+  | "noindex"
+  | "needs_review"
+  | "ready_for_review";
 export type BlogIntent =
   | "commercial"
   | "informational"
@@ -147,17 +152,68 @@ const p0Numbers = new Set([
   1, 3, 11, 16, 21, 29, 30, 31, 32, 33, 34, 35, 36, 47, 48, 65, 67, 74, 94, 98,
 ]);
 
-const publishedNumbers = new Set([1, 2, 3, 8, 11, 16, 21, 31]);
+/** RU Stage 2: 8 expanded + 12 new P0 articles; Stage 11 Wave 2: +20 articles */
+const publishedRuNumbers = new Set([
+  1, 2, 3, 4, 5, 8, 11, 12, 16, 21, 30, 31, 32, 33, 47, 48, 64, 65, 74, 98,
+  6, 7, 9, 10, 19, 20, 29, 34, 35, 36, 49, 55, 60, 61, 63, 67, 75, 77, 94, 96,
+]);
+
+/** EN Stage 2 + Stage 11 Wave 2: published pairs */
+const publishedEnNumbers = new Set([
+  1, 2, 3, 4, 5, 8, 11, 12, 16, 21, 30, 31, 32, 33, 47, 48, 64, 65, 74, 98,
+  6, 7, 9, 10, 19, 20, 29, 34, 35, 36, 49, 55, 60, 61, 63, 67, 75, 77, 94, 96,
+]);
+
+/** KK Stage 5/6: top 10 Kaspi/marketplace articles — published when QA approved */
+const publishedKkNumbers = new Set([1, 2, 3, 4, 5, 11, 12, 16, 31, 64]);
 
 const ruSlugOverrides: Record<number, string> = {
   1: "ai-foto-tovarov-dlya-marketpleysov",
   2: "kak-sdelat-foto-tovara-dlya-marketpleysa",
   3: "kak-sdelat-belyy-fon-dlya-tovara",
+  4: "kak-uluchshit-foto-tovara-bez-fotografa",
+  5: "kak-sdelat-kartochku-tovara-iz-obychnogo-foto",
   8: "kak-proverit-ai-foto-pered-publikatsiey",
   11: "kak-sdelat-foto-odezhdy-na-modeli",
+  12: "kak-perenesti-odezhdu-na-ai-model",
   16: "foto-belya-na-ai-modeli",
   21: "foto-bizhuterii-dlya-marketpleysa",
+  30: "kak-sdelat-foto-obuvi-dlya-kartochki-tovara",
   31: "foto-tovarov-dlya-kaspi",
+  32: "foto-tovarov-dlya-wildberries",
+  33: "foto-tovarov-dlya-ozon",
+  47: "kak-sdelat-reels-iz-foto-tovara",
+  48: "kak-sdelat-video-tovara-iz-fotografii",
+  64: "kak-udalit-fon-s-foto-tovara",
+  65: "kak-zamenit-fon-u-tovara",
+  74: "ai-foto-ili-fotosessiya-chto-vybrat",
+  98: "kak-zastavit-ai-sohranit-tovar",
+};
+
+const kkSlugOverrides: Record<number, string> = {
+  1: "ai-onim-fotografiyasi",
+  2: "marketpleisterge-onim-fotosu-kalay-zhasau",
+  3: "onim-ushin-ak-fon-kalay-zhasau",
+  4: "fotosurysyz-onim-fotosyn-zhetildiru",
+  5: "kadirdik-onim-fotosynan-kartochka",
+  11: "kiim-ai-model-fotosy",
+  12: "kiimdi-ai-modelge-kiyu",
+  16: "ish-kiyim-ai-model-fotosy",
+  31: "kaspi-ushin-onim-fotosy",
+  64: "onim-fonyn-alu",
+};
+
+const kkTitleOverrides: Record<number, string> = {
+  1: "AI тауар фотосы деген не: маркетплейс сатушыларына практикалық нұсқау",
+  2: "Маркетплейске тауар фотосын қалай дайындауға болады",
+  3: "Тауарға ақ фон қалай жасауға болады",
+  4: "Фотосуретшісіз тауар фотосын қалай жақсартуға болады",
+  5: "Қарапайым фотодан тауар карточкасын қалай жасауға болады",
+  11: "Киімді AI модельде көрсету: маркетплейс workflow",
+  12: "Киімді AI модельге кию: виртуалды примерка workflow",
+  16: "Іш киім фотосы AI модельде: қауіпсіз каталог стилі",
+  31: "Kaspi үшін тауар фотосы: дайындау және тексеру",
+  64: "Тауар фонын алу: AI және қолмен QA",
 };
 
 const p0KeywordOverrides: Record<number, { ru?: string; en?: string; ruSecondary?: string[]; enSecondary?: string[] }> = {
@@ -208,7 +264,15 @@ function slugify(value: string): string {
 }
 
 function statusFor(locale: Locale, n: number): BlogTopicStatus {
-  if (publishedNumbers.has(n) && (locale === "ru" || locale === "en")) {
+  if (locale === "ru" && publishedRuNumbers.has(n)) {
+    return "published";
+  }
+
+  if (locale === "en" && publishedEnNumbers.has(n)) {
+    return "published";
+  }
+
+  if (locale === "kk" && publishedKkNumbers.has(n)) {
     return "published";
   }
 
@@ -224,6 +288,11 @@ function metaDescription(locale: Locale, seed: TopicSeed): string {
     return `${seed.ru}: практический гид Vitrina AI Studio с чеклистом качества, ограничениями AI и ссылками на связанные use cases.`;
   }
 
+  if (locale === "kk") {
+    const title = kkTitleOverrides[seed.n] ?? seed.ru;
+    return `${title}: Vitrina AI Studio практикалық нұсқауы — AI шектеулері, Kaspi/marketplace тексеру тізімі, жарияламас бұрын QA.`;
+  }
+
   return `${seed.en}: a practical Vitrina AI Studio guide with a quality checklist, AI limitations, and related use cases.`;
 }
 
@@ -231,6 +300,7 @@ export const blogTopics: BlogTopic[] = seeds.map((seed) => {
   const override = p0KeywordOverrides[seed.n];
   const enSlug = slugify(seed.en);
   const ruSlug = ruSlugOverrides[seed.n] ?? enSlug;
+  const kkSlug = kkSlugOverrides[seed.n] ?? slugify(kkTitleOverrides[seed.n] ?? seed.ru);
 
   return {
     id: `blog_${String(seed.n).padStart(3, "0")}`,
@@ -254,8 +324,12 @@ export const blogTopics: BlogTopic[] = seeds.map((seed) => {
       ru: [`как ${seed.ru.toLowerCase()}?`, "как проверить AI-фото перед публикацией?"],
       en: [`how to ${seed.en.toLowerCase()}?`, "how to review AI product photos before publishing?"],
     },
-    title: { ru: seed.ru, en: seed.en },
-    slug: { ru: ruSlug, en: enSlug },
+    title: {
+      ru: seed.ru,
+      en: seed.en,
+      kk: kkTitleOverrides[seed.n],
+    },
+    slug: { ru: ruSlug, en: enSlug, kk: kkSlug },
     metaDescription: {
       ru: metaDescription("ru", seed),
       en: metaDescription("en", seed),

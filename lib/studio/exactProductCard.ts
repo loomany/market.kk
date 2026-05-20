@@ -1,5 +1,8 @@
 import type { FalModelResolution } from "@/lib/ai/modelOutputSizes";
-import type { ShotSizePreset } from "@/lib/ai/productShotSchemas";
+import {
+  PRODUCT_SHOT_EXPORT_QUALITY,
+  type ShotSizePreset,
+} from "@/lib/ai/productShotSchemas";
 import type { ProductShotScenePreset } from "@/components/studio/types";
 import { shotSizePresetToDimensions } from "@/lib/ai/productShotSchemas";
 import { prepareCutoutCanvas } from "@/lib/studio/cutoutImage";
@@ -51,7 +54,7 @@ export async function composeExactProductCard(
 ): Promise<string> {
   const [width, height] = shotSizePresetToDimensions(
     options.shotSizePreset,
-    options.imageQuality ?? "1K"
+    options.imageQuality ?? PRODUCT_SHOT_EXPORT_QUALITY
   );
   const img = await loadImage(cutoutUrl);
   const cutout = prepareCutoutCanvas(img);

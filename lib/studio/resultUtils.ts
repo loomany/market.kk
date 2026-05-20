@@ -55,6 +55,7 @@ export function mapProductShotStudioResults(
     selectedProductPreviewUrl?: string;
     manualMaskUsed?: boolean;
     exactCardWithoutMask?: boolean;
+    visionGarmentRefined?: boolean;
     provider?: string;
   }
 ): StudioResultImage[] {
@@ -74,5 +75,6 @@ export function mapProductShotStudioResults(
     selectedProductPreviewUrl: options?.selectedProductPreviewUrl,
     manualMaskUsed: options?.manualMaskUsed,
     exactCardWithoutMask: options?.exactCardWithoutMask,
+    visionGarmentRefined: options?.visionGarmentRefined,
   }));
 }
