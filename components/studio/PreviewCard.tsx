@@ -33,6 +33,7 @@ type PreviewCardProps = {
   loadingVariant?: "spinner" | "countdown";
   countdownSeconds?: number;
   countdownLabel?: string;
+  countdownStartedAt?: number | null;
   /**
    * Fixed aspect viewport — height follows column width (SaaS catalog preview).
    * Matches pipeline output (9:16, 3:4, …) so images are not cropped.
@@ -56,6 +57,7 @@ function PreviewLoadingOverlay({
   variant = "spinner",
   countdownSeconds = SAAS_PIPELINE_COUNTDOWN_SEC,
   countdownLabel,
+  countdownStartedAt,
 }: {
   detail: string;
   subdetail?: string | null;
@@ -63,12 +65,14 @@ function PreviewLoadingOverlay({
   variant?: "spinner" | "countdown";
   countdownSeconds?: number;
   countdownLabel?: string;
+  countdownStartedAt?: number | null;
 }) {
   if (variant === "countdown" && !fullBleed) {
     return (
       <SaasPipelineCountdown
         totalSeconds={countdownSeconds}
         label={countdownLabel ?? detail}
+        startedAt={countdownStartedAt}
       />
     );
   }
@@ -190,6 +194,7 @@ export function PreviewCard({
   loadingVariant = "spinner",
   countdownSeconds = SAAS_PIPELINE_COUNTDOWN_SEC,
   countdownLabel,
+  countdownStartedAt,
   viewportAspect,
   scrollableViewport = false,
   catalogViewport = false,
@@ -231,6 +236,7 @@ export function PreviewCard({
       variant={loadingVariant}
       countdownSeconds={countdownSeconds}
       countdownLabel={countdownLabel}
+      countdownStartedAt={countdownStartedAt}
     />
   ) : (
     <div className="flex h-full min-h-0 flex-1 items-center justify-center p-3">

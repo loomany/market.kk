@@ -20,25 +20,38 @@ function formatCountdown(seconds: number): string {
 type SaasPipelineCountdownProps = {
   totalSeconds?: number;
   label?: string;
+  /** Epoch ms when the operation started — survives tab unmount/remount. */
+  startedAt?: number | null;
 };
+
+function remainingFromStartedAt(
+  startedAt: number,
+  totalSeconds: number
+): number {
+  const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+  return Math.max(0, totalSeconds - elapsed);
+}
 
 export function SaasPipelineCountdown({
   totalSeconds = SAAS_PIPELINE_COUNTDOWN_SEC,
   label = "Создаём фото на модели",
+  startedAt,
 }: SaasPipelineCountdownProps) {
-  const [remaining, setRemaining] = useState(totalSeconds);
+  const [remaining, setRemaining] = useState(() =>
+    startedAt != null
+      ? remainingFromStartedAt(startedAt, totalSeconds)
+      : totalSeconds
+  );
 
   useEffect(() => {
-    setRemaining(totalSeconds);
-    const startedAt = Date.now();
+    const anchor = startedAt ?? Date.now();
     const tick = () => {
-      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
-      setRemaining(Math.max(0, totalSeconds - elapsed));
+      setRemaining(remainingFromStartedAt(anchor, totalSeconds));
     };
     tick();
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
-  }, [totalSeconds]);
+  }, [startedAt, totalSeconds]);
 
   return (
     <div className="flex h-full min-h-0 flex-col items-center justify-center gap-3 px-4 py-6 text-center">

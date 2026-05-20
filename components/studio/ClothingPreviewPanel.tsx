@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { RotateCcw } from "lucide-react";
 import type { FalModelAspectRatio } from "@/lib/ai/modelOutputSizes";
 import { SAAS_MODEL_GENERATION_COUNTDOWN_SEC } from "@/lib/studio/clothingTryOnEstimates";
@@ -44,6 +44,8 @@ type ClothingPreviewPanelProps = {
   modelGenerating: boolean;
   modelLoadingSubdetail: string | null;
   pipelineBusy: boolean;
+  pipelineCountdownStartedAt?: number | null;
+  modelCountdownStartedAt?: number | null;
   onReplaceModel: () => void;
   resultUrl: string | null;
   tryOnProgress: string | null;
@@ -56,12 +58,15 @@ function TabButton({
   active,
   ready,
   onClick,
+  size = "default",
 }: {
   label: string;
   active: boolean;
   ready: boolean;
   onClick: () => void;
+  size?: "default" | "mobile";
 }) {
+  const isMobile = size === "mobile";
   return (
     <button
       type="button"
@@ -69,10 +74,20 @@ function TabButton({
       aria-selected={active}
       onClick={onClick}
       className={cn(
-        "relative flex flex-1 items-center justify-center gap-1 rounded-md px-1 py-1.5 text-xs font-medium transition",
-        active
-          ? "bg-white text-slate-950 shadow-sm"
-          : "text-slate-600 hover:text-slate-900"
+        "relative flex flex-1 items-center justify-center gap-1 transition",
+        isMobile
+          ? cn(
+              "rounded-[10px] px-2 py-2 text-sm",
+              active
+                ? "bg-white font-semibold text-slate-950 shadow-sm"
+                : "font-medium text-slate-500 hover:text-slate-800"
+            )
+          : cn(
+              "rounded-md px-1 py-1.5 text-xs font-medium",
+              active
+                ? "bg-white text-slate-950 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+            )
       )}
     >
       {label}
@@ -105,19 +120,31 @@ function PreviewTabBar({
   tabReady,
   onTabChange,
   aspectLabel,
+  fullWidth = false,
 }: {
   tabs: { id: ClothingPreviewTabId; label: string }[];
   activeTab: ClothingPreviewTabId;
   tabReady: Record<ClothingPreviewTabId, boolean>;
   onTabChange: (tab: ClothingPreviewTabId) => void;
-  aspectLabel: string;
+  aspectLabel?: string;
+  fullWidth?: boolean;
 }) {
   return (
-    <div className="mb-2 flex items-center gap-2">
+    <div
+      className={cn(
+        "flex items-center gap-2",
+        fullWidth ? "mb-3 w-full" : "mb-2"
+      )}
+    >
       <div
         role="tablist"
         aria-label="Превью пайплайна"
-        className="flex min-w-0 flex-1 gap-0.5 rounded-lg bg-slate-100/90 p-0.5 ring-1 ring-slate-200/50"
+        className={cn(
+          "flex gap-0.5 bg-slate-100/90 ring-1 ring-slate-200/50",
+          fullWidth
+            ? "w-full rounded-xl p-1"
+            : "min-w-0 flex-1 rounded-lg p-0.5"
+        )}
       >
         {tabs.map((tab) => (
           <TabButton
@@ -126,15 +153,19 @@ function PreviewTabBar({
             active={activeTab === tab.id}
             ready={tabReady[tab.id]}
             onClick={() => onTabChange(tab.id)}
+            size={fullWidth ? "mobile" : "default"}
           />
         ))}
       </div>
-      <AspectBadge label={aspectLabel} />
+      {aspectLabel ? <AspectBadge label={aspectLabel} /> : null}
     </div>
   );
 }
 
 const previewCardShared = { compact: true, scrollableViewport: false as const };
+
+const mobilePreviewCardClass =
+  "w-full ring-2 ring-slate-100/90 shadow-lg shadow-slate-200/50 lg:w-full lg:ring-1 lg:shadow-sm lg:shadow-slate-200/50";
 
 export function ClothingPreviewPanel({
   modelOutputAspect,
@@ -148,6 +179,8 @@ export function ClothingPreviewPanel({
   modelGenerating,
   modelLoadingSubdetail,
   pipelineBusy,
+  pipelineCountdownStartedAt,
+  modelCountdownStartedAt,
   onReplaceModel,
   resultUrl,
   tryOnProgress,
@@ -171,17 +204,6 @@ export function ClothingPreviewPanel({
   const desktopSourceTab: "product" | "model" =
     activeTab === "product" ? "product" : "model";
 
-  const mobileActiveAspect = useMemo((): PreviewAspectState => {
-    switch (activeTab) {
-      case "product":
-        return productPreviewAspect;
-      case "model":
-        return modelPreviewAspect;
-      case "result":
-        return resultPreviewAspect;
-    }
-  }, [activeTab, modelPreviewAspect, productPreviewAspect, resultPreviewAspect]);
-
   const previewPropsFor = (aspect: PreviewAspectState) => ({
     ...previewCardShared,
     viewportAspect: DEFAULT_PREVIEW_ASPECT,
@@ -192,7 +214,7 @@ export function ClothingPreviewPanel({
   const productCard = (
     <PreviewCard
       {...previewPropsFor(productPreviewAspect)}
-      className="w-full"
+      className={mobilePreviewCardClass}
       title="Товар"
       url={productCarouselItems.length === 1 ? productUrl : null}
       empty="Загрузите фото"
@@ -212,7 +234,7 @@ export function ClothingPreviewPanel({
   const modelCard = (
     <PreviewCard
       {...previewPropsFor(modelPreviewAspect)}
-      className="w-full"
+      className={mobilePreviewCardClass}
       title="AI-модель"
       url={modelCarouselItems.length === 1 ? modelUrl : null}
       empty="Появится после генерации"
@@ -220,6 +242,7 @@ export function ClothingPreviewPanel({
       loadingVariant="countdown"
       countdownSeconds={SAAS_MODEL_GENERATION_COUNTDOWN_SEC}
       countdownLabel="Создаём AI-модель"
+      countdownStartedAt={modelCountdownStartedAt}
       loadingSubdetail={modelLoadingSubdetail}
       content={
         modelCarouselItems.length > 1 ? (
@@ -251,13 +274,14 @@ export function ClothingPreviewPanel({
   const resultCard = (
     <PreviewCard
       {...previewPropsFor(resultPreviewAspect)}
-      className="w-full"
+      className={mobilePreviewCardClass}
       title="Итоговый результат"
       url={resultUrl}
       empty="Создайте фото на модели"
       loading={pipelineBusy && !resultUrl}
       loadingVariant="countdown"
       countdownLabel="Создаём фото на модели"
+      countdownStartedAt={pipelineCountdownStartedAt}
       loadingDetail={tryOnProgress}
       footer={
         resultUrl ? (
@@ -307,16 +331,18 @@ export function ClothingPreviewPanel({
         </div>
       </div>
 
-      {/* Mobile: 3 tabs in one column */}
-      <div className="w-full max-w-[320px] lg:hidden">
+      {/* Mobile: full-width segmented tabs + preview */}
+      <div className="flex w-full flex-col max-lg:-mx-4 max-lg:w-[calc(100%+2rem)] lg:hidden">
         <PreviewTabBar
           tabs={MOBILE_TABS}
           activeTab={activeTab}
           tabReady={tabReady}
-          aspectLabel={mobileActiveAspect.badge}
           onTabChange={onTabChange}
+          fullWidth
         />
-        <div role="tabpanel">{mobileCard}</div>
+        <div role="tabpanel" className="w-full min-w-0">
+          {mobileCard}
+        </div>
       </div>
     </>
   );

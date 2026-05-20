@@ -338,6 +338,10 @@ export function StudioShell({
   const [clothingPreviewTab, setClothingPreviewTab] =
     useState<ClothingPreviewTabId>("product");
   const [tryOnProgress, setTryOnProgress] = useState<string | null>(null);
+  const [clothingPipelineCountdownStartedAt, setClothingPipelineCountdownStartedAt] =
+    useState<number | null>(null);
+  const [modelGenerationCountdownStartedAt, setModelGenerationCountdownStartedAt] =
+    useState<number | null>(null);
   const [results, setResults] = useState<StudioResultImage[]>([]);
   const [sessionAssets, setSessionAssets] = useState<StudioSessionAsset[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -583,6 +587,26 @@ export function StudioShell({
     void runProductDescriptionAnalysis(file);
   }, [runProductDescriptionAnalysis]);
 
+  const beginClothingPipelineLoading = useCallback(() => {
+    setClothingPipelineCountdownStartedAt((prev) => prev ?? Date.now());
+    setLoading(true);
+  }, []);
+
+  const endClothingPipelineLoading = useCallback(() => {
+    setLoading(false);
+    setClothingPipelineCountdownStartedAt(null);
+  }, []);
+
+  const beginModelGeneration = useCallback(() => {
+    setModelGenerationCountdownStartedAt((prev) => prev ?? Date.now());
+    setModelGenerating(true);
+  }, []);
+
+  const endModelGeneration = useCallback(() => {
+    setModelGenerating(false);
+    setModelGenerationCountdownStartedAt(null);
+  }, []);
+
   const resetClothingModelAndResult = useCallback(() => {
     setGeneratedModelUrl(null);
     setGeneratedModelPreviews([]);
@@ -592,8 +616,8 @@ export function StudioShell({
     setResults([]);
     setError(null);
     setTryOnProgress(null);
-    setLoading(false);
-    setModelGenerating(false);
+    endClothingPipelineLoading();
+    endModelGeneration();
     if (modelSource === "upload") {
       setModelFile(null);
       setModelPreviewUrl(modelPreview.setFromFile(null));
@@ -601,7 +625,13 @@ export function StudioShell({
     } else if (modelSource === "saved") {
       setModelSource(null);
     }
-  }, [modelPreview, modelSource, savedModelUrl]);
+  }, [
+    endClothingPipelineLoading,
+    endModelGeneration,
+    modelPreview,
+    modelSource,
+    savedModelUrl,
+  ]);
 
   const handleAddProductFiles = useCallback(
     (files: File[]) => {
@@ -1113,14 +1143,14 @@ export function StudioShell({
 
   const handleGenerateModel = async (seedOverride?: number) => {
     const useSeed = seedOverride ?? modelGenerationSeed;
-    setModelGenerating(true);
+    beginModelGeneration();
     setModelGenerateError(null);
     setModelGenerateNotice(null);
 
     const minorRestriction = minorRestrictedChoice(modelSettingsForGeneration);
     if (minorRestriction) {
       setModelGenerateError(minorRestrictionMessage(minorRestriction));
-      setModelGenerating(false);
+      endModelGeneration();
       return;
     }
 
@@ -1128,21 +1158,21 @@ export function StudioShell({
       setModelGenerateError(
         "Выберите соотношение сторон изображения."
       );
-      setModelGenerating(false);
+      endModelGeneration();
       return;
     }
 
     const anglesError = validateGenerationAngles();
     if (anglesError) {
       setModelGenerateError(anglesError);
-      setModelGenerating(false);
+      endModelGeneration();
       return;
     }
 
     const customParamsError = validateModelCustomParams(modelSettingsForGeneration);
     if (customParamsError) {
       setModelGenerateError(customParamsError);
-      setModelGenerating(false);
+      endModelGeneration();
       return;
     }
 
@@ -1312,7 +1342,7 @@ export function StudioShell({
         "Не удалось сгенерировать модель. Попробуйте ещё раз."
       );
     } finally {
-      setModelGenerating(false);
+      endModelGeneration();
       setModelGenerateProgress(null);
     }
   };
@@ -1414,7 +1444,7 @@ export function StudioShell({
     }
 
     if (!options?.skipLoadingState) {
-      setLoading(true);
+      beginClothingPipelineLoading();
     }
     setTryOnProgress("Переносим товар на модель…");
     setError(null);
@@ -1521,7 +1551,7 @@ export function StudioShell({
     } finally {
       if (!options?.skipLoadingState) {
         setTryOnProgress(null);
-        setLoading(false);
+        endClothingPipelineLoading();
       }
     }
   };
@@ -1680,7 +1710,7 @@ export function StudioShell({
       return;
     }
 
-    setLoading(true);
+    beginClothingPipelineLoading();
     setError(null);
     setResults([]);
     setClothingPreviewTab("model");
@@ -1708,7 +1738,7 @@ export function StudioShell({
           !generatedModelUrl || !isRemoteImageUrl(generatedModelUrl);
         if (needsFreshModel) {
           setTryOnProgress("Создаём модель…");
-          setModelGenerating(true);
+          beginModelGeneration();
           setModelGenerateError(null);
 
           const angles = resolveGenerationAngles();
@@ -1769,7 +1799,7 @@ export function StudioShell({
             return;
           } finally {
             window.clearTimeout(timeoutId);
-            setModelGenerating(false);
+            endModelGeneration();
           }
         } else {
           modelUrlForTryOn = resolveModelImageUrl();
@@ -1789,7 +1819,7 @@ export function StudioShell({
         requireExistingModel: false,
       });
     } finally {
-      setLoading(false);
+      endClothingPipelineLoading();
       setTryOnProgress(null);
     }
   };
@@ -2241,6 +2271,7 @@ export function StudioShell({
           <section
             className={cn(
               "flex min-h-0 flex-col pt-2 lg:sticky lg:top-6 lg:z-20 lg:self-start",
+              isClothingMode && "max-lg:items-stretch",
               isClothingMode &&
                 "lg:max-h-[calc(100dvh-2rem)] lg:overflow-y-auto lg:[scrollbar-width:thin]"
             )}
@@ -2281,6 +2312,8 @@ export function StudioShell({
                     pipelineBusy && !modelGenerating ? tryOnProgress : null
                   }
                   pipelineBusy={pipelineBusy}
+                  pipelineCountdownStartedAt={clothingPipelineCountdownStartedAt}
+                  modelCountdownStartedAt={modelGenerationCountdownStartedAt}
                   onReplaceModel={handleReplaceModel}
                   resultUrl={finalTryOnResult?.url ?? null}
                   tryOnProgress={tryOnProgress}
