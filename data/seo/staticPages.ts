@@ -1,10 +1,15 @@
 import type { Locale, TranslationStatus } from "@/lib/i18n/localeConfig";
 import { supportedLocaleCodes } from "@/lib/i18n/localeConfig";
 import { getRouteSlug, type StaticRouteKey } from "@/lib/i18n/routeSlugs";
+import { enFeatureLandingEnhancements } from "./enFeatureLandingEnhancements";
+import { kkFeatureLandingEnhancements } from "./kkFeatureLandingEnhancements";
+import { isKkStaticPageApproved } from "@/lib/seo/kkIndexPolicy";
+import { ruFeatureLandingEnhancements } from "./ruFeatureLandingEnhancements";
+import { trustStaticPages } from "./trustPages";
 
 export type StaticSeoPage = {
   key: StaticRouteKey;
-  kind: "feature" | "legal" | "ai-summary" | "pricing";
+  kind: "feature" | "legal" | "ai-summary" | "pricing" | "trust";
   indexPolicy: "index" | "noindex";
   content: Record<
     Locale,
@@ -16,6 +21,7 @@ export type StaticSeoPage = {
       intro: string;
       sections: Array<{ title: string; body: string }>;
       faq?: Array<{ question: string; answer: string }>;
+      relatedLinks?: Array<{ label: string; href: string }>;
       status: TranslationStatus;
     }
   >;
@@ -80,15 +86,42 @@ function createLocalizedContent(
   status: TranslationStatus
 ) {
   const isRu = locale === "ru";
+  const isKk = locale === "kk";
+  const enhanced = isRu
+    ? ruFeatureLandingEnhancements[key]
+    : locale === "en"
+      ? enFeatureLandingEnhancements[key]
+      : locale === "kk"
+        ? kkFeatureLandingEnhancements[key]
+        : undefined;
   return {
     slug: getRouteSlug(locale, key),
     title: `${title} — Vitrina AI Studio`,
     metaDescription: isRu
       ? `${title}: как Vitrina AI Studio помогает готовить товарный визуал, где AI может ошибаться и что проверять перед публикацией.`
-      : `${title}: how Vitrina AI Studio helps prepare product visuals, where AI can fail, and what to review before publishing.`,
+      : locale === "kk"
+        ? `${title}: Vitrina AI Studio — Kaspi/marketplace тауар фотосы, AI шектеулері және жарияламас бұрын қолмен тексеру.`
+        : `${title}: how Vitrina AI Studio helps prepare product visuals, where AI can fail, and what to review before publishing.`,
     h1: title,
-    intro,
-    sections: isRu
+    intro: enhanced?.intro ?? intro,
+    sections: enhanced?.sections ?? (isKk
+      ? [
+          {
+            title: "Бұл бет не туралы",
+            body: "Сценарий, AI шектеулері, байланысты материалдар және студияға өту — модерация кепілдемейді.",
+          },
+          {
+            title: "Сапа тізімі",
+            body: "Жарияламас бұрын түс, пішін, пропорция, края, текстура, логотиптерді тексеріңіз.",
+          },
+          {
+            title: "Функция статусы",
+            body: key === "productVideoGenerator"
+              ? "Видео workflow әзірленуде — production-ready деп уәде берілмейді."
+              : "Функция ағымдағы studio workflow бөлігі; қолмен тексеру міндетті.",
+          },
+        ]
+      : isRu
       ? [
           {
             title: "Что делает страница",
@@ -120,18 +153,55 @@ function createLocalizedContent(
               ? "The video workflow is described as planned/in development and is not presented as production-ready in this phase."
               : "The feature is described as part of the current studio or demo workflow with manual quality review.",
           },
-        ],
-    faq: [
+        ]),
+    faq: enhanced?.faq ?? [
       {
-        question: isRu ? "Можно ли гарантировать результат?" : "Can the result be guaranteed?",
-        answer: isRu
-          ? "Нет. AI может ошибаться, а продавец должен проверить товар и правила площадки."
-          : "No. AI can make mistakes, and the seller must review the product and platform rules.",
+        question: isKk
+          ? "Нәтижені кепілдей аламыз ба?"
+          : isRu
+            ? "Можно ли гарантировать результат?"
+            : "Can the result be guaranteed?",
+        answer: isKk
+          ? "Жоқ. AI қателесе алады; сатушы тауар мен маркетплейс ережелерін тексеруі керек."
+          : isRu
+            ? "Нет. AI может ошибаться, а продавец должен проверить товар и правила площадки."
+            : "No. AI can make mistakes, and the seller must review the product and platform rules.",
       },
     ],
+    relatedLinks: enhanced?.internalLinks,
     status,
   };
 }
+
+const kkFeatureTitles: Partial<
+  Record<StaticRouteKey, { title: string; intro: string }>
+> = {
+  aiProductPhotoStudio: {
+    title: "AI тауар фото студиясы",
+    intro:
+      "Kaspi және маркетплейстерге арналған тауар фотосын дайындау: карточка, фон, киім модельде — әр экспортты қолмен тексеру.",
+  },
+  productPhotoForMarketplaces: {
+    title: "Маркетплейске тауар фотосы",
+    intro: "Карточка және каталог үшін таза суреттер; жарияламас бұрын QA міндетті.",
+  },
+  productVideoGenerator: {
+    title: "Тауар видеосы",
+    intro: "Видео workflow әзірленуде — тек жоспарланған сценарий, production-ready емес.",
+  },
+  backgroundGenerator: {
+    title: "Тауар фон генераторы",
+    intro: "Фонды тазалау немесе ауыстыру; тауар өзгермеуі керек.",
+  },
+  fashionModelPhotos: {
+    title: "Киім AI модель фотосы",
+    intro: "Ересек каталог стилінде киім; виртуалды примерка workflow.",
+  },
+  jewelryProductPhotos: {
+    title: "Әшекей тауар фотосы",
+    intro: "Әшекей карточкалары; макро және бликтерді QA арқылы бақылау.",
+  },
+};
 
 function createFeaturePage(seed: (typeof featurePages)[number]): StaticSeoPage {
   return {
@@ -151,6 +221,23 @@ function createFeaturePage(seed: (typeof featurePages)[number]): StaticSeoPage {
           return [
             locale,
             createLocalizedContent(seed.key, locale, seed.enTitle, seed.enIntro, "published"),
+          ];
+        }
+
+        if (locale === "kk") {
+          const kk = kkFeatureTitles[seed.key];
+          const kkStatus = isKkStaticPageApproved(seed.key)
+            ? ("published" as TranslationStatus)
+            : ("ready_for_review" as TranslationStatus);
+          return [
+            locale,
+            createLocalizedContent(
+              seed.key,
+              locale,
+              kk?.title ?? seed.ruTitle,
+              kk?.intro ?? seed.ruIntro,
+              kkStatus
+            ),
           ];
         }
 
@@ -274,9 +361,221 @@ function createLegalPage(seed: (typeof legalSeeds)[number]): StaticSeoPage {
   };
 }
 
+const pricingPage: StaticSeoPage = {
+  key: "cost",
+  kind: "pricing",
+  indexPolicy: "index",
+  content: Object.fromEntries(
+    supportedLocaleCodes.map((locale) => {
+      if (locale === "ru") {
+        return [
+          locale,
+          {
+            slug: getRouteSlug(locale, "cost"),
+            title: "Тарифы Vitrina AI — Vitrina AI Studio",
+            metaDescription:
+              "Тарифы Vitrina AI Studio: бесплатный тест, стартовый доступ и premium-опции для AI-фото товара, примерки на модели, фона и улучшения фото для маркетплейсов.",
+            h1: "Тарифы Vitrina AI",
+            intro:
+              "Vitrina AI Studio помогает готовить товарные фото и визуал для Kaspi, Wildberries, Ozon и других площадок. Тарифы зависят от режима (демо или real AI) и объёма генераций.",
+            sections: [
+              {
+                title: "Бесплатный тест",
+                body: "Демо-режим показывает интерфейс и workflow без списаний. Подходит, чтобы понять сценарии: одежда на модели, товарная карточка, фон и проверка качества.",
+              },
+              {
+                title: "Старт",
+                body: "Для регулярной подготовки карточек и каталога. Оплата за генерации или пакеты уточняются — финальные цены будут опубликованы до запуска billing.",
+              },
+              {
+                title: "Premium",
+                body: "Для команд с большим объёмом контента: приоритетные сценарии, расширенные режимы и поддержка workflow контент-менеджера. Доступность функций зависит от roadmap продукта.",
+              },
+              {
+                title: "Что входит",
+                body: "AI-фото товара, примерка одежды на взрослой модели, удаление/замена фона, точная карточка, ручная проверка качества. Видео и Reels — по мере выхода функций.",
+              },
+            ],
+            faq: [
+              {
+                question: "Сколько стоит генерация?",
+                answer:
+                  "В демо-режиме списаний нет. В real AI mode стоимость зависит от типа задачи и должна быть видна до запуска, когда pricing включён в интерфейсе.",
+              },
+              {
+                question: "Можно ли использовать для Kaspi?",
+                answer:
+                  "Да, сервис помогает подготовить изображения для карточек, но не гарантирует принятие модерацией Kaspi. Правила площадки проверяет продавец.",
+              },
+              {
+                question: "Что входит в тариф?",
+                answer:
+                  "Подготовка товарного визуала: product shot, одежда на AI-модели, фон, чеклист качества. Конкретный набор режимов зависит от выбранного плана и статуса функций.",
+              },
+              {
+                question: "Можно ли попробовать бесплатно?",
+                answer:
+                  "Да. Откройте студию в демо-режиме, загрузите фото и проверьте workflow без оплаты.",
+              },
+            ],
+            relatedLinks: [
+              { label: "Как работает", href: "/ru/how-it-works" },
+              { label: "FAQ", href: "/ru/faq" },
+              { label: "Качество AI", href: "/ru/quality" },
+            ],
+            status: "published" as TranslationStatus,
+          },
+        ];
+      }
+
+      if (locale === "kk") {
+        return [
+          locale,
+          {
+            slug: getRouteSlug(locale, "cost"),
+            title: "Vitrina AI тарифтері — Vitrina AI Studio",
+            metaDescription:
+              "Vitrina AI Studio тарифтері: тегін демо, старт және premium — AI тауар фотосы, модельде киім, фон. Kaspi/marketplace үшін қолмен тексеру міндетті.",
+            h1: "Vitrina AI тарифтері",
+            intro:
+              "Vitrina AI Studio Kaspi, Wildberries, Ozon және басқа арналарға тауар визуалын дайындауға көмектеседі. Тариф демо немесе real AI режиміне және генерация көлеміне байланысты.",
+            sections: [
+              {
+                title: "Тегін тест",
+                body: "Демо-режим интерфейсті және workflow-ды ақша алмай көрсетеді: киім модельде, карточка, фон, сапа тексеруі.",
+              },
+              {
+                title: "Старт",
+                body: "Тұрақты карточка және каталог жаңартуы үшін. Нақты баға billing іске қосылғанға дейін жарияланады.",
+              },
+              {
+                title: "Premium",
+                body: "Үлкен көлемді командалар: кеңейтілген сценарийлер, контент-менеджер workflow. Функциялар roadmap-қа тәуелді.",
+              },
+              {
+                title: "Не кіреді",
+                body: "AI тауар фотосы, ересек модельде киім, фон алу/ауыстыру, нақты карточка, қолмен QA. Видео/Reels функциялар шыққан сайын.",
+              },
+            ],
+            faq: [
+              {
+                question: "Генерация қанша тұрады?",
+                answer:
+                  "Демо-режимде төлем жоқ. Real AI режимінде құн тапсырмаға байланысты; UI-да баға көрсетілгенге дейін тексеріңіз.",
+              },
+              {
+                question: "Kaspi үшін пайдалануға бола ма?",
+                answer:
+                  "Иә, студия карточка суретін дайындауға көмектеседі, бірақ Kaspi модерациясын кепілдемейді. Ережелерді сатушы өзі тексереді.",
+              },
+              {
+                question: "Тарифке не кіреді?",
+                answer:
+                  "Тауар визуалы: product shot, модельде киім, фон, сапа тізімі. Нақты режимдер тариф пен функция статусына байланысты.",
+              },
+              {
+                question: "Тегін сынауға бола ма?",
+                answer: "Иә. Демо-режимде студияны ашып, workflow-ды төлемсіз тексеріңіз.",
+              },
+            ],
+            relatedLinks: [
+              { label: "Қалай жұмыс істейді", href: "/kk/how-it-works" },
+              { label: "FAQ", href: "/kk/faq" },
+              { label: "AI сапасы", href: "/kk/quality" },
+            ],
+            status: "published" as TranslationStatus,
+          },
+        ];
+      }
+
+      if (locale === "en") {
+        return [
+          locale,
+          {
+            slug: getRouteSlug(locale, "cost"),
+            title: "Vitrina AI pricing — Vitrina AI Studio",
+            metaDescription:
+              "Vitrina AI Studio pricing: free demo, starter access, and premium options for AI product photos, on-model try-on, backgrounds, and marketplace-ready visuals.",
+            h1: "Vitrina AI pricing",
+            intro:
+              "Vitrina AI Studio helps prepare product visuals for Kaspi, Wildberries, Ozon, and other channels. Pricing depends on demo vs real AI mode and generation volume.",
+            sections: [
+              {
+                title: "Free test",
+                body: "Demo mode shows the interface and workflow without charges. Use it to explore on-model clothing, product cards, backgrounds, and quality review.",
+              },
+              {
+                title: "Starter",
+                body: "For regular listing and catalog work. Pay-per-generation or bundles are being finalized — final prices will be published before billing goes live.",
+              },
+              {
+                title: "Premium",
+                body: "For higher-volume teams: priority workflows, extended modes, and content-manager use cases. Feature availability depends on the product roadmap.",
+              },
+              {
+                title: "What's included",
+                body: "AI product photos, adult on-model clothing try-on, background removal/replacement, exact product cards, and manual quality review. Video and Reels roll out as features ship.",
+              },
+            ],
+            faq: [
+              {
+                question: "How much does a generation cost?",
+                answer:
+                  "Demo mode has no charges. In real AI mode, cost depends on the task type and should be visible before launch when pricing is enabled in the UI.",
+              },
+              {
+                question: "Can I use it for Kaspi?",
+                answer:
+                  "Yes, the studio helps prepare listing images, but it does not guarantee Kaspi moderation acceptance. Sellers must verify current platform rules.",
+              },
+              {
+                question: "What is included in a plan?",
+                answer:
+                  "Product visual preparation: product shots, on-model clothing, backgrounds, and quality checklist. Exact modes depend on the selected plan and feature status.",
+              },
+              {
+                question: "Can I try it for free?",
+                answer:
+                  "Yes. Open the studio in demo mode, upload a photo, and review the workflow without payment.",
+              },
+            ],
+            relatedLinks: [
+              { label: "How it works", href: "/en/how-it-works" },
+              { label: "FAQ", href: "/en/faq" },
+              { label: "AI quality", href: "/en/quality" },
+            ],
+            status: "published" as TranslationStatus,
+          },
+        ];
+      }
+
+      return [
+        locale,
+        {
+          slug: getRouteSlug(locale, "cost"),
+          title: "Vitrina AI pricing — Vitrina AI Studio",
+          metaDescription:
+            "Vitrina AI Studio pricing overview. Published plans are available in Russian and English.",
+          h1: "Vitrina AI pricing",
+          intro: "Pricing details are published for Russian and English locales.",
+          sections: [
+            {
+              title: "Availability",
+              body: "See /ru/cost or /en/cost for the current pricing overview.",
+            },
+          ],
+          status: "needs_review" as TranslationStatus,
+        },
+      ];
+    })
+  ) as StaticSeoPage["content"],
+};
+
 export const staticSeoPages: StaticSeoPage[] = [
   ...featurePages.map(createFeaturePage),
+  pricingPage,
   ...legalSeeds.map(createLegalPage),
+  ...trustStaticPages,
 ];
 
 export function getStaticSeoPageBySlug(locale: Locale, slug: string) {

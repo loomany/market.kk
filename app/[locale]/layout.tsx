@@ -9,13 +9,14 @@ import {
   softwareApplicationJsonLd,
   websiteJsonLd,
 } from "@/lib/seo/jsonLd";
+import { createLayoutMetadata } from "@/lib/seo/metadata";
 import {
   assertLocale,
   getHtmlLanguage,
   getTextDirection,
   supportedLocaleCodes,
 } from "@/lib/i18n/localeConfig";
-import { siteDescription, siteName, siteUrl } from "@/lib/seo/site";
+import { siteDescription, siteName } from "@/lib/seo/site";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -45,24 +46,12 @@ export async function generateMetadata({
   }
 
   return {
-    metadataBase: new URL(siteUrl),
     title: {
       default: siteName,
       template: `%s | ${siteName}`,
     },
     description: siteDescription,
-    // Site-wide noindex. Pairs with `app/robots.ts` `Disallow: /`. Remove
-    // both when the site is ready to be indexed by search engines.
-    robots: {
-      index: false,
-      follow: false,
-      nocache: true,
-      googleBot: {
-        index: false,
-        follow: false,
-        noimageindex: true,
-      },
-    },
+    ...createLayoutMetadata(),
     verification: {
       google: process.env.NEXT_PUBLIC_GSC_VERIFICATION || undefined,
       yandex: process.env.NEXT_PUBLIC_YANDEX_VERIFICATION || undefined,

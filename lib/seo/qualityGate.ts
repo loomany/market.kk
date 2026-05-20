@@ -27,6 +27,7 @@ const noindexStatuses = new Set<string>([
   "draft",
   "machine_translated",
   "needs_review",
+  "ready_for_review",
   "noindex",
   "index_when_content_ready",
 ]);

@@ -1,16 +1,20 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { CommercialExamplesTeaser } from "@/components/examples/CommercialExamplesTeaser";
 import { JsonLdScript } from "@/components/seo/JsonLd";
+import { getTeaserCategoriesForFeature } from "@/data/seo/featureExamplesTeaser";
 import {
   getStaticSeoPageBySlug,
   staticSeoPages,
 } from "@/data/seo/staticPages";
 import {
   assertLocale,
+  indexableLocales,
   supportedLocaleCodes,
   type Locale,
 } from "@/lib/i18n/localeConfig";
+import { shouldIndexPage } from "@/lib/seo/qualityGate";
 import { createSeoMetadata } from "@/lib/seo/metadata";
 import { breadcrumbJsonLd, faqJsonLd, serviceJsonLd, webPageJsonLd } from "@/lib/seo/jsonLd";
 
@@ -26,11 +30,25 @@ export function generateStaticParams() {
 
 function pathMap(page: (typeof staticSeoPages)[number]) {
   return Object.fromEntries(
-    supportedLocaleCodes.map((locale) => [
-      locale,
-      `/${locale}/${page.content[locale].slug}`,
-    ])
-  ) as Record<Locale, string>;
+    indexableLocales
+      .filter((locale) => {
+        const content = page.content[locale];
+        if (!content?.slug) return false;
+        const status = page.indexPolicy === "noindex" ? "noindex" : content.status;
+        return shouldIndexPage({
+          locale,
+          title: content.title,
+          description: content.metaDescription,
+          h1: content.h1,
+          status,
+          sectionCount: content.sections.length,
+          internalLinkCount: content.relatedLinks?.length ?? 3,
+          hasCanonical: true,
+          hasHreflang: true,
+        });
+      })
+      .map((locale) => [locale, `/${locale}/${page.content[locale].slug}`])
+  ) as Partial<Record<Locale, string>>;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -52,7 +70,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     sectionCount: content.sections.length,
     internalLinkCount: 3,
     hasCanonical: true,
-    hasHreflang: true,
+    hasHreflang: Object.keys(pathMap(page)).length >= 2,
   });
 }
 
@@ -107,6 +125,15 @@ export default async function StaticSeoPage({ params }: PageProps) {
             <p className="mt-3 text-sm leading-6 text-slate-600">{section.body}</p>
           </section>
         ))}
+        {page.kind === "feature"
+          ? getTeaserCategoriesForFeature(page.key).map((categoryId) => (
+              <CommercialExamplesTeaser
+                key={categoryId}
+                locale={locale}
+                categoryId={categoryId}
+              />
+            ))
+          : null}
       </div>
 
       {content.faq ? (
@@ -123,9 +150,24 @@ export default async function StaticSeoPage({ params }: PageProps) {
         </section>
       ) : null}
 
+      {content.relatedLinks && content.relatedLinks.length > 0 ? (
+        <section className="mt-10">
+          <h2 className="text-2xl font-bold tracking-tight text-slate-950">
+            {locale === "ru" ? "Полезные материалы" : "Related resources"}
+          </h2>
+          <ul className="mt-4 grid gap-2 text-sm font-semibold text-teal-700">
+            {content.relatedLinks.map((link) => (
+              <li key={link.href}>
+                <Link href={link.href}>{link.label}</Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       <div className="mt-10 flex flex-wrap gap-3">
         <Link href="/studio" prefetch={false} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">
-          {locale === "ru" ? "Открыть студию" : "Open studio"}
+          {locale === "ru" ? "Открыть студию" : locale === "kk" ? "Студияны ашу" : "Open studio"}
         </Link>
         <Link href={`/${locale}/use-cases`} className="rounded-lg border border-border bg-white px-4 py-2 text-sm font-semibold text-slate-800">
           Use cases

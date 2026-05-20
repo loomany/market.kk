@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { ArrowRight, Globe2 } from "lucide-react";
 import type { Locale } from "@/lib/i18n/localeConfig";
-import { supportedLocales } from "@/lib/i18n/localeConfig";
+import { indexableLocales, supportedLocales } from "@/lib/i18n/localeConfig";
 import type { getLandingCopy } from "@/lib/i18n/translations";
+import { LocaleSwitchLink } from "@/components/i18n/LocaleSwitchLink";
 import { cn } from "@/lib/utils";
 
 type LandingCopy = ReturnType<typeof getLandingCopy>;
@@ -80,8 +81,8 @@ function FooterLanguageGrid({
           </div>
         </div>
         <p className="text-xs font-medium text-slate-400 sm:pb-0.5">
-          {supportedLocales.length}{" "}
-          {locale === "ru" ? "локалей" : "locales"}
+          {indexableLocales.length}{" "}
+          {locale === "ru" ? "индексируемых локали" : "indexable locales"}
         </p>
       </div>
 
@@ -90,19 +91,21 @@ function FooterLanguageGrid({
         role="navigation"
         aria-label={title}
       >
-        {supportedLocales.map((item) => {
+        {supportedLocales
+          .filter((item) => (indexableLocales as readonly Locale[]).includes(item.code))
+          .map((item) => {
           const active = item.code === locale;
           return (
-            <Link
+            <LocaleSwitchLink
               key={item.code}
-              href={`/${item.code}`}
+              targetLocale={item.code}
+              active={active}
               className={cn(
                 "group flex min-w-0 items-center gap-2 rounded-xl border px-3 py-2.5 transition-all",
                 active
                   ? "border-teal-300 bg-teal-50 shadow-sm ring-1 ring-teal-500/10"
                   : "border-border/70 bg-slate-50/60 hover:border-teal-200 hover:bg-white hover:shadow-sm"
               )}
-              aria-current={active ? "page" : undefined}
             >
               <span
                 className={cn(
@@ -120,7 +123,7 @@ function FooterLanguageGrid({
               >
                 {item.nativeLabel}
               </span>
-            </Link>
+            </LocaleSwitchLink>
           );
         })}
       </div>
@@ -195,8 +198,8 @@ export function SaasFooter({
             title={isRu ? "Язык интерфейса" : "Interface language"}
             subtitle={
               isRu
-                ? "Выберите локаль — откроется главная на нужном языке."
-                : "Pick a locale to open the homepage in that language."
+                ? "Переключение RU/EN сохраняет текущую страницу, если перевод опубликован."
+                : "RU/EN switching keeps the current page when a published translation exists."
             }
           />
         </div>

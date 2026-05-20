@@ -8,7 +8,7 @@ import {
   softwareApplicationJsonLd,
   websiteJsonLd,
 } from "@/lib/seo/jsonLd";
-import { siteUrl } from "@/lib/seo/site";
+import { defaultOgImageUrl, siteUrl } from "@/lib/seo/site";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -30,17 +30,23 @@ export const metadata: Metadata = {
   },
   description:
     "AI-студия товарных фото для маркетплейсов: одежда на AI-модели, product shot, чистый фон и проверка качества.",
-  // Site-wide noindex. Pairs with `app/robots.ts` `Disallow: /`. Remove
-  // both when the site is ready to be indexed by search engines.
   robots: {
     index: false,
-    follow: false,
-    nocache: true,
-    googleBot: {
-      index: false,
-      follow: false,
-      noimageindex: true,
-    },
+    follow: true,
+  },
+  openGraph: {
+    images: [defaultOgImageUrl()],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: [defaultOgImageUrl()],
+  },
+  icons: {
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
 };
 

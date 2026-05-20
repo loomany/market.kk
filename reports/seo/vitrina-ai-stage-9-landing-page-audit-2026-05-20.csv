@@ -1,0 +1,19 @@
+cluster,current_ru_url,current_en_url,index_ru_en,index_kk,word_depth_ru,faq,cta,examples_block,schema,problems,recommended_action,priority
+AI фото товара,/ru/ii-studiya-tovarnyh-foto,/en/ai-product-photo-studio,index,index partial,medium-high,yes,yes,no,partial,No gallery; needs before/after,Add examples section + FAQ expand,P0
+AI фото для маркетплейса,/ru/foto-tovarov-dlya-marketpleysov,/en/product-photo-for-marketplaces,index,index partial,medium,yes,yes,no,partial,Thin vs blog #1/#2,Cross-link Wave 2 + Kaspi checklist,P0
+Фото товара на модели,/ru/foto-odezhdy-na-ai-modeli,/en/fashion-model-photos,index,index partial,medium,yes,yes,no,partial,No try-on visuals,Examples hub clothing-on-model,P0
+AI примерка одежды,/ru/use-cases/odezhda-na-ai-modeli,/en/use-cases/clothing-on-ai-model,index,no kk UC,medium,yes,yes,no,partial,Virtual try-on term scattered,Merge messaging with fashion LP,P0
+Виртуальная примерка,/ru/use-cases/odezhda-na-ai-modeli,(same),index,no,medium,partial,yes,no,no,Duplicate intent with above,Use blog #12 as canonical depth,P1
+AI примерка белья,/ru/use-cases/bele-na-ai-modeli,/en/use-cases/lingerie-on-ai-model,index,no,medium,yes,yes,no,partial,Adult disclaimer needs prominence,Trust block + examples (safe),P0
+Одежда на AI-модели,(fashion LP + use case),both,index,partial,medium,yes,yes,no,partial,Overlap 3 URLs,Internal link matrix not hub,P1
+Удалить фон,/ru/generator-fona-dlya-tovara + cleanup UC,index,index partial,medium,yes,yes,no,partial,Blog #64 published LP ok,Before/after gallery,P1
+Заменить фон,/ru/generator-fona-dlya-tovara,/en/background-generator,index,index partial,medium,yes,yes,no,partial,Same LP serves both,Add comparison vs cleanup,P1
+Улучшить фото,/ru/use-cases/ochistka-tovarnogo-foto,/en/use-cases/product-photo-cleanup,index,no,medium,yes,yes,no,partial,Blog #4 supports,Link improve checklist,P1
+Фото для Kaspi,/ru/platforms/kaspi-foto-tovarov,/en/platforms/kaspi-product-photos,index,no platform kk,medium-high,yes,yes,no,partial,KK platform copy EN-fallback,Native kk platform blurb Stage 11,P0
+Фото для Wildberries,/ru/platforms/wildberries-foto-tovarov,/en/platforms/wildberries-product-photos,index,no,medium,yes,yes,no,partial,Blog #32 live,Expand LP WB rules,P1
+Фото для Ozon,/ru/platforms/ozon-foto-tovarov,/en/platforms/ozon-product-photos,index,no,medium,yes,yes,no,partial,Blog #33 live,Video mention honest,P1
+Карточка товара AI,/ru/use-cases/tochnaya-tovarnaya-kartochka,/en/use-cases/exact-product-card,index,no,medium,yes,yes,no,partial,Strong blog #5,LP examples cards,P0
+Видео из фото,/ru/generator-video-tovara,/en/product-video-generator,noindex,noindex,medium,yes,yes,no,partial,In dev — correct noindex,Keep noindex until ship,P2
+AI модель для одежды,Studio flow + blog #96 draft,/en,studio CTA,draft blog,low on LP,n/a,yes,no,no,No dedicated LP,Publish #96 Wave 2; no fake gen claims,P1
+Рекламные креативы,/ru/use-cases/kreativnaya-scena-tovara,/en/use-cases/creative-product-scene,index,no,medium,partial,yes,no,partial,Blog #47 Reels adjacent,Creative examples page,P1
+Instagram/Reels,/ru/use-cases/foto-tovara-dlya-instagram + reels UC,index,no,medium,yes,yes,no,partial,Blog #47 published,Publish #49 Wave 2,P1

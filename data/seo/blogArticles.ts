@@ -1,5 +1,12 @@
 import type { Locale } from "@/lib/i18n/localeConfig";
 import type { FaqItem } from "./platforms";
+import { enBlogStage4Legacy } from "./enBlogStage4LegacyContent";
+import { enBlogStage3P0 } from "./enBlogStage3Content";
+import { enBlogStage11Wave2 } from "./enBlogStage11Wave2";
+import { kkBlogStage5P0 } from "./kkBlogStage5Content";
+import { kkBlogStage13Wave2 } from "./kkBlogStage13Wave2";
+import { ruBlogExpanded, ruBlogNewP0 } from "./ruBlogStage2Content";
+import { ruBlogStage11Wave2 } from "./ruBlogStage11Wave2";
 
 export type BlogArticle = {
   topicId: string;
@@ -44,7 +51,132 @@ const commonEnFaq: FaqItem[] = [
   },
 ];
 
-export const blogArticles: BlogArticle[] = [
+const stage2RuByTopic = { ...ruBlogExpanded, ...ruBlogNewP0 };
+
+function applyStage2Ru(articles: BlogArticle[]): BlogArticle[] {
+  const existingIds = new Set(articles.map((article) => article.topicId));
+
+  const merged = articles.map((article) => {
+    const ru = stage2RuByTopic[article.topicId];
+    if (!ru) return article;
+    return {
+      ...article,
+      updatedAt: "2026-05-20",
+      content: { ...article.content, ru },
+    };
+  });
+
+  const newRuOnly = Object.keys(ruBlogNewP0)
+    .filter((topicId) => !existingIds.has(topicId))
+    .map(
+      (topicId): BlogArticle => ({
+        topicId,
+        publishedAt: "2026-05-20",
+        updatedAt: "2026-05-20",
+        content: { ru: ruBlogNewP0[topicId] },
+      })
+    );
+
+  return [...merged, ...newRuOnly];
+}
+
+function applyStage4LegacyEn(articles: BlogArticle[]): BlogArticle[] {
+  return articles.map((article) => {
+    const en = enBlogStage4Legacy[article.topicId];
+    if (!en) return article;
+    return {
+      ...article,
+      updatedAt: "2026-05-20",
+      content: { ...article.content, en },
+    };
+  });
+}
+
+function applyStage3En(articles: BlogArticle[]): BlogArticle[] {
+  return articles.map((article) => {
+    const en = enBlogStage3P0[article.topicId];
+    if (!en) return article;
+    return {
+      ...article,
+      updatedAt: "2026-05-20",
+      content: { ...article.content, en },
+    };
+  });
+}
+
+function applyStage5Kk(articles: BlogArticle[]): BlogArticle[] {
+  return articles.map((article) => {
+    const kk = kkBlogStage5P0[article.topicId];
+    if (!kk) return article;
+    return {
+      ...article,
+      updatedAt: "2026-05-20",
+      content: { ...article.content, kk },
+    };
+  });
+}
+
+function applyStage13KkWave2(articles: BlogArticle[]): BlogArticle[] {
+  return articles.map((article) => {
+    const kk = kkBlogStage13Wave2[article.topicId];
+    if (!kk) return article;
+    return {
+      ...article,
+      updatedAt: "2026-05-20",
+      content: { ...article.content, kk },
+    };
+  });
+}
+
+function applyStage11Wave2Ru(articles: BlogArticle[]): BlogArticle[] {
+  const existingIds = new Set(articles.map((a) => a.topicId));
+  const merged = articles.map((article) => {
+    const ru = ruBlogStage11Wave2[article.topicId];
+    if (!ru) return article;
+    return {
+      ...article,
+      updatedAt: "2026-05-20",
+      content: { ...article.content, ru },
+    };
+  });
+  const added = Object.keys(ruBlogStage11Wave2)
+    .filter((topicId) => !existingIds.has(topicId))
+    .map(
+      (topicId): BlogArticle => ({
+        topicId,
+        publishedAt: "2026-05-20",
+        updatedAt: "2026-05-20",
+        content: { ru: ruBlogStage11Wave2[topicId] },
+      })
+    );
+  return [...merged, ...added];
+}
+
+function applyStage11Wave2En(articles: BlogArticle[]): BlogArticle[] {
+  const existingIds = new Set(articles.map((a) => a.topicId));
+  const merged = articles.map((article) => {
+    const en = enBlogStage11Wave2[article.topicId];
+    if (!en) return article;
+    return {
+      ...article,
+      updatedAt: "2026-05-20",
+      content: { ...article.content, en },
+    };
+  });
+  const added = Object.keys(enBlogStage11Wave2)
+    .filter((topicId) => !existingIds.has(topicId))
+    .map(
+      (topicId): BlogArticle => ({
+        topicId,
+        publishedAt: "2026-05-20",
+        updatedAt: "2026-05-20",
+        content: { en: enBlogStage11Wave2[topicId] },
+      })
+    );
+  return [...merged, ...added];
+}
+
+const baseBlogArticles: BlogArticle[] = [
   {
     topicId: "blog_001",
     publishedAt: "2026-05-18",
@@ -426,6 +558,16 @@ export const blogArticles: BlogArticle[] = [
     },
   },
 ];
+
+export const blogArticles = applyStage13KkWave2(
+  applyStage11Wave2En(
+    applyStage11Wave2Ru(
+      applyStage5Kk(
+        applyStage4LegacyEn(applyStage3En(applyStage2Ru(baseBlogArticles)))
+      )
+    )
+  )
+);
 
 export function getArticleByTopicId(topicId: string) {
   return blogArticles.find((article) => article.topicId === topicId);

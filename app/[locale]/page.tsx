@@ -5,6 +5,7 @@ import { JsonLdScript } from "@/components/seo/JsonLd";
 import { getLandingCopy } from "@/lib/i18n/translations";
 import {
   assertLocale,
+  indexableLocales,
   supportedLocaleCodes,
   type Locale,
 } from "@/lib/i18n/localeConfig";
@@ -16,8 +17,8 @@ type PageProps = {
 };
 
 const homePathByLocale = Object.fromEntries(
-  supportedLocaleCodes.map((locale) => [locale, `/${locale}`])
-) as Record<Locale, string>;
+  indexableLocales.map((locale) => [locale, `/${locale}`])
+) as Partial<Record<Locale, string>>;
 
 export function generateStaticParams() {
   return supportedLocaleCodes.map((locale) => ({ locale }));
@@ -62,15 +63,29 @@ export default async function LocaleHomePage({ params }: PageProps) {
             url: `/${locale}`,
             inLanguage: locale,
           }),
-          faqJsonLd(
-            copy.trust.items.slice(0, 3).map((item, index) => ({
+          faqJsonLd([
+            {
               question:
                 locale === "ru"
-                  ? `Что важно знать о Vitrina AI Studio? ${index + 1}`
-                  : `What should I know about Vitrina AI Studio? ${index + 1}`,
-              answer: item,
-            }))
-          ),
+                  ? "Может ли AI ошибаться при генерации товара?"
+                  : "Can AI make mistakes when generating a product image?",
+              answer: copy.trust.items[0] ?? "",
+            },
+            {
+              question:
+                locale === "ru"
+                  ? "Есть ли бесплатный демо-режим?"
+                  : "Is there a free demo mode?",
+              answer: copy.trust.items[2] ?? "",
+            },
+            {
+              question:
+                locale === "ru"
+                  ? "Гарантирует ли сервис принятие маркетплейсом?"
+                  : "Does the service guarantee marketplace acceptance?",
+              answer: copy.trust.items[4] ?? "",
+            },
+          ]),
         ]}
       />
       <SaasLanding locale={locale} />
