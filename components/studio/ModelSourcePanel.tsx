@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ImagePlus, Sparkles, Trash2, Upload, X } from "lucide-react";
+import { Check, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatFileSize, validateImageFileClient } from "@/lib/ai/clientImageValidation";
+import { validateImageFileClient } from "@/lib/ai/clientImageValidation";
 
 export type ModelSourceKind = "upload" | "saved" | null;
 
@@ -45,6 +45,7 @@ export function ModelSourcePanel({
   const canUploadFile = Boolean(onFileSelect);
   const savedSelected = modelSource === "saved" && Boolean(savedModelUrl);
   const uploadSelected = modelSource === "upload";
+  const hasUploadedFile = uploadSelected && Boolean(selectedFile);
 
   const ingestFiles = (fileList: FileList | null | undefined) => {
     if (!fileList?.length || !onFileSelect) return;
@@ -62,6 +63,53 @@ export function ModelSourcePanel({
     setUploadError(null);
     onFileSelect(file);
   };
+
+  const clearUploadedFile = () => {
+    setUploadError(null);
+    onClearFile?.();
+  };
+
+  const dropZone = (
+    <label
+      onDragEnter={(event) => {
+        event.preventDefault();
+        setDragActive(true);
+      }}
+      onDragOver={(event) => {
+        event.preventDefault();
+        setDragActive(true);
+      }}
+      onDragLeave={(event) => {
+        event.preventDefault();
+        setDragActive(false);
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        setDragActive(false);
+        ingestFiles(event.dataTransfer.files);
+      }}
+      className={cn(
+        "flex min-h-[120px] cursor-pointer flex-col items-center justify-center rounded-[22px] border-2 border-dashed px-4 py-5 text-center transition-colors",
+        dragActive
+          ? "border-teal-500 bg-teal-50"
+          : "border-border bg-slate-50/80 hover:border-teal-300 hover:bg-teal-50/60"
+      )}
+    >
+      <Upload className="mb-2 h-6 w-6 text-teal-700" />
+      <span className="text-sm font-semibold text-slate-800">
+        Выберите файл или перетащите его сюда
+      </span>
+      <input
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={(event) => {
+          ingestFiles(event.target.files);
+          event.target.value = "";
+        }}
+      />
+    </label>
+  );
 
   return (
     <div className={cn(isSaas ? "space-y-3" : "space-y-4", className)}>
@@ -156,91 +204,59 @@ export function ModelSourcePanel({
         </p>
       ) : null}
 
-      {canUploadFile && (
-        <label
-          onDragEnter={(event) => {
-            event.preventDefault();
-            setDragActive(true);
-          }}
-          onDragOver={(event) => {
-            event.preventDefault();
-            setDragActive(true);
-          }}
-          onDragLeave={(event) => {
-            event.preventDefault();
-            setDragActive(false);
-          }}
-          onDrop={(event) => {
-            event.preventDefault();
-            setDragActive(false);
-            ingestFiles(event.dataTransfer.files);
-          }}
-          className={cn(
-            "flex cursor-pointer flex-col items-center justify-center rounded-[22px] border-2 border-dashed px-4 py-6 text-center transition-colors",
-            isSaas ? "min-h-[120px] py-5" : "min-h-[148px]",
-            uploadSelected && selectedFile
-              ? "border-teal-500 bg-teal-50/80 ring-2 ring-teal-100"
-              : dragActive
-                ? "border-teal-500 bg-teal-50"
-                : "border-border bg-slate-50/80 hover:border-teal-300 hover:bg-teal-50/60"
-          )}
-        >
-          <Upload className="mb-3 h-7 w-7 text-teal-700" />
-          <span className="text-sm font-semibold text-slate-800">
-            Выберите файл или перетащите его сюда
-          </span>
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="hidden"
-            onChange={(event) => {
-              ingestFiles(event.target.files);
-              event.target.value = "";
-            }}
-          />
-        </label>
-      )}
-
-      {selectedFile && uploadSelected ? (
-        <div className="flex items-center justify-between gap-3 rounded-[16px] border border-border bg-white px-3 py-2 text-sm shadow-sm">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] bg-teal-50 text-teal-700">
-              <ImagePlus className="h-4 w-4" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-semibold text-slate-800">
-                {selectedFile.name}
-              </p>
-              <p className="text-xs text-slate-500">
-                {formatFileSize(selectedFile.size)}
-              </p>
+      {canUploadFile ? (
+        !hasUploadedFile ? (
+          dropZone
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-medium text-slate-600">Фото модели</p>
+              {onClearFile ? (
+                <button
+                  type="button"
+                  onClick={clearUploadedFile}
+                  className="text-xs font-medium text-slate-500 hover:text-slate-800"
+                >
+                  Удалить
+                </button>
+              ) : null}
             </div>
-          </div>
-          {onClearFile ? (
-            <button
-              type="button"
-              onClick={() => {
-                setUploadError(null);
-                onClearFile();
-              }}
-              className="shrink-0 rounded-[12px] p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
-              aria-label="Очистить выбранный файл"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          ) : null}
-        </div>
-      ) : null}
 
-      {previewUrl && uploadSelected && !savedSelected ? (
-        <div className="overflow-hidden rounded-[16px] border border-border bg-slate-50">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={previewUrl}
-            alt="Предпросмотр загруженной модели"
-            className="max-h-[320px] min-h-[180px] w-full object-contain"
-          />
-        </div>
+            {previewUrl ? (
+              <div className="relative overflow-hidden rounded-[22px] border border-border bg-slate-50">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={previewUrl}
+                  alt="Предпросмотр загруженной модели"
+                  className="w-full object-contain"
+                />
+                {onClearFile ? (
+                  <button
+                    type="button"
+                    aria-label="Удалить фото модели"
+                    onClick={clearUploadedFile}
+                    className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-white/95 text-slate-600 shadow-sm hover:bg-slate-50"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+
+            <label className="flex cursor-pointer items-center justify-center rounded-[14px] border border-border bg-white px-3 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:border-teal-300 hover:bg-teal-50/50">
+              Заменить фото
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(event) => {
+                  ingestFiles(event.target.files);
+                  event.target.value = "";
+                }}
+              />
+            </label>
+          </div>
+        )
       ) : null}
     </div>
   );

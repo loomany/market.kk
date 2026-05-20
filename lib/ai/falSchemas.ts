@@ -134,6 +134,8 @@ export type TryOnFormPayload = {
   modelResolution?: FalModelResolution;
   /** fast = original product ref; premium = FASHN Edit before try-on (feature-flagged). */
   garmentPrepMode?: "fast" | "premium";
+  /** When true, final try-on uses FASHN Try-On Max instead of Fal v1.6. */
+  tryOnMaxExperimental?: boolean;
 };
 
 function parseModelResolutionFormValue(
@@ -209,6 +211,10 @@ export function buildTryOnFormPayload(formData: FormData): TryOnFormPayload {
       formData.get("modelResolution")
     ),
     garmentPrepMode: parseGarmentPrepModeFormValue(formData.get("garmentPrepMode")),
+    tryOnMaxExperimental: parseBooleanFormValue(
+      formData.get("tryOnMaxExperimental"),
+      false
+    ),
   };
 }
 

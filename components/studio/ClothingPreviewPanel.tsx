@@ -134,7 +134,7 @@ function PreviewTabBar({
   );
 }
 
-const previewCardShared = { compact: true, scrollableViewport: true as const };
+const previewCardShared = { compact: true, scrollableViewport: false as const };
 
 export function ClothingPreviewPanel({
   modelOutputAspect,

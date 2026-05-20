@@ -10,7 +10,11 @@ import {
   isPremiumGarmentEditFeatureEnabled,
   shouldRunPremiumGarmentPrep,
 } from "../lib/ai/fashnEditSchemas.ts";
-import { FASHN_GARMENT_PREP_PROMPT } from "../lib/ai/fashnGarmentPrepPrompt.ts";
+import {
+  buildFashnGarmentPrepPrompt,
+  FASHN_GARMENT_PREP_PROMPT,
+} from "../lib/ai/fashnGarmentPrepPrompt.ts";
+import { mockLingerieSetOnModelAnalysis } from "../lib/ai/mockLingerieProductAnalysis.ts";
 import {
   createGarmentPreparationMaskPng,
   readImageDimensions,
@@ -33,10 +37,13 @@ function withEnv(key: string, value: string | undefined, fn: () => void) {
 }
 
 function testFashnEditPayload() {
+  const prepPrompt = buildFashnGarmentPrepPrompt({
+    productAnalysis: mockLingerieSetOnModelAnalysis(),
+  }).prompt;
   const body = buildFashnEditRunBody({
     imageUrl: ORIGINAL,
     maskUrl: "https://fal.media/mask.png",
-    prompt: FASHN_GARMENT_PREP_PROMPT,
+    prompt: prepPrompt,
     resolution: "2k",
     generationMode: "balanced",
     outputFormat: "png",
@@ -45,7 +52,7 @@ function testFashnEditPayload() {
   assert.equal(body.model_name, FASHN_EDIT_MODEL_NAME);
   assert.equal(body.inputs.image, ORIGINAL);
   assert.equal(body.inputs.mask, "https://fal.media/mask.png");
-  assert.equal(body.inputs.prompt, FASHN_GARMENT_PREP_PROMPT);
+  assert.match(String(body.inputs.prompt), /TWO-PIECE lingerie set/i);
   assert.equal(body.inputs.resolution, "2k");
   assert.equal(body.inputs.generation_mode, "balanced");
   assert.equal(body.inputs.output_format, "png");

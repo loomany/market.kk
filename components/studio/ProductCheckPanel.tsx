@@ -3,6 +3,7 @@
 import { useLayoutEffect, useRef } from "react";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { cn } from "@/lib/utils";
 import { PRODUCT_POSE_DESCRIPTION_RU_MAX } from "@/lib/ai/modelCustomParams";
 import type { ProductDescriptionAnalysis } from "@/lib/ai/productDescriptionAnalysisSchemas";
 import { sourcePresentationSummaryRu } from "@/lib/studio/garmentPhotoTypeFromPresentation";
@@ -119,9 +120,6 @@ export function ProductCheckPanel({
           ) : null}
           {sourceModelLines ? (
             <>
-              <p className="col-span-full text-[11px] leading-4 text-teal-900">
-                AI подберёт модель похожей комплекции и позы
-              </p>
               {sourceModelLines.bodyLine ? (
                 <div className="col-span-full text-[11px] leading-4 text-slate-700">
                   {sourceModelLines.bodyLine}
@@ -172,11 +170,13 @@ export function ProductCheckPanel({
         type="button"
         variant="outline"
         className="w-full"
-        loading={analyzing}
         disabled={analyzing}
         onClick={onReanalyze}
       >
-        <RefreshCw className="h-4 w-4" />
+        <RefreshCw
+          className={cn("h-4 w-4", analyzing && "animate-spin")}
+          aria-hidden
+        />
         Повторить анализ AI
       </Button>
     </div>

@@ -22,6 +22,7 @@ export function appendStudioTryOnFields(
     userEditedProductDescription: boolean;
     modelResolution: FalModelResolution;
     seed: number;
+    tryOnMaxExperimental?: boolean;
   }
 ): void {
   formData.append("productImageFile", input.productFile);
@@ -70,4 +71,7 @@ export function appendStudioTryOnFields(
   formData.append("segmentationFree", "true");
   formData.append("outputFormat", "png");
   formData.append("seed", String(input.seed));
+  if (input.tryOnMaxExperimental) {
+    formData.append("tryOnMaxExperimental", "true");
+  }
 }

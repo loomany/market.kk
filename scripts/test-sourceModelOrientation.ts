@@ -12,6 +12,7 @@ import {
 } from "../lib/ai/sourceModelOrientation.ts";
 import type { GenerateModelRequest } from "../lib/ai/modelGenerationSchemas.ts";
 import type { ProductDescriptionAnalysis } from "../lib/ai/productDescriptionAnalysisSchemas.ts";
+import { lingerieSetTypeFieldsForSetType } from "../lib/ai/lingerieSetType.ts";
 
 function baseRequest(
   overrides: Partial<GenerateModelRequest> = {}
@@ -42,6 +43,7 @@ function framingForBackProduct() {
     sourcePresentation: "on-model",
     garmentPhotoType: "model",
     setType: "bra_brief_set",
+    ...lingerieSetTypeFieldsForSetType("bra_brief_set"),
     baseColor: "black",
     accentColors: [],
     pattern: "solid",

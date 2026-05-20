@@ -18,6 +18,12 @@ import { prepareGarmentForTryOn } from "@/lib/ai/prepareGarmentForTryOn";
 import { shouldRunPremiumGarmentPrep } from "@/lib/ai/fashnEditSchemas";
 import { resolveTryOnEngine } from "@/lib/ai/tryOnEngine";
 import { buildTryOnPipelineDebug } from "@/lib/ai/tryOnPipelineDebug";
+import { buildFashnTryOnMaxPrompt } from "@/lib/ai/fashnTryOnMaxPrompt";
+import { runFashnTryOnMax } from "@/lib/ai/fashnTryOnMaxClient";
+import {
+  FASHN_TRYON_MAX_MODEL_NAME,
+  mapModelResolutionToFashnTryOnMax,
+} from "@/lib/ai/fashnTryOnMaxSchemas";
 import type { QualityMode } from "@/components/studio/types";
 import { getMockTryOnResults } from "@/lib/ai/mockResults";
 import {
@@ -39,8 +45,12 @@ export const maxDuration = 300;
 
 const ROUTE_ID = "/api/ai/tryon";
 
-function estimateTryOnCostUsd(numSamples: number) {
-  return Number((0.08 * Math.max(1, numSamples)).toFixed(2));
+function estimateTryOnCostUsd(
+  numSamples: number,
+  tryOnMaxExperimental?: boolean
+) {
+  const unit = tryOnMaxExperimental ? 0.16 : 0.08;
+  return Number((unit * Math.max(1, numSamples)).toFixed(2));
 }
 
 function isMockMode() {
@@ -202,54 +212,111 @@ async function runTryOn(
     payload?: TryOnFormPayload;
     guard?: PaidAiGuardInput;
     premiumGarmentEdit?: import("@/lib/ai/fashnEditSchemas").PremiumGarmentEditDebug;
+    tryOnMaxExperimental?: boolean;
+    modelResolution?: FalModelResolution;
   }
 ) {
   if (isMockMode()) {
     return mockResponse(data, inputSource);
   }
 
+  const tryOnMaxExperimental = options?.tryOnMaxExperimental ?? false;
   const guard: PaidAiGuardInput = options?.guard ?? {
     provider: "fal",
     route: ROUTE_ID,
-    estimatedCostUsd: estimateTryOnCostUsd(data.numSamples),
+    estimatedCostUsd: estimateTryOnCostUsd(data.numSamples, tryOnMaxExperimental),
   };
 
-  try {
-    const fal = getFalClientOrThrow(guard);
-    const result = await fal.subscribe(FASHN_TRYON_MODEL, {
-      input: {
-        model_image: data.modelImageUrl,
-        garment_image: data.productImageUrl,
+  const productAnalysis = options?.payload
+    ? getProductAnalysisFromPayload(options.payload)
+    : null;
+
+  const fashnTryOnMaxGenerationMode = "quality" as const;
+  const fashnTryOnMaxResolution = mapModelResolutionToFashnTryOnMax(
+    options?.modelResolution ?? options?.payload?.modelResolution
+  );
+  const fashnTryOnMaxPromptResult = tryOnMaxExperimental
+    ? buildFashnTryOnMaxPrompt({
+        productAnalysis,
+        userDescriptionRu: options?.payload?.userDescriptionRu,
+        userEdited: options?.payload?.userEditedProductDescription,
         category: data.category,
-        mode: data.mode,
-        garment_photo_type: data.garmentPhotoType,
-        moderation_level: data.moderationLevel,
-        num_samples: data.numSamples,
-        segmentation_free: data.segmentationFree,
-        output_format: data.outputFormat,
-        ...(typeof data.seed === "number" ? { seed: data.seed } : {}),
-      },
-      logs: true,
-      onQueueUpdate(update) {
-        if (update.status === "IN_PROGRESS") {
-          console.log(
-            "[fal tryon]",
-            update.logs?.map((log) => log.message).join("\n")
-          );
-        }
-      },
-    });
+        garmentPhotoType: data.garmentPhotoType,
+      })
+    : null;
+  const fashnTryOnMaxPrompt = fashnTryOnMaxPromptResult?.prompt;
 
-    let images =
-      (
-        result.data as {
-          images?: { url: string; width?: number; height?: number }[];
-        }
-      ).images ?? [];
+  try {
+    let images: { url: string; width?: number; height?: number }[] = [];
+    let requestId: string;
+    let provider: string;
+    let model: string;
 
-    const productAnalysis = options?.payload
-      ? getProductAnalysisFromPayload(options.payload)
-      : null;
+    if (tryOnMaxExperimental) {
+      const maxResult = await runFashnTryOnMax({
+        productImageUrl: data.productImageUrl,
+        modelImageUrl: data.modelImageUrl,
+        prompt: fashnTryOnMaxPrompt,
+        resolution: fashnTryOnMaxResolution,
+        generationMode: fashnTryOnMaxGenerationMode,
+        outputFormat: data.outputFormat === "jpeg" ? "jpeg" : "png",
+        seed: data.seed,
+        numImages: data.numSamples,
+      });
+
+      if (!maxResult.ok) {
+        const status =
+          maxResult.errorCode === "FASHN_API_KEY_MISSING" ? 500 : 502;
+        return NextResponse.json(
+          {
+            ok: false,
+            errorCode: maxResult.errorCode,
+            message: maxResult.errorMessage,
+          },
+          { status }
+        );
+      }
+
+      images = [{ url: maxResult.imageUrl }];
+      requestId = maxResult.requestId;
+      provider = "fashn";
+      model = FASHN_TRYON_MAX_MODEL_NAME;
+    } else {
+      const fal = getFalClientOrThrow(guard);
+      const result = await fal.subscribe(FASHN_TRYON_MODEL, {
+        input: {
+          model_image: data.modelImageUrl,
+          garment_image: data.productImageUrl,
+          category: data.category,
+          mode: data.mode,
+          garment_photo_type: data.garmentPhotoType,
+          moderation_level: data.moderationLevel,
+          num_samples: data.numSamples,
+          segmentation_free: data.segmentationFree,
+          output_format: data.outputFormat,
+          ...(typeof data.seed === "number" ? { seed: data.seed } : {}),
+        },
+        logs: true,
+        onQueueUpdate(update) {
+          if (update.status === "IN_PROGRESS") {
+            console.log(
+              "[fal tryon]",
+              update.logs?.map((log) => log.message).join("\n")
+            );
+          }
+        },
+      });
+
+      images =
+        (
+          result.data as {
+            images?: { url: string; width?: number; height?: number }[];
+          }
+        ).images ?? [];
+      requestId = result.requestId;
+      provider = "fal";
+      model = FASHN_TRYON_MODEL;
+    }
 
     let qualityMeta:
       | {
@@ -279,20 +346,22 @@ async function runTryOn(
 
     const selectedQualityMode = (data.mode ?? "balanced") as QualityMode;
     const garmentPrepMode = options?.payload?.garmentPrepMode ?? "fast";
-    const tryOnEngine = resolveTryOnEngine(selectedQualityMode);
+    const tryOnEngine = resolveTryOnEngine(selectedQualityMode, {
+      tryOnMaxExperimental,
+    });
 
     return NextResponse.json({
       ok: true,
-      provider: "fal",
-      model: FASHN_TRYON_MODEL,
+      provider,
+      model,
       images,
-      requestId: result.requestId,
+      requestId,
       ...(inputSource ? { inputSource } : {}),
       ...(options?.premiumGarmentEdit
         ? {
             premiumGarmentEdit: options.premiumGarmentEdit,
             tryOn: {
-              requestId: result.requestId,
+              requestId,
               finalImageUrl: images[0]?.url,
               garmentImageUrl: data.productImageUrl,
             },
@@ -308,6 +377,16 @@ async function runTryOn(
               tryOnEngine,
               garmentPrepMode,
               premiumGarmentEdit: options?.premiumGarmentEdit,
+              tryOnMaxExperimental,
+              fashnTryOnMaxPrompt,
+              promptPreview: fashnTryOnMaxPrompt,
+              fashnTryOnMaxResolution,
+              fashnTryOnMaxGenerationMode,
+              garmentTypeLockApplied:
+                fashnTryOnMaxPromptResult?.garmentTypeLockApplied,
+              antiOnePieceApplied:
+                fashnTryOnMaxPromptResult?.antiOnePieceApplied,
+              qualityMeta,
             }),
           }
         : {}),
@@ -371,6 +450,22 @@ function handleTryOnError(error: unknown) {
     );
   }
 
+  if (
+    message.includes("FASHN_API_KEY") ||
+    message.includes("FASHN Try-On Max")
+  ) {
+    console.error("[fashn tryon max] failed:", message);
+    return NextResponse.json(
+      {
+        ok: false,
+        errorCode: "FASHN_TRYON_MAX_FAILED",
+        message:
+          "Try-On Max не удалось выполнить. Проверьте FASHN_API_KEY или отключите галочку Try-On Max.",
+      },
+      { status: 502 }
+    );
+  }
+
   console.error("[fal tryon] failed:", message);
   return NextResponse.json(
     {
@@ -387,7 +482,10 @@ async function processFormPayload(payload: TryOnFormPayload) {
   const guard: PaidAiGuardInput = {
     provider: "fal",
     route: ROUTE_ID,
-    estimatedCostUsd: estimateTryOnCostUsd(payload.numSamples),
+    estimatedCostUsd: estimateTryOnCostUsd(
+      payload.numSamples,
+      payload.tryOnMaxExperimental
+    ),
   };
 
   try {
@@ -422,6 +520,7 @@ async function processFormPayload(payload: TryOnFormPayload) {
         productImageUrl,
         garmentPrepMode: payload.garmentPrepMode,
         garmentPhotoType: payload.garmentPhotoType,
+        productAnalysis: getProductAnalysisFromPayload(payload),
         guard,
         mockMode,
       });
@@ -445,6 +544,8 @@ async function processFormPayload(payload: TryOnFormPayload) {
       payload,
       guard,
       premiumGarmentEdit,
+      tryOnMaxExperimental: payload.tryOnMaxExperimental,
+      modelResolution: payload.modelResolution,
     });
   } catch (error) {
     return handleTryOnError(error);

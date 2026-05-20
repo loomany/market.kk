@@ -19,6 +19,8 @@
     "test:product-view-resolver": "node --experimental-strip-types --import=./scripts/lib/registerTsAlias.mjs scripts/test-productViewResolver.ts",
     "test:lingerie-crop-ui": "node --experimental-strip-types --import=./scripts/lib/registerTsAlias.mjs scripts/test-lingerieCropUiCopy.ts",
     "test:premium-garment-prep": "node --experimental-strip-types --import=./scripts/lib/registerTsAlias.mjs scripts/test-premium-garment-prep.ts",
+    "test:lingerie-set-type": "node --experimental-strip-types --import=./scripts/lib/registerTsAlias.mjs scripts/test-lingerie-set-type.ts",
+    "test:lingerie-tryon-ab": "node --experimental-strip-types --import=./scripts/lib/registerTsAlias.mjs scripts/test-lingerie-tryon-ab.ts",
     "smoke:ai:mock": "node --experimental-strip-types scripts/smoke/mock-ai-routes.ts"
   },
   "dependencies": {

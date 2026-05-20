@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { PRODUCT_POSE_DESCRIPTION_RU_MAX } from "@/lib/ai/modelCustomParams";
+import { LINGERIE_SET_TYPES } from "@/lib/ai/lingerieSetType";
 
 export const PRODUCT_ANALYSIS_CONFIDENCE_THRESHOLD = 0.75;
 
@@ -81,6 +82,10 @@ export const productDescriptionAnalysisSchema = z.object({
     "unknown",
   ]),
 
+  lingerieSetType: z.enum(LINGERIE_SET_TYPES),
+  lingerieSetTypeConfidence: z.number().min(0).max(1),
+  lingerieSetTypeReason: z.string().trim().min(3).max(400),
+
   baseColor: z.string().trim().max(80).nullable(),
   accentColors: z.array(z.string().trim().max(40)).max(8),
   pattern: z.string().trim().max(120).nullable(),
@@ -145,6 +150,18 @@ export function parseProductAnalysisJson(
   }
   if (typeof value === "object" && value !== null && !("sourceModel" in value)) {
     value = { ...value, sourceModel: null };
+  }
+
+  if (typeof value === "object" && value !== null) {
+    const record = value as Record<string, unknown>;
+    if (!record.lingerieSetType) record.lingerieSetType = "unknown";
+    if (typeof record.lingerieSetTypeConfidence !== "number") {
+      record.lingerieSetTypeConfidence = 0.3;
+    }
+    if (typeof record.lingerieSetTypeReason !== "string") {
+      record.lingerieSetTypeReason =
+        "Legacy product analysis without lingerieSetType; will be re-derived.";
+    }
   }
 
   const parsed = productDescriptionAnalysisSchema.safeParse(value);

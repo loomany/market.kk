@@ -31,6 +31,7 @@ import {
 } from "../lib/ai/neutralBaseFitGuidance.ts";
 import { deriveSourceFramingGuidance } from "../lib/ai/sourceFramingGuidance.ts";
 import type { ProductDescriptionAnalysis } from "../lib/ai/productDescriptionAnalysisSchemas.ts";
+import { lingerieSetTypeFieldsForSetType } from "../lib/ai/lingerieSetType.ts";
 import { buildModelGenerationPrompt } from "../lib/ai/modelPrompts.ts";
 import { MODEL_GENERATION_NO_GARMENT_COPY_RULE } from "../lib/ai/modelIdentityPipeline.ts";
 import type { GenerateModelRequest } from "../lib/ai/modelGenerationSchemas.ts";
@@ -43,6 +44,7 @@ import { productAnalysisForModelGeneration } from "../lib/ai/productAnalysisShar
 function baseAnalysis(
   overrides: Partial<ProductDescriptionAnalysis> = {}
 ): ProductDescriptionAnalysis {
+  const setType = overrides.setType ?? "bra_brief_set";
   return {
     descriptionRu:
       "На фото комплект нижнего белья на модели: чёрный поддерживающий бюстгальтер с широкими бретелями и высокие трусы с бирюзово-зелёным кружевным узором.",
@@ -52,7 +54,8 @@ function baseAnalysis(
     productCategory: "auto",
     sourcePresentation: "on-model",
     garmentPhotoType: "model",
-    setType: "bra_brief_set",
+    setType,
+    ...lingerieSetTypeFieldsForSetType(setType),
     baseColor: "black",
     accentColors: ["turquoise", "green"],
     pattern: "floral lace",

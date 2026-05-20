@@ -1,9 +1,7 @@
 import "server-only";
 import { runFashnEdit } from "@/lib/ai/fashnEditClient";
-import {
-  FASHN_GARMENT_PREP_PROMPT,
-  FASHN_GARMENT_PREP_PROMPT_SUMMARY,
-} from "@/lib/ai/fashnGarmentPrepPrompt";
+import { buildFashnGarmentPrepPrompt } from "@/lib/ai/fashnGarmentPrepPrompt";
+import type { ProductDescriptionAnalysis } from "@/lib/ai/productDescriptionAnalysisSchemas";
 import {
   FASHN_EDIT_MODEL_NAME,
   type PremiumGarmentEditDebug,
@@ -25,6 +23,7 @@ export type PrepareGarmentForTryOnInput = {
   productImageUrl: string;
   garmentPrepMode?: TryOnGarmentPrepMode;
   garmentPhotoType: string;
+  productAnalysis?: ProductDescriptionAnalysis | null;
   guard: PaidAiGuardInput;
   mockMode?: boolean;
   maskStrategy?: GarmentMaskStrategy;
@@ -108,9 +107,13 @@ export async function prepareGarmentForTryOn(
     }
   }
 
+  const editPrompt = buildFashnGarmentPrepPrompt({
+    productAnalysis: input.productAnalysis,
+  });
+
   const edit = await runFashnEdit({
     imageUrl: input.productImageUrl,
-    prompt: FASHN_GARMENT_PREP_PROMPT,
+    prompt: editPrompt.prompt,
     maskUrl,
     resolution: editOpts.resolution,
     generationMode: editOpts.generationMode,
@@ -139,7 +142,9 @@ export async function prepareGarmentForTryOn(
       maskStrategy,
       maskWarning:
         "center_product_zone mask (5–95% of frame) may alter lace edges or SKU details — review preparedGarmentImageUrl before production",
-      editPromptSummary: FASHN_GARMENT_PREP_PROMPT_SUMMARY,
+      editPromptSummary: editPrompt.summary,
+      lingerieSetType: editPrompt.lingerieSetType,
+      editAntiOnePieceApplied: editPrompt.antiOnePieceApplied,
       garmentPrepMode: "premium",
       fashnEditResolution: editOpts.resolution,
       fashnEditGenerationMode: editOpts.generationMode,

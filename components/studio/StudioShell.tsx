@@ -34,6 +34,7 @@ import { appendStudioTryOnFields } from "@/lib/studio/buildTryOnFormData";
 import { cn } from "@/lib/utils";
 import { fetchGenerateSingleStudioModel } from "@/lib/studio/generateSingleStudioModel";
 import { isStudioAiDebugEnabled } from "@/lib/studio/studioAiDebug";
+import { isTryOnMaxToggleEnabled } from "@/lib/studio/tryOnMaxToggle";
 import {
   type ResolvedModelAngle,
   validateModelAngles,
@@ -283,6 +284,8 @@ export function StudioShell({
   const skipCropOverrideMark = useRef(false);
   const productAnalysisRequestId = useRef(0);
   const showDevControls = isStudioAiDebugEnabled();
+  const showTryOnMaxToggle = isTryOnMaxToggleEnabled();
+  const [tryOnMaxExperimental, setTryOnMaxExperimental] = useState(false);
   const [modelSettings, setModelSettings] = useState<ModelGenerationSettings>(
     DEFAULT_MODEL_GENERATION_SETTINGS
   );
@@ -580,11 +583,36 @@ export function StudioShell({
     void runProductDescriptionAnalysis(file);
   }, [runProductDescriptionAnalysis]);
 
+  const resetClothingModelAndResult = useCallback(() => {
+    setGeneratedModelUrl(null);
+    setGeneratedModelPreviews([]);
+    setModelGenerateError(null);
+    setModelGenerateProgress(null);
+    setModelGenerateNotice(null);
+    setResults([]);
+    setError(null);
+    setTryOnProgress(null);
+    setLoading(false);
+    setModelGenerating(false);
+    if (modelSource === "upload") {
+      setModelFile(null);
+      setModelPreviewUrl(modelPreview.setFromFile(null));
+      setModelSource(savedModelUrl ? "saved" : null);
+    } else if (modelSource === "saved") {
+      setModelSource(null);
+    }
+  }, [modelPreview, modelSource, savedModelUrl]);
+
   const handleAddProductFiles = useCallback(
     (files: File[]) => {
       if (files.length === 0) return;
+      const replacingProduct = productPhotosRef.current.length > 0;
       setError(null);
       resetProductAnalysisState();
+      if (replacingProduct) {
+        resetClothingModelAndResult();
+        setClothingPreviewTab("product");
+      }
       const file = files[0]!;
       const newPhoto = createStudioProductPhoto(file);
       setProductPhotos((prev) => {
@@ -599,6 +627,7 @@ export function StudioShell({
     },
     [
       clearSelectedProduct,
+      resetClothingModelAndResult,
       resetProductAnalysisState,
       runProductDescriptionAnalysis,
     ]
@@ -827,21 +856,8 @@ export function StudioShell({
   }, [modelSource]);
 
   const handleReplaceModel = useCallback(() => {
-    setGeneratedModelUrl(null);
-    setGeneratedModelPreviews([]);
-    setModelGenerateError(null);
-    setModelGenerateProgress(null);
-    setResults([]);
-    setError(null);
-    setTryOnProgress(null);
-    if (modelSource === "upload") {
-      setModelFile(null);
-      setModelPreviewUrl(modelPreview.setFromFile(null));
-      setModelSource(savedModelUrl ? "saved" : null);
-    } else if (modelSource === "saved") {
-      setModelSource(null);
-    }
-  }, [modelPreview, modelSource, savedModelUrl]);
+    resetClothingModelAndResult();
+  }, [resetClothingModelAndResult]);
 
   const handleStartOverModel = handleReplaceModel;
 
@@ -1430,6 +1446,7 @@ export function StudioShell({
         userEditedProductDescription,
         modelResolution: pipelineSize.resolution,
         seed: useSeed,
+        tryOnMaxExperimental,
       });
 
       // Soft slow-notice timer: after `slowNoticeAfterMs` we just update the
@@ -2008,7 +2025,7 @@ export function StudioShell({
                           <div className="relative space-y-4">
                             {productAnalyzing ? (
                               <div
-                                className="absolute inset-0 z-10 flex items-center justify-center rounded-[14px] bg-white/80 px-4 backdrop-blur-[2px]"
+                                className="absolute inset-0 z-10 flex items-center justify-center rounded-[14px] bg-white px-4"
                                 role="status"
                                 aria-live="polite"
                               >
@@ -2056,11 +2073,6 @@ export function StudioShell({
                                 settingsLocked={
                                   loading || modelGenerating || productAnalyzing
                                 }
-                                settingsLockMessage={
-                                  productAnalyzing
-                                    ? "Идёт AI-анализ товара. Настройки модели откроются после завершения."
-                                    : undefined
-                                }
                                 sourceProductZoneFramingActive={
                                   sourceProductZoneFramingActive
                                 }
@@ -2096,6 +2108,22 @@ export function StudioShell({
 
                         <StudioWorkflowStep step={3} label="Создание фото" isLast>
                           <div className="space-y-3">
+                            {showTryOnMaxToggle ? (
+                              <label className="flex cursor-pointer items-start gap-2 rounded-[12px] border border-slate-200 bg-slate-50 px-3 py-2.5 text-left">
+                                <input
+                                  type="checkbox"
+                                  checked={tryOnMaxExperimental}
+                                  onChange={(event) =>
+                                    setTryOnMaxExperimental(event.target.checked)
+                                  }
+                                  disabled={loading || modelGenerating}
+                                  className="mt-0.5 h-4 w-4 rounded border-border accent-teal-700"
+                                />
+                                <span className="text-xs font-medium leading-5 text-slate-900">
+                                  Try-On Max (FASHN API)
+                                </span>
+                              </label>
+                            ) : null}
                             <Button
                               className="w-full"
                               size="lg"
@@ -2115,21 +2143,63 @@ export function StudioShell({
                                 <summary className="cursor-pointer font-medium text-slate-900">
                                   Pipeline debug (view / pose / quality)
                                 </summary>
+                                <div className="mt-2 space-y-1 font-mono text-[11px] leading-relaxed text-slate-600">
+                                  {productAnalysis ? (
+                                    <p>
+                                      lingerieSetType:{" "}
+                                      {productAnalysis.lingerieSetType} (
+                                      {productAnalysis.lingerieSetTypeConfidence.toFixed(2)}
+                                      )
+                                    </p>
+                                  ) : null}
+                                  {pipelineDebug.tryOn?.analysis?.detectedProductView ? (
+                                    <p>
+                                      productView:{" "}
+                                      {pipelineDebug.tryOn.analysis.detectedProductView}
+                                    </p>
+                                  ) : null}
+                                  {pipelineDebug.tryOn?.resolver?.resolvedModelPose ? (
+                                    <p>
+                                      resolvedModelPose:{" "}
+                                      {pipelineDebug.tryOn.resolver.resolvedModelPose}
+                                    </p>
+                                  ) : null}
+                                  {pipelineDebug.tryOn?.tryOn?.tryOnEngine ? (
+                                    <p>
+                                      tryOnEngine:{" "}
+                                      {pipelineDebug.tryOn.tryOn.tryOnEngine}
+                                    </p>
+                                  ) : null}
+                                  {pipelineDebug.tryOn?.premium?.premiumGarmentEditRan !==
+                                  undefined ? (
+                                    <p>
+                                      premiumGarmentEditRan:{" "}
+                                      {String(
+                                        pipelineDebug.tryOn.premium.premiumGarmentEditRan
+                                      )}
+                                    </p>
+                                  ) : null}
+                                  {pipelineDebug.tryOn?.quality?.repaired !== undefined ? (
+                                    <p>
+                                      repaired:{" "}
+                                      {String(pipelineDebug.tryOn.quality.repaired)} (
+                                      score{" "}
+                                      {pipelineDebug.tryOn.quality.judgeScore?.toFixed(2) ??
+                                        "n/a"}
+                                      )
+                                    </p>
+                                  ) : null}
+                                  {pipelineDebug.tryOn?.tryOn?.promptPreview ? (
+                                    <p className="whitespace-pre-wrap break-words">
+                                      promptPreview:{" "}
+                                      {pipelineDebug.tryOn.tryOn.promptPreview}
+                                    </p>
+                                  ) : null}
+                                </div>
                                 <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed">
                                   {JSON.stringify(pipelineDebug, null, 2)}
                                 </pre>
                               </details>
-                            ) : null}
-                            {productAnalysis?.sourcePresentation === "on-model" &&
-                            isSourceModelPopulated(productAnalysis.sourceModel) ? (
-                              <p className="text-center text-xs leading-5 text-teal-900">
-                                AI подберёт модель похожей комплекции и позы
-                              </p>
-                            ) : null}
-                            {tryOnProgress ? (
-                              <p className="rounded-[12px] border border-teal-100 bg-teal-50 px-3 py-2 text-center text-sm text-teal-900">
-                                {tryOnProgress}
-                              </p>
                             ) : null}
                           </div>
                         </StudioWorkflowStep>

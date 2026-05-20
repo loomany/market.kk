@@ -2,10 +2,7 @@
 
 import { useState } from "react";
 import { Upload, X } from "lucide-react";
-import {
-  formatFileSize,
-  validateImageFileClient,
-} from "@/lib/ai/clientImageValidation";
+import { validateImageFileClient } from "@/lib/ai/clientImageValidation";
 import type { StudioProductPhoto } from "@/lib/studio/productPhotos";
 import { cn } from "@/lib/utils";
 
@@ -131,15 +128,8 @@ export function ProductPhotosUploader({
               <img
                 src={activePhoto.previewUrl}
                 alt="Предпросмотр товара"
-                className="max-h-[280px] min-h-[160px] w-full object-contain"
+                className="w-full object-contain"
               />
-              <p className="border-t border-border/70 px-3 py-2 text-xs text-slate-500">
-                <span className="font-medium text-slate-700">
-                  {activePhoto.file.name}
-                </span>
-                {" · "}
-                {formatFileSize(activePhoto.file.size)}
-              </p>
               <button
                 type="button"
                 aria-label="Удалить фото товара"

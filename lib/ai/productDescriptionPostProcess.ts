@@ -2,6 +2,7 @@ import type {
   ProductDescriptionAnalysis,
   ProductDescriptionAnalysisDebug,
 } from "@/lib/ai/productDescriptionAnalysisSchemas";
+import { enrichAnalysisWithLingerieSetType } from "@/lib/ai/lingerieSetType";
 import { finalizeSourceModel } from "@/lib/ai/sourceModelPostProcess";
 import { garmentPhotoTypeFromSourcePresentation } from "@/lib/studio/garmentPhotoTypeFromPresentation";
 
@@ -204,6 +205,17 @@ export function applyProductDescriptionSafetyRules(
       postProcessingOverrides.push("sourceModel.promptEn rebuilt/sanitized");
     }
     next = { ...next, sourceModel: finalizedSourceModel };
+  }
+
+  const enriched = enrichAnalysisWithLingerieSetType(next);
+  if (
+    enriched.lingerieSetType !== next.lingerieSetType ||
+    enriched.lingerieSetTypeConfidence !== next.lingerieSetTypeConfidence
+  ) {
+    postProcessingOverrides.push(
+      `lingerieSetType resolved → ${enriched.lingerieSetType} (${enriched.lingerieSetTypeConfidence.toFixed(2)})`
+    );
+    next = enriched;
   }
 
   return {

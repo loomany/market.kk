@@ -17,6 +17,7 @@ import { buildGenerateModelRequestBody } from "../lib/studio/buildGenerateModelR
 import { buildStudioModelGenerationFields } from "../lib/ai/productGenerationContext.ts";
 import { DEFAULT_MODEL_GENERATION_SETTINGS } from "../components/studio/types.ts";
 import type { ProductDescriptionAnalysis } from "../lib/ai/productDescriptionAnalysisSchemas.ts";
+import { lingerieSetTypeFieldsForSetType } from "../lib/ai/lingerieSetType.ts";
 
 function backAnalysis(): ProductDescriptionAnalysis {
   return {
@@ -26,6 +27,7 @@ function backAnalysis(): ProductDescriptionAnalysis {
     garmentPhotoType: "auto",
     sourcePresentation: "on-model",
     setType: "bra_brief_set",
+    ...lingerieSetTypeFieldsForSetType("bra_brief_set"),
     descriptionRu: "бельё со спины",
     shortAiSummaryEn: "test",
     baseColor: "black",

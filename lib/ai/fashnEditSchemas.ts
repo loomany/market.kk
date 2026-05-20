@@ -50,6 +50,8 @@ export type PremiumGarmentEditDebug = {
   maskStrategy?: string;
   maskWarning?: string;
   editPromptSummary: string;
+  lingerieSetType?: string;
+  editAntiOnePieceApplied?: boolean;
   garmentPrepMode: "premium";
   fashnEditResolution: FashnEditResolution;
   fashnEditGenerationMode: FashnEditGenerationMode;

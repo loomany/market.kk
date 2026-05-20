@@ -28,6 +28,7 @@ import { fileURLToPath } from "node:url";
 import { buildModelGenerationPrompt } from "../lib/ai/modelPrompts.ts";
 import { deriveSourceFramingGuidance } from "../lib/ai/sourceFramingGuidance.ts";
 import { lingerieNeutralBaseOutfitGuidance } from "../lib/ai/modelIdentityPipeline.ts";
+import { lingerieSetTypeFieldsForSetType } from "../lib/ai/lingerieSetType.ts";
 import {
   MODEL_ANGLE_PRESETS,
   resolveSelectedModelAngles,
@@ -317,6 +318,7 @@ function checkProductZoneIgnoresUnsafeSourcePose() {
       sourcePresentation: "on-model",
       garmentPhotoType: "model",
       setType: "bra_brief_set",
+      ...lingerieSetTypeFieldsForSetType("bra_brief_set"),
       baseColor: null,
       accentColors: [],
       pattern: null,
