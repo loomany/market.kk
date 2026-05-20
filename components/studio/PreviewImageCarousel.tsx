@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import {
@@ -22,6 +22,9 @@ type PreviewImageCarouselProps = {
   className?: string;
   imageClassName?: string;
   showDownloadActions?: boolean;
+  /** Синхронный индекс с другими каруселями (товар / модель / итог). */
+  activeIndex?: number;
+  onActiveIndexChange?: (index: number) => void;
 };
 
 export function PreviewImageCarousel({
@@ -30,10 +33,29 @@ export function PreviewImageCarousel({
   className,
   imageClassName = "max-h-[460px] w-full object-contain",
   showDownloadActions = true,
+  activeIndex: controlledIndex,
+  onActiveIndexChange,
 }: PreviewImageCarouselProps) {
   const trackRef = useRef<HTMLDivElement>(null);
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [internalIndex, setInternalIndex] = useState(0);
   const [downloadingAll, setDownloadingAll] = useState(false);
+  const isControlled = controlledIndex !== undefined;
+  const activeIndex = isControlled ? controlledIndex : internalIndex;
+  const safeIndex = Math.min(
+    Math.max(0, activeIndex),
+    Math.max(0, items.length - 1)
+  );
+
+  const setIndex = useCallback(
+    (index: number) => {
+      const clamped = Math.max(0, Math.min(index, Math.max(0, items.length - 1)));
+      if (!isControlled) {
+        setInternalIndex(clamped);
+      }
+      onActiveIndexChange?.(clamped);
+    },
+    [isControlled, items.length, onActiveIndexChange]
+  );
 
   const scrollToIndex = useCallback(
     (index: number) => {
@@ -46,10 +68,30 @@ export function PreviewImageCarousel({
         inline: "start",
         block: "nearest",
       });
-      setActiveIndex(clamped);
+      setIndex(clamped);
     },
-    [items.length]
+    [items.length, setIndex]
   );
+
+  useEffect(() => {
+    if (activeIndex !== safeIndex) {
+      onActiveIndexChange?.(safeIndex);
+    }
+  }, [activeIndex, safeIndex, onActiveIndexChange]);
+
+  useEffect(() => {
+    if (!isControlled || controlledIndex === undefined) return;
+    const track = trackRef.current;
+    if (!track) return;
+    const slide = track.children.item(controlledIndex) as HTMLElement | null;
+    if (!slide) return;
+    const width = track.clientWidth;
+    if (width <= 0) return;
+    const targetLeft = controlledIndex * width;
+    if (Math.abs(track.scrollLeft - targetLeft) > 2) {
+      track.scrollTo({ left: targetLeft, behavior: "smooth" });
+    }
+  }, [controlledIndex, isControlled, items.length]);
 
   const handleScroll = useCallback(() => {
     const track = trackRef.current;
@@ -57,12 +99,12 @@ export function PreviewImageCarousel({
     const width = track.clientWidth;
     if (width <= 0) return;
     const index = Math.round(track.scrollLeft / width);
-    setActiveIndex(Math.max(0, Math.min(index, items.length - 1)));
-  }, [items.length]);
+    setIndex(index);
+  }, [items.length, setIndex]);
 
   if (items.length === 0) return null;
 
-  const activeItem = items[activeIndex] ?? items[0]!;
+  const activeItem = items[safeIndex] ?? items[0]!;
   const showNav = items.length > 1;
 
   return (
@@ -70,7 +112,7 @@ export function PreviewImageCarousel({
       {showNav ? (
         <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/60 bg-white px-3 py-2">
           <p className="min-w-0 truncate text-xs font-medium text-slate-600">
-            {activeIndex + 1} из {items.length}
+            {safeIndex + 1} из {items.length}
             <span className="mx-1.5 text-slate-300">·</span>
             <span className="text-slate-800">{activeItem.label}</span>
           </p>
@@ -88,7 +130,7 @@ export function PreviewImageCarousel({
                   previewImageFilename(
                     downloadFilenamePrefix,
                     activeItem.label,
-                    activeIndex
+                    safeIndex
                   )
                 )
               }

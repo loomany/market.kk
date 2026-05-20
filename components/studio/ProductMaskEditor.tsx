@@ -1,26 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import {
-  ArrowLeft,
-  Check,
-  Eraser,
-  Paintbrush,
-  RotateCcw,
-  Square,
-} from "lucide-react";
+import { ArrowLeft, Check, RotateCcw, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/Badge";
 import {
   applyMaskToProductImage,
   createSelectionPreviewBlob,
-  fillMaskInterior,
   fillRectangleOnMask,
   getMaskCoverageRatio,
   loadImageElement,
   maskHasSelection,
-  shouldFillMaskInterior,
-  type MaskSelectionMethod,
 } from "@/lib/studio/productMask";
 import { Button } from "@/components/ui/Button";
 
@@ -29,8 +19,6 @@ export type ProductMaskApplyResult = {
   previewUrl: string;
   coverageRatio: number;
 };
-
-type Tool = "rectangle" | "brush" | "eraser";
 
 type RectPreview = { x: number; y: number; w: number; h: number };
 
@@ -56,6 +44,19 @@ function getCanvasPoint(
   };
 }
 
+function rectangleCoverageHint(ratio: number): string | null {
+  if (ratio > 0.45) {
+    return "Рамка слишком большая: оставьте внутри только товар (без всей фигуры модели и фона).";
+  }
+  if (ratio > 0.28) {
+    return "Рамка широкая — ИИ попытается вырезать товар внутри, но лучше сузить до самой ткани.";
+  }
+  if (ratio < 0.002) {
+    return "Рамка слишком маленькая — растяните её на весь товар.";
+  }
+  return null;
+}
+
 export function ProductMaskEditor({
   imageUrl,
   onApply,
@@ -66,22 +67,17 @@ export function ProductMaskEditor({
   const dimLayerRef = useRef<HTMLCanvasElement | null>(null);
   const tintLayerRef = useRef<HTMLCanvasElement | null>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
-  const drawingRef = useRef(false);
-  const strokeStartedRef = useRef(false);
-  const lastPointRef = useRef<Point | null>(null);
   const rectAnchorRef = useRef<Point | null>(null);
   const rectPreviewRef = useRef<RectPreview | null>(null);
-  const appliedMethodRef = useRef<MaskSelectionMethod>("rectangle");
 
-  const [tool, setTool] = useState<Tool>("rectangle");
-  const [brushMode, setBrushMode] = useState<"paint" | "contour">("paint");
-  const [brushSize, setBrushSize] = useState(28);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [displaySize, setDisplaySize] = useState({ width: 320, height: 320 });
   const [applyError, setApplyError] = useState<string | null>(null);
   const [coverageHint, setCoverageHint] = useState<string | null>(null);
   const [imageReady, setImageReady] = useState(false);
+  const [hasSelection, setHasSelection] = useState(false);
+  const [isDrawingRect, setIsDrawingRect] = useState(false);
 
   const renderView = useCallback(() => {
     const viewCanvas = viewCanvasRef.current;
@@ -97,102 +93,64 @@ export function ProductMaskEditor({
     ctx.drawImage(image, 0, 0, width, height);
 
     const hasMask = maskHasSelection(dataCanvas);
+    setHasSelection(hasMask);
 
     if (hasMask) {
-    let dimLayer = dimLayerRef.current;
-    if (!dimLayer || dimLayer.width !== width || dimLayer.height !== height) {
-      dimLayer = document.createElement("canvas");
-      dimLayer.width = width;
-      dimLayer.height = height;
-      dimLayerRef.current = dimLayer;
-    }
-    const dimCtx = dimLayer.getContext("2d");
-    if (!dimCtx) return;
+      let dimLayer = dimLayerRef.current;
+      if (!dimLayer || dimLayer.width !== width || dimLayer.height !== height) {
+        dimLayer = document.createElement("canvas");
+        dimLayer.width = width;
+        dimLayer.height = height;
+        dimLayerRef.current = dimLayer;
+      }
+      const dimCtx = dimLayer.getContext("2d");
+      if (!dimCtx) return;
 
-    dimCtx.clearRect(0, 0, width, height);
-    dimCtx.globalCompositeOperation = "source-over";
-    dimCtx.fillStyle = "rgba(15, 23, 42, 0.55)";
-    dimCtx.fillRect(0, 0, width, height);
-    dimCtx.globalCompositeOperation = "destination-out";
-    dimCtx.drawImage(dataCanvas, 0, 0);
-    dimCtx.globalCompositeOperation = "source-over";
-    ctx.drawImage(dimLayer, 0, 0);
+      dimCtx.clearRect(0, 0, width, height);
+      dimCtx.globalCompositeOperation = "source-over";
+      dimCtx.fillStyle = "rgba(15, 23, 42, 0.55)";
+      dimCtx.fillRect(0, 0, width, height);
+      dimCtx.globalCompositeOperation = "destination-out";
+      dimCtx.drawImage(dataCanvas, 0, 0);
+      dimCtx.globalCompositeOperation = "source-over";
+      ctx.drawImage(dimLayer, 0, 0);
 
-    let tintLayer = tintLayerRef.current;
-    if (!tintLayer || tintLayer.width !== width || tintLayer.height !== height) {
-      tintLayer = document.createElement("canvas");
-      tintLayer.width = width;
-      tintLayer.height = height;
-      tintLayerRef.current = tintLayer;
-    }
-    const tintCtx = tintLayer.getContext("2d");
-    if (!tintCtx) return;
+      let tintLayer = tintLayerRef.current;
+      if (!tintLayer || tintLayer.width !== width || tintLayer.height !== height) {
+        tintLayer = document.createElement("canvas");
+        tintLayer.width = width;
+        tintLayer.height = height;
+        tintLayerRef.current = tintLayer;
+      }
+      const tintCtx = tintLayer.getContext("2d");
+      if (!tintCtx) return;
 
-    tintCtx.clearRect(0, 0, width, height);
-    tintCtx.fillStyle = "rgba(20, 184, 166, 0.45)";
-    tintCtx.fillRect(0, 0, width, height);
-    tintCtx.globalCompositeOperation = "destination-in";
-    tintCtx.drawImage(dataCanvas, 0, 0);
-    tintCtx.globalCompositeOperation = "source-over";
-    ctx.drawImage(tintLayer, 0, 0);
+      tintCtx.clearRect(0, 0, width, height);
+      tintCtx.fillStyle = "rgba(20, 184, 166, 0.45)";
+      tintCtx.fillRect(0, 0, width, height);
+      tintCtx.globalCompositeOperation = "destination-in";
+      tintCtx.drawImage(dataCanvas, 0, 0);
+      tintCtx.globalCompositeOperation = "source-over";
+      ctx.drawImage(tintLayer, 0, 0);
     }
 
     const rect = rectPreviewRef.current;
     if (rect && rect.w > 1 && rect.h > 1) {
+      const displayScale =
+        width / Math.max(1, viewCanvas.clientWidth || width);
+      const rectStroke = Math.max(10, displayScale * 4);
       ctx.save();
-      ctx.strokeStyle = "rgba(20, 184, 166, 0.95)";
-      ctx.lineWidth = Math.max(2, width / (viewCanvas.clientWidth || width));
-      ctx.setLineDash([10, 6]);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.92)";
+      ctx.lineWidth = rectStroke + displayScale * 2;
+      ctx.setLineDash([]);
+      ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+      ctx.strokeStyle = "rgba(20, 184, 166, 0.98)";
+      ctx.lineWidth = rectStroke;
+      ctx.setLineDash([14, 8]);
       ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
       ctx.restore();
     }
   }, []);
-
-  const strokeTo = useCallback(
-    (point: Point, isStart: boolean) => {
-      const dataCanvas = maskDataRef.current;
-      if (!dataCanvas) return;
-      const ctx = dataCanvas.getContext("2d");
-      if (!ctx) return;
-
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.lineWidth = brushSize;
-
-      if (tool === "brush") {
-        appliedMethodRef.current = brushMode;
-        ctx.globalCompositeOperation = "source-over";
-        ctx.strokeStyle = "rgba(255,255,255,1)";
-        if (isStart) {
-          ctx.beginPath();
-          ctx.moveTo(point.x, point.y);
-          ctx.lineTo(point.x, point.y);
-        } else if (lastPointRef.current) {
-          ctx.beginPath();
-          ctx.moveTo(lastPointRef.current.x, lastPointRef.current.y);
-          ctx.lineTo(point.x, point.y);
-        }
-        ctx.stroke();
-      } else {
-        ctx.globalCompositeOperation = "destination-out";
-        ctx.strokeStyle = "rgba(0,0,0,1)";
-        if (isStart) {
-          ctx.beginPath();
-          ctx.moveTo(point.x, point.y);
-          ctx.lineTo(point.x, point.y);
-        } else if (lastPointRef.current) {
-          ctx.beginPath();
-          ctx.moveTo(lastPointRef.current.x, lastPointRef.current.y);
-          ctx.lineTo(point.x, point.y);
-        }
-        ctx.stroke();
-        ctx.globalCompositeOperation = "source-over";
-      }
-      lastPointRef.current = point;
-      renderView();
-    },
-    [brushMode, brushSize, renderView, tool]
-  );
 
   useEffect(() => {
     let cancelled = false;
@@ -202,6 +160,7 @@ export function ProductMaskEditor({
         if (cancelled) return;
         imageRef.current = img;
         maskDataRef.current = null;
+        setHasSelection(false);
         setImageReady(true);
       })
       .catch((err) => {
@@ -258,55 +217,32 @@ export function ProductMaskEditor({
 
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = viewCanvasRef.current;
-    const dataCanvas = maskDataRef.current;
-    if (!canvas || !dataCanvas) return;
+    if (!canvas) return;
     e.preventDefault();
     canvas.setPointerCapture(e.pointerId);
     const point = getCanvasPoint(canvas, e.clientX, e.clientY);
-
-    if (tool === "rectangle") {
-      rectAnchorRef.current = point;
-      rectPreviewRef.current = { x: point.x, y: point.y, w: 0, h: 0 };
-      renderView();
-      return;
-    }
-
-    drawingRef.current = true;
-    lastPointRef.current = point;
-    strokeStartedRef.current = false;
+    rectAnchorRef.current = point;
+    rectPreviewRef.current = { x: point.x, y: point.y, w: 0, h: 0 };
+    setIsDrawingRect(true);
+    setApplyError(null);
+    setCoverageHint(null);
+    renderView();
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = viewCanvasRef.current;
-    if (!canvas) return;
-
-    if (tool === "rectangle" && rectAnchorRef.current) {
-      e.preventDefault();
-      const point = getCanvasPoint(canvas, e.clientX, e.clientY);
-      const x0 = rectAnchorRef.current.x;
-      const y0 = rectAnchorRef.current.y;
-      rectPreviewRef.current = {
-        x: Math.min(x0, point.x),
-        y: Math.min(y0, point.y),
-        w: Math.abs(point.x - x0),
-        h: Math.abs(point.y - y0),
-      };
-      renderView();
-      return;
-    }
-
-    if (!drawingRef.current) return;
-    const dataCanvas = maskDataRef.current;
-    if (!dataCanvas) return;
+    if (!canvas || !rectAnchorRef.current) return;
     e.preventDefault();
     const point = getCanvasPoint(canvas, e.clientX, e.clientY);
-
-    if (!strokeStartedRef.current) {
-      strokeTo(point, true);
-      strokeStartedRef.current = true;
-    } else {
-      strokeTo(point, false);
-    }
+    const x0 = rectAnchorRef.current.x;
+    const y0 = rectAnchorRef.current.y;
+    rectPreviewRef.current = {
+      x: Math.min(x0, point.x),
+      y: Math.min(y0, point.y),
+      w: Math.abs(point.x - x0),
+      h: Math.abs(point.y - y0),
+    };
+    renderView();
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -317,34 +253,28 @@ export function ProductMaskEditor({
       canvas.releasePointerCapture(e.pointerId);
     }
 
-    if (tool === "rectangle" && rectAnchorRef.current && dataCanvas) {
-      const point = getCanvasPoint(canvas, e.clientX, e.clientY);
-      fillRectangleOnMask(
-        dataCanvas,
-        rectAnchorRef.current.x,
-        rectAnchorRef.current.y,
-        point.x,
-        point.y
-      );
-      appliedMethodRef.current = "rectangle";
+    if (!rectAnchorRef.current || !dataCanvas) {
       rectAnchorRef.current = null;
       rectPreviewRef.current = null;
-      renderView();
+      setIsDrawingRect(false);
       return;
     }
 
-    if (
-      drawingRef.current &&
-      (tool === "brush" || tool === "eraser") &&
-      !strokeStartedRef.current &&
-      lastPointRef.current
-    ) {
-      strokeTo(lastPointRef.current, true);
-    }
+    const point = getCanvasPoint(canvas, e.clientX, e.clientY);
+    fillRectangleOnMask(
+      dataCanvas,
+      rectAnchorRef.current.x,
+      rectAnchorRef.current.y,
+      point.x,
+      point.y
+    );
+    rectAnchorRef.current = null;
+    rectPreviewRef.current = null;
+    setIsDrawingRect(false);
 
-    drawingRef.current = false;
-    strokeStartedRef.current = false;
-    lastPointRef.current = null;
+    const ratio = getMaskCoverageRatio(dataCanvas);
+    setCoverageHint(rectangleCoverageHint(ratio));
+    renderView();
   };
 
   const handleClear = () => {
@@ -355,6 +285,8 @@ export function ProductMaskEditor({
     rectPreviewRef.current = null;
     setApplyError(null);
     setCoverageHint(null);
+    setHasSelection(false);
+    setIsDrawingRect(false);
     renderView();
   };
 
@@ -367,6 +299,18 @@ export function ProductMaskEditor({
     setCoverageHint(null);
 
     try {
+      const filledCoverage = getMaskCoverageRatio(dataCanvas);
+      if (filledCoverage < 0.001) {
+        setApplyError("Нарисуйте рамку вокруг товара на фото.");
+        return;
+      }
+
+      const hint = rectangleCoverageHint(filledCoverage);
+      if (hint && filledCoverage > 0.45) {
+        setCoverageHint(hint);
+        return;
+      }
+
       const exportMask = document.createElement("canvas");
       exportMask.width = dataCanvas.width;
       exportMask.height = dataCanvas.height;
@@ -376,32 +320,14 @@ export function ProductMaskEditor({
       }
       exportCtx.drawImage(dataCanvas, 0, 0);
 
-      const applyMethod = appliedMethodRef.current;
-
-      if (shouldFillMaskInterior(applyMethod)) {
-        fillMaskInterior(exportMask);
-      }
-
-      const filledCoverage = getMaskCoverageRatio(exportMask);
-      if (filledCoverage < 0.001) {
-        setApplyError("Сначала выделите товар на фото.");
-        return;
-      }
-
       const { blob } = await applyMaskToProductImage(image, exportMask);
 
-      if (filledCoverage < 0.002) {
-        setCoverageHint(
-          "Выделение очень маленькое. Закрасьте товар или замкните контур без разрывов."
-        );
-      } else if (filledCoverage > 0.55) {
-        setCoverageHint(
-          "Область слишком большая. Сузьте контур или используйте ластик у соседних предметов."
-        );
+      if (hint) {
+        setCoverageHint(hint);
       }
 
       const previewBlob = await createSelectionPreviewBlob(image, exportMask, {
-        selectionMethod: applyMethod,
+        selectionMethod: "rectangle",
       });
       const file = new File([blob], "selected-product.png", {
         type: "image/png",
@@ -427,9 +353,9 @@ export function ProductMaskEditor({
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-slate-950">Выделение товара</p>
+          <p className="text-sm font-semibold text-slate-950">Рамка вокруг товара</p>
           <p className="text-xs text-slate-500">
-            Укажите, что оставить на карточке
+            ИИ вырежет предмет внутри прямоугольника
           </p>
         </div>
         <Badge variant="outline" className="shrink-0">
@@ -446,171 +372,92 @@ export function ProductMaskEditor({
 
         {!loadError && (
           <>
-            <p className="rounded-[12px] border border-border/80 bg-slate-50/80 px-3 py-2 text-xs leading-5 text-slate-600">
-              Обведите рамкой или закрасьте кистью → при необходимости ластиком
-              уберите лишнее → сохраните.
-            </p>
+            <div className="space-y-2">
+              <p
+                className="rounded-[12px] border border-teal-200/90 bg-teal-50 px-3 py-2.5 text-xs leading-5 text-teal-950"
+                role="status"
+              >
+                <strong>Как это работает:</strong> потяните мышью{" "}
+                <strong>прямоугольник</strong> вокруг товара. Внутри рамки ИИ
+                оставит только ткань/предмет, фон и лишнее уберёт. Рамка не
+                должна захватывать всю модель — только трусы, лиф или сам товар.
+              </p>
+              <ul className="rounded-[12px] border border-border/80 bg-slate-50/80 px-3 py-2.5 text-xs leading-5 text-slate-600">
+                <li>• Зелёная область — зона для ИИ (не итоговая карточка).</li>
+                <li>• Новая рамка заменяет предыдущую.</li>
+                <li>• После «Сохранить» станет доступно «Создать карточку».</li>
+              </ul>
+            </div>
 
             <div
               className="relative mx-auto max-w-full overflow-hidden rounded-[18px] border border-border bg-slate-100 shadow-inner"
               style={{ touchAction: "none" }}
             >
-            {loading && (
-              <div className="absolute inset-0 z-10 flex min-h-[200px] items-center justify-center bg-slate-100 text-sm text-slate-600">
-                Загружаем изображение…
-              </div>
-            )}
-            <canvas
-              ref={viewCanvasRef}
-              className="mx-auto block max-w-full cursor-crosshair"
-              style={{
-                width: displaySize.width,
-                height: displaySize.height,
-                minHeight: loading ? 200 : undefined,
-              }}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerLeave={handlePointerUp}
-            />
-          </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                  Инструмент
-                </span>
-                <button
-                  type="button"
-                  onClick={handleClear}
-                  className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-                  aria-label="Очистить выделение"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  Очистить
-                </button>
-              </div>
-              <div
-                className="flex gap-1 rounded-[14px] border border-border bg-slate-100/80 p-1"
-                role="toolbar"
-                aria-label="Инструменты выделения"
-              >
-                {(
-                  [
-                    {
-                      id: "rectangle" as const,
-                      label: "Прямоугольник",
-                      icon: Square,
-                      flex: "flex-[1.55] min-w-0 sm:flex-[1.65]",
-                    },
-                    {
-                      id: "brush" as const,
-                      label: "Кисть",
-                      icon: Paintbrush,
-                      flex: "flex-1 min-w-0",
-                    },
-                    {
-                      id: "eraser" as const,
-                      label: "Ластик",
-                      icon: Eraser,
-                      flex: "flex-1 min-w-0",
-                    },
-                  ] as const
-                ).map(({ id, label, flex, icon: Icon }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setTool(id)}
-                    aria-pressed={tool === id}
-                    className={cn(
-                      flex,
-                      "flex items-center justify-center gap-1.5 whitespace-nowrap rounded-[10px] px-2 py-2.5 text-xs font-semibold transition sm:px-3",
-                      tool === id
-                        ? "bg-white text-teal-900 shadow-sm ring-1 ring-teal-500/20"
-                        : "text-slate-600 hover:bg-white/80"
-                    )}
-                  >
-                    <Icon className="h-4 w-4 shrink-0" aria-hidden />
-                    <span>{label}</span>
-                  </button>
-                ))}
-              </div>
+              {loading && (
+                <div className="absolute inset-0 z-10 flex min-h-[200px] items-center justify-center bg-slate-100 text-sm text-slate-600">
+                  Загружаем изображение…
+                </div>
+              )}
+              <canvas
+                ref={viewCanvasRef}
+                className={cn(
+                  "mx-auto block max-w-full",
+                  isDrawingRect ? "cursor-crosshair" : "cursor-cell"
+                )}
+                style={{
+                  width: displaySize.width,
+                  height: displaySize.height,
+                  minHeight: loading ? 200 : undefined,
+                }}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerLeave={handlePointerUp}
+              />
+              {!loading && !hasSelection && !isDrawingRect && (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4">
+                  <p className="rounded-[12px] bg-white/90 px-3 py-2 text-center text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200/80">
+                    Потяните от угла к углу — рамка вокруг товара
+                  </p>
+                </div>
+              )}
             </div>
 
-            {tool === "brush" && (
-              <div className="space-y-2">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                  Режим кисти
-                </span>
-                <div className="grid grid-cols-2 gap-1 rounded-[14px] border border-border bg-slate-100/80 p-1">
-                  {(
-                    [
-                      {
-                        id: "paint" as const,
-                        label: "Закрасить товар",
-                        hint: "Рекомендуем",
-                      },
-                      {
-                        id: "contour" as const,
-                        label: "Обвести контур",
-                        hint: "Плотно, без разрывов",
-                      },
-                    ] as const
-                  ).map(({ id, label, hint }) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => setBrushMode(id)}
-                      className={cn(
-                        "rounded-[10px] px-3 py-2.5 text-left text-xs transition",
-                        brushMode === id
-                          ? "bg-white text-teal-900 shadow-sm ring-1 ring-teal-500/20"
-                          : "text-slate-600 hover:bg-white/80"
-                      )}
-                    >
-                      <span className="font-semibold">{label}</span>
-                      <span className="mt-0.5 block text-[10px] text-slate-500">
-                        {hint}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+            <div className="flex items-center justify-between gap-2 rounded-[14px] border border-border bg-slate-100/80 px-3 py-2.5">
+              <span className="inline-flex items-center gap-2 text-xs font-semibold text-teal-900">
+                <Square className="h-4 w-4 shrink-0" aria-hidden />
+                Только прямоугольник
+              </span>
+              <button
+                type="button"
+                onClick={handleClear}
+                disabled={!hasSelection}
+                className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-white hover:text-slate-900 disabled:opacity-40"
+                aria-label="Сбросить рамку"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Сбросить рамку
+              </button>
+            </div>
 
-            {(tool === "brush" || tool === "eraser") && (
-              <div className="space-y-2 rounded-[14px] border border-border bg-white px-3 py-3">
-                <div className="flex items-center justify-between gap-2">
-                  <label
-                    htmlFor="mask-brush-size"
-                    className="text-xs font-semibold text-slate-700"
-                  >
-                    Размер кисти
-                  </label>
-                  <span className="text-xs tabular-nums text-slate-500">
-                    {brushSize}px
-                  </span>
-                </div>
-                <input
-                  id="mask-brush-size"
-                  type="range"
-                  min={8}
-                  max={80}
-                  value={brushSize}
-                  onChange={(e) => setBrushSize(Number(e.target.value))}
-                  className="h-2 w-full cursor-pointer accent-teal-600"
-                />
-              </div>
+            {applyError && (
+              <p className="text-xs text-red-700" role="alert">
+                {applyError}
+              </p>
             )}
-
-          {applyError && (
-            <p className="text-xs text-red-700" role="alert">
-              {applyError}
-            </p>
-          )}
-          {coverageHint && (
-            <p className="text-xs text-amber-800">{coverageHint}</p>
-          )}
+            {coverageHint && (
+              <p
+                className={cn(
+                  "text-xs leading-5",
+                  coverageHint.includes("слишком большая")
+                    ? "text-amber-900"
+                    : "text-slate-600"
+                )}
+                role="status"
+              >
+                {coverageHint}
+              </p>
+            )}
 
             <div className="border-t border-border/70 pt-4">
               <div className="grid grid-cols-2 gap-2">
@@ -619,10 +466,11 @@ export function ProductMaskEditor({
                   variant="primary"
                   size="lg"
                   className="w-full"
+                  disabled={!hasSelection}
                   onClick={handleApply}
                 >
                   <Check className="h-4 w-4 shrink-0" />
-                  Сохранить
+                  Сохранить рамку
                 </Button>
                 <Button
                   type="button"
@@ -635,7 +483,7 @@ export function ProductMaskEditor({
                 </Button>
               </div>
               <p className="mt-2 text-center text-xs leading-5 text-slate-500">
-                Вне выделения фон уберётся при создании карточки
+                На карточке останется вырезка внутри рамки, не весь прямоугольник
               </p>
             </div>
           </>

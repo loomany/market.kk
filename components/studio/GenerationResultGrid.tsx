@@ -385,7 +385,9 @@ export function GenerationResultGrid({
           url={null}
           empty={
             saasPreviewChrome
-              ? "Создайте карточку"
+              ? hasProductPreview
+                ? "Карточка убрана. Фото и рамка на месте — нажмите «Создать карточку»."
+                : "Создайте карточку"
               : "Здесь появится результат после генерации"
           }
           {...productCardResultPreviewProps(
@@ -429,6 +431,14 @@ export function GenerationResultGrid({
             <TryOnResultActions
               onDownload={() => void downloadImageFile(result.url, `${result.id}.png`)}
               onStartOver={onStartOver}
+              startOverLabel={
+                isProductShotMode ? "Создать ещё раз" : "Начать сначала"
+              }
+              startOverTitle={
+                isProductShotMode
+                  ? "Убрать готовую карточку. Фото, рамка и настройки останутся."
+                  : undefined
+              }
             />
           </>
         );
@@ -623,9 +633,14 @@ export function GenerationResultGrid({
                   size="sm"
                   className="w-full"
                   onClick={onStartOver}
+                  title={
+                    isProductShotMode
+                      ? "Убрать готовую карточку. Фото, рамка и настройки останутся."
+                      : undefined
+                  }
                 >
                   <RotateCcw className="h-4 w-4" />
-                  Начать сначала
+                  {isProductShotMode ? "Создать ещё раз" : "Начать сначала"}
                 </Button>
               </div>
             )}

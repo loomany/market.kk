@@ -8,6 +8,7 @@ import {
 } from "@/lib/studio/previewImageAspect";
 import {
   saasPreviewCardClass,
+  StudioPreviewResultColumnHeader,
   StudioPreviewTabBar,
 } from "./StudioSaaSPreviewChrome";
 
@@ -19,7 +20,7 @@ const DESKTOP_PRODUCT_TABS: { id: "product"; label: string }[] = [
 
 const MOBILE_TABS: { id: ProductCardPreviewTabId; label: string }[] = [
   { id: "product", label: "Товар" },
-  { id: "result", label: "Результат" },
+  { id: "result", label: "Итог" },
 ];
 
 type ProductCardSaaSPreviewLayoutProps = {
@@ -59,6 +60,9 @@ export function ProductCardSaaSPreviewLayout({
         </div>
 
         <div className="w-[320px] shrink-0" aria-label="Результат генерации">
+          {!resultReady ? (
+            <StudioPreviewResultColumnHeader aspectLabel={previewAspect.badge} />
+          ) : null}
           {resultPanel}
         </div>
       </div>

@@ -24,6 +24,11 @@ import {
 } from "@/lib/ai/falErrorMessage";
 
 import { shouldUseNeutralBaseModelGeneration } from "@/lib/ai/modelIdentityPipeline";
+import { extractModelIdentityVisionFromHeroUrl } from "@/lib/ai/extractModelIdentityFromHero";
+import {
+  appendModelIdentityLockToT2iPrompt,
+  mergeStudioAndVisionIdentityLock,
+} from "@/lib/ai/modelIdentityLock";
 import { buildModelGenerationDebug } from "@/lib/ai/modelGenerationDebug";
 import {
   deriveProductViewFromRequest,
@@ -121,12 +126,15 @@ export async function POST(request: Request) {
 
 
 
-  const referenceImageUrl = data.referenceImageUrl?.trim();
+  const preferTextOnly = Boolean(data.preferTextOnlyAngleFollowUp);
+  const referenceImageUrl = preferTextOnly
+    ? undefined
+    : data.referenceImageUrl?.trim();
   const useAngleEdit = Boolean(referenceImageUrl);
 
   let generationInput = data;
 
-  if (useAngleEdit) {
+  if (useAngleEdit || preferTextOnly) {
     try {
       generationInput = await translateModelGenerationTextFields(
         data,
@@ -145,6 +153,42 @@ export async function POST(request: Request) {
 
   const neutralBaseForTryOn = shouldUseNeutralBaseModelGeneration(generationInput);
 
+  let usedVisionIdentity = false;
+  let identityLockEn: string | undefined;
+
+  if (preferTextOnly) {
+    if (data.modelIdentityLockEn?.trim()) {
+      identityLockEn = data.modelIdentityLockEn.trim();
+    } else {
+      let visionSupplement: string | null = null;
+      const heroUrl = data.heroImageUrlForIdentity?.trim();
+      if (heroUrl) {
+        try {
+          visionSupplement = await extractModelIdentityVisionFromHeroUrl({
+            heroImageUrl: heroUrl,
+            merchantNationality: generationInput.modelNationality,
+            route: ROUTE_ID,
+          });
+          usedVisionIdentity = Boolean(visionSupplement);
+        } catch (error) {
+          if (isPaidAiGuardError(error)) {
+            return NextResponse.json(paidAiGuardResponse(error), {
+              status: error.status,
+            });
+          }
+          console.warn(
+            "[fal generate-model] hero identity vision failed:",
+            error
+          );
+        }
+      }
+      identityLockEn = mergeStudioAndVisionIdentityLock(
+        generationInput,
+        visionSupplement
+      );
+    }
+  }
+
   let prompt: string;
   let promptComposer: "openai" | "template" = "template";
   let openAiPromptModel: string | undefined;
@@ -159,11 +203,19 @@ export async function POST(request: Request) {
         promptLocale,
         productPoseDescriptionRu: data.productPoseDescriptionRu,
         neutralBaseForTryOn,
+        followUpAngle: preferTextOnly,
       });
       prompt = composed.prompt;
       promptComposer = composed.source;
       openAiPromptModel = composed.promptModel;
-      generationPromptForFal = composed.prompt;
+      generationPromptForFal =
+        preferTextOnly && identityLockEn
+          ? appendModelIdentityLockToT2iPrompt({
+              basePrompt: composed.prompt,
+              identityLockEn,
+              cameraAnglePrompt: generationInput.cameraAnglePrompt,
+            })
+          : composed.prompt;
     } catch (error) {
       if (isPaidAiGuardError(error)) {
         return NextResponse.json(paidAiGuardResponse(error), {
@@ -238,6 +290,8 @@ export async function POST(request: Request) {
 
       generationPrompt: generationPromptForFal,
 
+      skipAngleEdit: preferTextOnly,
+
     });
 
 
@@ -277,6 +331,8 @@ export async function POST(request: Request) {
       openAiPromptModel,
 
       usedAngleEditFallback,
+
+      usedVisionIdentity: preferTextOnly ? usedVisionIdentity : undefined,
 
       identityPipeline: neutralBaseForTryOn ? "neutral-base-tryon" : "direct",
 

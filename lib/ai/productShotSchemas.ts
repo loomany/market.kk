@@ -1,5 +1,9 @@
 import { z } from "zod";
-import type { FalModelResolution } from "@/lib/ai/modelOutputSizes";
+import {
+  FAL_MODEL_ASPECT_RATIO_OPTIONS,
+  type FalModelAspectRatio,
+  type FalModelResolution,
+} from "@/lib/ai/modelOutputSizes";
 import { validateImageFile } from "@/lib/ai/imageConstraints";
 import {
   normalizeTryOnFormValue,
@@ -11,11 +15,16 @@ export const SHOT_SIZE_PRESET_VALUES = [
   "square",
   "vertical_4_5",
   "vertical_3_4",
+  "vertical_2_3",
   "horizontal_4_3",
+  "horizontal_16_9",
   "reels_9_16",
 ] as const;
 
 export type ShotSizePreset = (typeof SHOT_SIZE_PRESET_VALUES)[number];
+
+/** Товарная карточка: фиксированное качество экспорта (без выбора в UI). */
+export const PRODUCT_SHOT_EXPORT_QUALITY: FalModelResolution = "2K";
 
 const LEGACY_SHOT_SIZE_PRESET_MAP: Record<string, ShotSizePreset> = {
   portrait: "vertical_4_5",
@@ -33,65 +42,55 @@ export const PRODUCT_SHOT_SIZE_OPTIONS: {
   pixels: string;
   subtitle?: string;
 }[] = [
-  { id: "square", ratio: "1:1", pixels: "1000×1000", subtitle: "Квадрат" },
+  { id: "square", ratio: "1:1", pixels: "1000×1000", subtitle: "квадрат" },
   {
     id: "vertical_4_5",
     ratio: "4:5",
     pixels: "1000×1250",
-    subtitle: "Вертикально",
+    subtitle: "лента",
   },
-  { id: "vertical_3_4", ratio: "3:4", pixels: "900×1200", subtitle: "Каталог" },
+  { id: "vertical_3_4", ratio: "3:4", pixels: "900×1200", subtitle: "WB и Ozon" },
+  { id: "vertical_2_3", ratio: "2:3", pixels: "800×1200", subtitle: "Полный рост" },
   {
     id: "horizontal_4_3",
     ratio: "4:3",
     pixels: "1200×900",
-    subtitle: "Горизонтально",
+    subtitle: "Горизонталь",
+  },
+  {
+    id: "horizontal_16_9",
+    ratio: "16:9",
+    pixels: "1280×720",
+    subtitle: "Баннер",
   },
   {
     id: "reels_9_16",
     ratio: "9:16",
     pixels: "1080×1920",
-    subtitle: "Reels / Stories",
+    subtitle: "Stories",
   },
 ];
 
-export const PRODUCT_SHOT_ASPECT_RATIO_OPTIONS = [
-  {
-    id: "1:1",
-    label: "1:1",
-    shortHint: "Квадрат",
-    hint: "Квадрат для маркетплейсов и превью",
-    presetId: "square" as const,
-  },
-  {
-    id: "4:5",
-    label: "4:5",
-    shortHint: "Вертикально",
-    hint: "Вертикаль для ленты и витрины",
-    presetId: "vertical_4_5" as const,
-  },
-  {
-    id: "3:4",
-    label: "3:4",
-    shortHint: "Каталог",
-    hint: "Портрет для Wildberries и Ozon",
-    presetId: "vertical_3_4" as const,
-  },
-  {
-    id: "4:3",
-    label: "4:3",
-    shortHint: "Горизонтально",
-    hint: "Горизонтальный каталог",
-    presetId: "horizontal_4_3" as const,
-  },
-  {
-    id: "9:16",
-    label: "9:16",
-    shortHint: "Stories",
-    hint: "Reels, Stories и TikTok",
-    presetId: "reels_9_16" as const,
-  },
-] as const;
+const FAL_ASPECT_TO_SHOT_PRESET: Record<FalModelAspectRatio, ShotSizePreset> = {
+  "3:4": "vertical_3_4",
+  "4:5": "vertical_4_5",
+  "1:1": "square",
+  "2:3": "vertical_2_3",
+  "9:16": "reels_9_16",
+  "4:3": "horizontal_4_3",
+  "16:9": "horizontal_16_9",
+};
+
+/** Те же форматы, что у Fal nano-banana — подписи и порядок как в AI-модели. */
+export const PRODUCT_SHOT_ASPECT_RATIO_OPTIONS = FAL_MODEL_ASPECT_RATIO_OPTIONS.map(
+  (opt) => ({
+    id: opt.id,
+    label: opt.label,
+    shortHint: opt.shortHint,
+    hint: opt.hint,
+    presetId: FAL_ASPECT_TO_SHOT_PRESET[opt.id],
+  })
+);
 
 const PRODUCT_SHOT_QUALITY_SCALE: Record<FalModelResolution, number> = {
   "1K": 1,
@@ -118,8 +117,12 @@ function baseShotSizePresetDimensions(preset: ShotSizePreset): [number, number] 
       return [1000, 1250];
     case "vertical_3_4":
       return [900, 1200];
+    case "vertical_2_3":
+      return [800, 1200];
     case "horizontal_4_3":
       return [1200, 900];
+    case "horizontal_16_9":
+      return [1280, 720];
     case "reels_9_16":
       return [1080, 1920];
     case "square":
@@ -171,13 +174,7 @@ export const productShotRequestSchema = z.object({
   shotSizePreset: z.preprocess(
     (value) =>
       typeof value === "string" ? normalizeShotSizePreset(value) : value,
-    z.enum([
-      "square",
-      "vertical_4_5",
-      "vertical_3_4",
-      "horizontal_4_3",
-      "reels_9_16",
-    ])
+    z.enum([...SHOT_SIZE_PRESET_VALUES])
   ).default("square"),
   syncMode: z.boolean().default(false),
   fidelityMode: z.enum(["exact-card"]).default("exact-card"),

@@ -1,19 +1,21 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Select } from "@/components/ui/Select";
-import { FAL_MODEL_RESOLUTION_OPTIONS } from "@/lib/ai/modelOutputSizes";
-import {
-  MODEL_CUSTOM_SELECT_OPTION,
-  MODEL_CUSTOM_TEXT_MAX,
-  MODEL_PARAM_CUSTOM,
-} from "@/lib/ai/modelCustomParams";
+import { MODEL_PARAM_CUSTOM } from "@/lib/ai/modelCustomParams";
 import {
   PRODUCT_SHOT_ASPECT_RATIO_OPTIONS,
   aspectRatioForShotSizePreset,
   shotSizePresetFromAspectRatio,
 } from "@/lib/ai/productShotSchemas";
+import {
+  AspectRatioSelectField,
+  hintForAspectRatioOption,
+} from "@/components/studio/AspectRatioSelectField";
 import type { ProductShotScenePreset, ProductShotSettings } from "./types";
+
+const MARKETPLACE_SCENE_HELP =
+  "Стандартная карточка для Kaspi, Wildberries и Ozon: ровный нейтральный фон, товар остаётся как на вашем фото — меняется только подложка, без декора и без перекраски изделия.";
 
 const SCENE_PRESETS: {
   id: Exclude<ProductShotScenePreset, typeof MODEL_PARAM_CUSTOM>;
@@ -23,31 +25,18 @@ const SCENE_PRESETS: {
   {
     id: "marketplace-clean",
     label: "Маркетплейс",
-    hint: "Чистый фон без изменения товара.",
+    hint: MARKETPLACE_SCENE_HELP,
   },
   {
     id: "white-studio",
     label: "Белый фон",
-    hint: "Чаще всего подходит для карточек.",
+    hint: "Чистый белый фон — универсальный вариант для карточки.",
   },
   {
     id: "light-gray-studio",
     label: "Светло-серый фон",
-    hint: "Мягче белого, но всё ещё чисто.",
+    hint: "Мягкий серый фон — чуть мягче белого, всё ещё нейтрально.",
   },
-];
-
-const SCENE_SELECT_OPTIONS: {
-  id: ProductShotScenePreset;
-  label: string;
-  hint: string;
-}[] = [
-  {
-    id: MODEL_PARAM_CUSTOM,
-    label: MODEL_CUSTOM_SELECT_OPTION.label,
-    hint: MODEL_CUSTOM_SELECT_OPTION.hint,
-  },
-  ...SCENE_PRESETS,
 ];
 
 type ProductShotSettingsPanelProps = {
@@ -79,47 +68,6 @@ function SettingField({
   );
 }
 
-function SelectField<T extends string>({
-  label,
-  description,
-  value,
-  options,
-  onChange,
-  placeholder = "Выберите…",
-}: {
-  label: string;
-  description?: string;
-  value?: T;
-  options: {
-    id: T;
-    label: string;
-    shortHint?: string;
-    disabled?: boolean;
-  }[];
-  onChange: (value: T) => void;
-  placeholder?: string;
-}) {
-  return (
-    <SettingField label={label} description={description}>
-      <Select
-        triggerClassName="rounded-[12px] font-medium"
-        placeholder={placeholder}
-        menuMatchTriggerWidth
-        value={value}
-        options={options.map((opt) => ({
-          value: opt.id,
-          label: opt.shortHint
-            ? `${opt.label} — ${opt.shortHint}`
-            : opt.label,
-          triggerLabel: opt.label,
-          disabled: opt.disabled,
-        }))}
-        onChange={onChange}
-      />
-    </SettingField>
-  );
-}
-
 function hintForOption<T extends string>(
   options: ReadonlyArray<{ id: T; hint: string }>,
   value: T
@@ -135,22 +83,28 @@ export function ProductShotSettingsPanel({
     onChange({ ...settings, ...partial });
 
   const aspectRatio = aspectRatioForShotSizePreset(settings.shotSizePreset);
-  const imageQuality = settings.imageQuality;
-  const isCustomScene = settings.scenePreset === MODEL_PARAM_CUSTOM;
+  const scenePreset =
+    settings.scenePreset === MODEL_PARAM_CUSTOM
+      ? "marketplace-clean"
+      : settings.scenePreset;
 
-  const sceneDescription = isCustomScene
-    ? settings.sceneCustomDescription.trim()
-      ? "Подберём ближайший чистый фон под ваше описание."
-      : MODEL_CUSTOM_SELECT_OPTION.hint
-    : hintForOption(SCENE_SELECT_OPTIONS, settings.scenePreset);
+  useEffect(() => {
+    if (settings.scenePreset !== MODEL_PARAM_CUSTOM) return;
+    onChange({
+      ...settings,
+      scenePreset: "marketplace-clean",
+      sceneCustomDescription: "",
+    });
+  }, [settings.scenePreset]);
+
+  const sceneDescription =
+    scenePreset === "marketplace-clean"
+      ? MARKETPLACE_SCENE_HELP
+      : hintForOption(SCENE_PRESETS, scenePreset);
 
   const aspectRatioDescription = aspectRatio
-    ? hintForOption(PRODUCT_SHOT_ASPECT_RATIO_OPTIONS, aspectRatio)
+    ? hintForAspectRatioOption(PRODUCT_SHOT_ASPECT_RATIO_OPTIONS, aspectRatio)
     : "Формат кадра для карточки.";
-
-  const qualityDescription = imageQuality
-    ? hintForOption(FAL_MODEL_RESOLUTION_OPTIONS, imageQuality)
-    : "Качество итогового файла.";
 
   return (
     <div className="space-y-4">
@@ -174,57 +128,32 @@ export function ProductShotSettingsPanel({
               triggerClassName="rounded-[12px] font-medium"
               placeholder="Выберите фон"
               menuMatchTriggerWidth
-              value={settings.scenePreset}
-              options={SCENE_SELECT_OPTIONS.map((opt) => ({
+              value={scenePreset}
+              options={SCENE_PRESETS.map((opt) => ({
                 value: opt.id,
                 label: opt.label,
                 triggerLabel: opt.label,
               }))}
-              onChange={(next) => patch({ scenePreset: next })}
-            />
-            {isCustomScene ? (
-              <textarea
-              rows={2}
-              value={settings.sceneCustomDescription}
-              maxLength={MODEL_CUSTOM_TEXT_MAX}
-              placeholder="Например: тёплый бежевый, светло-серый градиент"
-              onChange={(event) =>
-                patch({ sceneCustomDescription: event.target.value })
+              onChange={(next) =>
+                patch({
+                  scenePreset: next,
+                  sceneCustomDescription: "",
+                })
               }
-              className="min-h-[72px] w-full resize-y rounded-[12px] border border-border bg-white px-3 py-2.5 text-base text-slate-900 shadow-sm outline-none transition sm:text-sm hover:border-slate-300 focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
-              />
-            ) : null}
+            />
           </div>
         </SettingField>
       </div>
 
       <div className="flex flex-col gap-4">
-        <SelectField
-          label="Соотношение сторон"
+        <AspectRatioSelectField
           description={aspectRatioDescription}
-          placeholder="Выберите формат"
           value={aspectRatio}
-          options={PRODUCT_SHOT_ASPECT_RATIO_OPTIONS.map((item) => ({
-            id: item.id,
-            label: item.label,
-            shortHint: item.shortHint,
-          }))}
+          options={PRODUCT_SHOT_ASPECT_RATIO_OPTIONS}
           onChange={(nextRatio) => {
             const preset = shotSizePresetFromAspectRatio(nextRatio);
             if (preset) patch({ shotSizePreset: preset });
           }}
-        />
-        <SelectField
-          label="Качество"
-          description={qualityDescription}
-          placeholder="Выберите качество"
-          value={imageQuality}
-          options={FAL_MODEL_RESOLUTION_OPTIONS.map((item) => ({
-            id: item.id,
-            label: item.label,
-            shortHint: item.shortHint,
-          }))}
-          onChange={(nextQuality) => patch({ imageQuality: nextQuality })}
         />
       </div>
     </div>

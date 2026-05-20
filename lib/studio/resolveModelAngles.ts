@@ -1,4 +1,8 @@
 import {
+  MAX_CLOTHING_PRODUCT_SET,
+  isProductSetMode,
+} from "@/lib/studio/productPhotos";
+import {
   resolveSelectedModelAngles,
   type ResolvedModelAngle,
 } from "@/lib/ai/modelAngles";
@@ -15,6 +19,7 @@ export function resolveAnglesForGeneration(
   options: {
     useProductSampleAngles: boolean;
     productSampleAngles: ResolvedModelAngle[] | null;
+    productPhotoCount?: number;
   }
 ): ResolvedModelAngle[] {
   if (
@@ -22,7 +27,10 @@ export function resolveAnglesForGeneration(
     options.productSampleAngles &&
     options.productSampleAngles.length > 0
   ) {
-    return options.productSampleAngles.slice(0, 1);
+    const max = isProductSetMode(options.productPhotoCount ?? 1)
+      ? MAX_CLOTHING_PRODUCT_SET
+      : 1;
+    return options.productSampleAngles.slice(0, max);
   }
 
   const angles = resolveSelectedModelAngles(settings);
@@ -40,6 +48,12 @@ export function validateProductSampleAnglesMatch(
   if (!useProductSampleAngles) return null;
   if (!productSampleAngles || productSampleAngles.length === 0) {
     return "Нажмите «Подобрать позу по фото товара» или опишите позу вручную.";
+  }
+  if (isProductSetMode(productPhotoCount)) {
+    if (productSampleAngles.length !== productPhotoCount) {
+      return "Число ракурсов не совпадает с числом фото — подождите анализ или загрузите фото заново.";
+    }
+    return null;
   }
   if (productPhotoCount !== 1 || productSampleAngles.length !== 1) {
     return "Заменили фото товара — снова нажмите «Подобрать позу по фото товара».";

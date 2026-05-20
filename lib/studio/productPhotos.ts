@@ -1,5 +1,8 @@
-/** Один товар за запуск — следующий SKU: замените фото и снова «Создать фото на модели». */
+/** Один товар — режим «точная карточка» и legacy API. */
 export const MAX_PRODUCT_PHOTOS = 1;
+
+/** Комплект ракурсов в SaaS try-on (фронт, спина, 3/4 …). */
+export const MAX_CLOTHING_PRODUCT_SET = 5;
 
 export type StudioProductPhoto = {
   id: string;
@@ -7,12 +10,20 @@ export type StudioProductPhoto = {
   previewUrl: string;
 };
 
-export function createStudioProductPhoto(file: File): StudioProductPhoto {
+export function isProductSetMode(photoCount: number): boolean {
+  return photoCount > 1;
+}
+
+export function createStudioProductPhoto(
+  file: File,
+  id?: string
+): StudioProductPhoto {
   return {
     id:
-      typeof crypto !== "undefined" && "randomUUID" in crypto
+      id ??
+      (typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
-        : `product-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        : `product-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`),
     file,
     previewUrl: URL.createObjectURL(file),
   };

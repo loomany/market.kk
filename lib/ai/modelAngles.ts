@@ -94,7 +94,7 @@ export const MODEL_ANGLE_PRESETS: {
     label: "Сзади",
     hint: "Вид со спины",
     prompt:
-      "back or back three-quarter view, natural spine curve and relaxed shoulders, arms relaxed along the body with hands below the shoulder line, medium full framing showing garment back and fit, hair styled away from garment, subtle head turn if needed, editorial catalog not rigid parade-rest stance",
+      "back or back three-quarter view, natural spine curve and relaxed shoulders, arms relaxed along the body with hands below the shoulder line, medium full framing showing garment back and fit, hair styled away from garment, subtle head turn if needed, uniform natural skin tone on back shoulders and arms with realistic texture, no blotches patches ghosting or duplicate skin layers, editorial catalog not rigid parade-rest stance",
   },
   {
     id: "seated-lifestyle",

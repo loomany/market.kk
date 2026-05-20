@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   Camera,
+  Info,
   Sparkles,
   Wand2,
 } from "lucide-react";
@@ -24,6 +25,7 @@ import {
   sanitizeModelSettingsForAge,
 } from "@/lib/ai/modelAge";
 import {
+  FAL_MODEL_ASPECT_RATIOS,
   FAL_MODEL_RESOLUTIONS,
   DEFAULT_MODEL_OUTPUT_SIZE,
   type FalModelAspectRatio,
@@ -47,8 +49,10 @@ import {
 import { validateModelCustomParams } from "@/lib/ai/modelGenerationValidation";
 import { buildGenerateModelRequestBody } from "@/lib/studio/buildGenerateModelRequest";
 import { validateImageFileClient } from "@/lib/ai/clientImageValidation";
-import { fitCutoutToShotSize, refineCutoutWithUserMask } from "@/lib/studio/cutoutImage";
+import { fitCutoutToShotSize, prepareCutoutCanvas } from "@/lib/studio/cutoutImage";
+import { prepareGarmentExtractionFile } from "@/lib/studio/extractGarmentForProductCard";
 import {
+  PRODUCT_SHOT_EXPORT_QUALITY,
   aspectRatioForShotSizePreset,
   shotSizePresetToDimensions,
 } from "@/lib/ai/productShotSchemas";
@@ -96,10 +100,39 @@ import { Badge } from "@/components/ui/Badge";
 import { ProductPhotosUploader } from "./ProductPhotosUploader";
 import {
   createStudioProductPhoto,
+  MAX_CLOTHING_PRODUCT_SET,
+  MAX_PRODUCT_PHOTOS,
   revokeStudioProductPhoto,
   revokeStudioProductPhotos,
   type StudioProductPhoto,
 } from "@/lib/studio/productPhotos";
+import {
+  clearProductCardPipelineSession,
+  loadProductCardPipelineSession,
+  saveProductCardPipelineSession,
+} from "@/lib/studio/productCardPipelineSession";
+import {
+  clearPersistedProductPhotoBlobs,
+  clearProductShotMaskBlob,
+  loadPersistedProductPhotoBlobs,
+  loadProductShotMaskBlob,
+  persistProductPhotoBlobs,
+  persistProductShotMaskBlob,
+  type PersistedProductPhotoBlob,
+} from "@/lib/studio/productPhotoPersistence";
+import {
+  mergeWorkspaceSnapshot,
+  studioPhotosFromPersistedBlobs,
+} from "@/lib/studio/hydrateStudioWorkspace";
+import {
+  isStudioProductPhotoMode,
+  type StudioProductPhotoMode,
+} from "@/lib/studio/studioProductPhotoMode";
+import {
+  loadStudioWorkspaceSession,
+  saveStudioWorkspaceSession,
+  type ClothingWorkspaceDraft,
+} from "@/lib/studio/studioWorkspaceSession";
 import {
   ModelSourcePanel,
   type ModelSourceKind,
@@ -263,6 +296,9 @@ export function StudioShell({
   const modelPreview = useObjectUrlPreview();
 
   const [studioMode, setStudioMode] = useState<StudioMode>("clothing-tryon");
+  const [studioSessionHydrated, setStudioSessionHydrated] = useState(false);
+  const studioHydrationStartedRef = useRef(false);
+  const skipPhotoPersistRef = useRef(false);
   const [productPhotos, setProductPhotos] = useState<StudioProductPhoto[]>([]);
   const [activeProductId, setActiveProductId] = useState<string | null>(null);
   const productPhotosRef = useRef<StudioProductPhoto[]>([]);
@@ -344,6 +380,9 @@ export function StudioShell({
     useState<number | null>(null);
   const [productCardCountdownStartedAt, setProductCardCountdownStartedAt] =
     useState<number | null>(null);
+  const [productCardResetNotice, setProductCardResetNotice] = useState<
+    string | null
+  >(null);
   const [results, setResults] = useState<StudioResultImage[]>([]);
   const [sessionAssets, setSessionAssets] = useState<StudioSessionAsset[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -365,11 +404,194 @@ export function StudioShell({
     setSelectedProductFile(null);
     setSelectedProductPreviewUrl(null);
     setMaskEditorOpen(false);
+    void clearProductShotMaskBlob();
   }, []);
 
   useEffect(() => {
     productPhotosRef.current = productPhotos;
   }, [productPhotos]);
+
+  const persistModeProductPhotos = useCallback(
+    async (mode: StudioProductPhotoMode) => {
+      const photos = productPhotosRef.current;
+      const items: PersistedProductPhotoBlob[] = photos.map((photo) => ({
+        id: photo.id,
+        name: photo.file.name,
+        type: photo.file.type || "image/png",
+        blob: photo.file,
+      }));
+      await persistProductPhotoBlobs(mode, items);
+    },
+    []
+  );
+
+  const restoreProductShotSelection = useCallback(async () => {
+    const maskFile = await loadProductShotMaskBlob();
+    if (!maskFile) return;
+    if (selectedProductPreviewRef.current) {
+      URL.revokeObjectURL(selectedProductPreviewRef.current);
+    }
+    const previewUrl = URL.createObjectURL(maskFile);
+    selectedProductPreviewRef.current = previewUrl;
+    setSelectedProductFile(maskFile);
+    setSelectedProductPreviewUrl(previewUrl);
+    setMaskEditorOpen(false);
+  }, []);
+
+  const applyClothingWorkspaceDraft = useCallback((draft: ClothingWorkspaceDraft) => {
+      setModelSettings(draft.modelSettings);
+      setModelOutputSize(draft.modelOutputSize);
+      setModelDescription(draft.modelDescription);
+      setProductDescription(draft.productDescription);
+      setModelInputMode(draft.modelInputMode);
+      setClothingPreviewTab(draft.clothingPreviewTab);
+      setUserEditedProductDescription(draft.userEditedProductDescription);
+      setProductAnalysis(draft.productAnalysis);
+  }, []);
+
+  const persistStudioWorkspace = useCallback(() => {
+    saveStudioWorkspaceSession({
+      version: 1,
+      savedAt: Date.now(),
+      activeMode: studioMode,
+      clothing: {
+        modelSettings,
+        modelOutputSize,
+        modelDescription,
+        productDescription,
+        modelInputMode,
+        clothingPreviewTab,
+        userEditedProductDescription,
+        productAnalysis,
+      },
+      productCard: { productShotSettings },
+    });
+  }, [
+    studioMode,
+    modelSettings,
+    modelOutputSize,
+    modelDescription,
+    productDescription,
+    modelInputMode,
+    clothingPreviewTab,
+    userEditedProductDescription,
+    productAnalysis,
+    productShotSettings,
+  ]);
+
+  const handleStudioModeChange = useCallback(
+    async (next: StudioMode) => {
+      if (next === studioMode) return;
+
+      if (isStudioProductPhotoMode(studioMode)) {
+        await persistModeProductPhotos(studioMode);
+      }
+
+      setStudioMode(next);
+
+      if (isStudioProductPhotoMode(next)) {
+        skipPhotoPersistRef.current = true;
+        const rows = await loadPersistedProductPhotoBlobs(next);
+        const restored = studioPhotosFromPersistedBlobs(rows);
+        setProductPhotos((prev) => {
+          revokeStudioProductPhotos(prev);
+          return restored;
+        });
+        setActiveProductId(restored[0]?.id ?? null);
+        if (next === "product-shot") {
+          await restoreProductShotSelection();
+        } else {
+          clearSelectedProduct();
+        }
+        skipPhotoPersistRef.current = false;
+        return;
+      }
+
+      setProductPhotos((prev) => {
+        revokeStudioProductPhotos(prev);
+        return [];
+      });
+      setActiveProductId(null);
+      clearSelectedProduct();
+    },
+    [
+      studioMode,
+      persistModeProductPhotos,
+      restoreProductShotSelection,
+      clearSelectedProduct,
+    ]
+  );
+
+  useEffect(() => {
+    if (studioHydrationStartedRef.current) return;
+    studioHydrationStartedRef.current = true;
+
+    const hydrate = async () => {
+      const workspace = mergeWorkspaceSnapshot(loadStudioWorkspaceSession());
+      const activeMode = workspace?.activeMode ?? "clothing-tryon";
+      setStudioMode(activeMode);
+
+      if (workspace) {
+        applyClothingWorkspaceDraft(workspace.clothing);
+        setProductShotSettings(workspace.productCard.productShotSettings);
+      }
+
+      if (isStudioProductPhotoMode(activeMode)) {
+        skipPhotoPersistRef.current = true;
+        const rows = await loadPersistedProductPhotoBlobs(activeMode);
+        const restored = studioPhotosFromPersistedBlobs(rows);
+        setProductPhotos(restored);
+        setActiveProductId(restored[0]?.id ?? null);
+        skipPhotoPersistRef.current = false;
+
+        if (activeMode === "product-shot") {
+          await restoreProductShotSelection();
+          const cardSession = loadProductCardPipelineSession();
+          if (cardSession?.results?.length) {
+            setResults(cardSession.results);
+          }
+        }
+      }
+
+      setStudioSessionHydrated(true);
+    };
+
+    void hydrate();
+  }, [applyClothingWorkspaceDraft, restoreProductShotSelection]);
+
+  useEffect(() => {
+    if (!studioSessionHydrated) return;
+    persistStudioWorkspace();
+  }, [studioSessionHydrated, persistStudioWorkspace]);
+
+  useEffect(() => {
+    if (!studioSessionHydrated || skipPhotoPersistRef.current) return;
+    if (!isStudioProductPhotoMode(studioMode)) return;
+
+    const timer = window.setTimeout(() => {
+      void persistModeProductPhotos(studioMode);
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [
+    studioSessionHydrated,
+    studioMode,
+    productPhotos,
+    persistModeProductPhotos,
+  ]);
+
+  useEffect(() => {
+    if (!studioSessionHydrated || studioMode !== "product-shot") return;
+    if (results.length === 0) {
+      clearProductCardPipelineSession();
+      return;
+    }
+    saveProductCardPipelineSession({
+      version: 1,
+      savedAt: Date.now(),
+      results,
+      previewSlideIndex: 0,
+    });
+  }, [studioSessionHydrated, studioMode, results]);
 
   useEffect(() => {
     if (productPhotos.length === 0) {
@@ -693,7 +915,14 @@ export function StudioShell({
     setActiveProductId(null);
     clearSelectedProduct();
     resetProductAnalysisState();
-  }, [clearSelectedProduct, resetProductAnalysisState]);
+    setProductCardResetNotice(null);
+    if (isStudioProductPhotoMode(studioMode)) {
+      void clearPersistedProductPhotoBlobs(studioMode);
+    }
+    if (studioMode === "product-shot") {
+      clearProductCardPipelineSession();
+    }
+  }, [clearSelectedProduct, resetProductAnalysisState, studioMode]);
 
   const handleModelFile = useCallback(
     (file: File) => {
@@ -732,6 +961,7 @@ export function StudioShell({
     setSelectedProductPreviewUrl(result.previewUrl);
     setMaskEditorOpen(false);
     setError(null);
+    void persistProductShotMaskBlob(result.file);
   }, []);
 
   const clearModelFile = useCallback(() => {
@@ -1581,23 +1811,31 @@ export function StudioShell({
   };
 
   const handleExactProductCard = async () => {
-    const bgSourceFile = selectedProductFile ?? productFile;
-
-    if (!bgSourceFile) {
+    if (!productFile) {
       setError("Загрузите фото товара.");
+      return;
+    }
+    if (!selectedProductFile) {
+      setError("Сначала нарисуйте рамку вокруг товара на шаге 2.");
       return;
     }
 
     setProductCardCountdownStartedAt((prev) => prev ?? Date.now());
+    setProductCardResetNotice(null);
     setLoading(true);
     setError(null);
     setResults([]);
 
     try {
-      const maskUsed = Boolean(selectedProductFile);
-      let cutoutUrl: string;
+      const { extractionFile, usedVision, garmentLabelRu } =
+        await prepareGarmentExtractionFile({
+          originalFile: productFile,
+          maskedSelectionFile: selectedProductFile,
+          onProgress: setTryOnProgress,
+        });
 
-      const bgData = await removeBackgroundForProduct(bgSourceFile);
+      setTryOnProgress("Убираем фон…");
+      const bgData = await removeBackgroundForProduct(extractionFile);
 
       if (!bgData.ok) {
         setError(friendlyAiError(bgData.errorCode, bgData.message));
@@ -1606,24 +1844,38 @@ export function StudioShell({
 
       const bgProvider = bgData.provider;
 
-      if (selectedProductFile) {
-        cutoutUrl = await refineCutoutWithUserMask(
-          bgData.image.url,
-          selectedProductFile
-        );
+      let cutoutUrl = bgData.image.url;
+      try {
+        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const el = new Image();
+          if (/^https?:\/\//i.test(cutoutUrl)) {
+            el.crossOrigin = "anonymous";
+          }
+          el.onload = () => resolve(el);
+          el.onerror = () =>
+            reject(new Error("Не удалось загрузить вырезку"));
+          el.src = cutoutUrl;
+        });
+        cutoutUrl = prepareCutoutCanvas(img).toDataURL("image/png");
+      } catch {
+        /* keep Fal url */
+      }
+
+      if (usedVision && garmentLabelRu) {
+        setTryOnProgress(`Собираем карточку: ${garmentLabelRu}…`);
       } else {
-        cutoutUrl = bgData.image.url;
+        setTryOnProgress("Собираем карточку…");
       }
       const [exportWidth, exportHeight] = shotSizePresetToDimensions(
         productShotSettings.shotSizePreset,
-        productShotSettings.imageQuality
+        PRODUCT_SHOT_EXPORT_QUALITY
       );
       let sizedCutoutUrl = cutoutUrl;
       try {
         sizedCutoutUrl = await fitCutoutToShotSize(
           cutoutUrl,
           productShotSettings.shotSizePreset,
-          productShotSettings.imageQuality
+          PRODUCT_SHOT_EXPORT_QUALITY
         );
       } catch {
         /* keep API url if canvas processing fails */
@@ -1635,7 +1887,7 @@ export function StudioShell({
       const cardUrl = await composeExactProductCard(sizedCutoutUrl, {
         background,
         shotSizePreset: productShotSettings.shotSizePreset,
-        imageQuality: productShotSettings.imageQuality,
+        imageQuality: PRODUCT_SHOT_EXPORT_QUALITY,
       });
 
       const mappedResults = mapProductShotStudioResults(
@@ -1644,8 +1896,9 @@ export function StudioShell({
         {
           cutoutPreviewUrl: sizedCutoutUrl,
           selectedProductPreviewUrl: selectedProductPreviewUrl ?? undefined,
-          manualMaskUsed: maskUsed,
-          exactCardWithoutMask: !maskUsed,
+          manualMaskUsed: true,
+          exactCardWithoutMask: false,
+          visionGarmentRefined: usedVision,
           provider: bgProvider,
         }
       );
@@ -1681,9 +1934,21 @@ export function StudioShell({
       handleReplaceModel();
       return;
     }
+    if (studioMode === "product-shot") {
+      setResults([]);
+      setError(null);
+      setTryOnProgress(null);
+      setProductCardCountdownStartedAt(null);
+      clearProductCardPipelineSession();
+      setProductCardResetNotice(
+        "Готовая карточка убрана. Фото, рамка и настройки сохранены — можно снова нажать «Создать карточку»."
+      );
+      return;
+    }
     setResults([]);
     setError(null);
     setProductCardCountdownStartedAt(null);
+    clearProductCardPipelineSession();
   }, [studioMode, handleReplaceModel]);
 
   const handleCreatePhotoOnModel = async () => {
@@ -1851,6 +2116,21 @@ export function StudioShell({
     if (!hasProductInput) return "Сначала загрузите фото.";
     if (productAnalyzing) return "Идёт AI-анализ товара…";
 
+    if (isProductShotMode) {
+      if (maskEditorOpen) {
+        return "Нарисуйте рамку вокруг товара и нажмите «Сохранить рамку» выше.";
+      }
+      if (!selectedProductFile) {
+        return "На шаге 2 нажмите «Нарисовать рамку на фото» и сохраните.";
+      }
+      if (
+        productShotSettings.scenePreset === "custom" &&
+        !productShotSettings.sceneCustomDescription.trim()
+      ) {
+        return "Опишите фон своими словами.";
+      }
+    }
+
     if (isClothingMode) {
       const anglesError = validateGenerationAngles();
       if (anglesError) return anglesError;
@@ -1864,22 +2144,34 @@ export function StudioShell({
       }
     }
 
-    if (
-      isProductShotMode &&
-      productShotSettings.scenePreset === "custom" &&
-      !productShotSettings.sceneCustomDescription.trim()
-    ) {
-      return "Опишите фон своими словами.";
-    }
-
     return null;
   })();
   const canRunPrimary =
     !loading && !modelGenerating && !productAnalyzing && primaryBlocker === null;
 
-  const primaryButtonLabel = isClothingMode
-    ? "Создать фото на модели"
-    : "Создать карточку";
+  const primaryStatusMessage = (() => {
+    if (!hasProductInput) return null;
+    if (isProductShotMode && (productAnalyzing || loading)) {
+      return null;
+    }
+    if (loading || modelGenerating) {
+      return tryOnProgress ?? (isProductShotMode ? "Создаём карточку…" : "Идёт генерация…");
+    }
+    if (productAnalyzing) return null;
+    return primaryBlocker;
+  })();
+
+  const primaryButtonLabel = (() => {
+    if (isProductShotMode && productAnalyzing) {
+      return "Анализ AI…";
+    }
+    if (isProductShotMode && loading) {
+      return tryOnProgress ?? "Создаём карточку…";
+    }
+    return isClothingMode ? "Создать фото на модели" : "Создать карточку";
+  })();
+
+  const productCardPrimaryBusy = isProductShotMode && (loading || productAnalyzing);
 
   const PrimaryIcon = isClothingMode ? Wand2 : Camera;
 
@@ -1923,6 +2215,17 @@ export function StudioShell({
     }
   }, [finalTryOnResult?.url, studioMode]);
 
+  if (!studioSessionHydrated) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-50 px-4">
+        <p className="text-sm font-medium text-slate-700">Загружаем студию…</p>
+        <p className="max-w-sm text-center text-xs leading-5 text-slate-500">
+          Восстанавливаем вкладку, фото и настройки с этой сессии браузера.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen">
       <header className="border-b border-border/70 bg-white/85 backdrop-blur-xl">
@@ -1957,7 +2260,10 @@ export function StudioShell({
             </p>
         </section>
 
-        <StudioModeSelector value={studioMode} onChange={setStudioMode} />
+        <StudioModeSelector
+          value={studioMode}
+          onChange={(mode) => void handleStudioModeChange(mode)}
+        />
 
         {isPostProcessingMode ? (
           <ProcessedAssetsPanel
@@ -1991,8 +2297,14 @@ export function StudioShell({
                         hint={
                           isClothingMode
                             ? "Подойдёт фото товара на модели или отдельно. AI сам определит параметры."
-                            : "Одно фото за раз. Для следующего SKU замените файл после примерки."
+                            : "Одно фото за раз. Для следующего SKU замените файл кнопкой «Заменить фото»."
                         }
+                        maxPhotos={
+                          isClothingMode
+                            ? MAX_CLOTHING_PRODUCT_SET
+                            : MAX_PRODUCT_PHOTOS
+                        }
+                        singlePhotoMode={isProductShotMode}
                         photos={productPhotos}
                         activePhotoId={activeProductId}
                         onAddFiles={handleAddProductFiles}
@@ -2173,12 +2485,35 @@ export function StudioShell({
                               size="lg"
                               loading={loading || modelGenerating}
                               disabled={!canRunPrimary}
-                              title={primaryBlocker ?? undefined}
+                              aria-describedby={
+                                primaryStatusMessage
+                                  ? "studio-primary-status"
+                                  : undefined
+                              }
                               onClick={handlePrimaryAction}
                             >
                               <PrimaryIcon className="h-5 w-5" />
                               {primaryButtonLabel}
                             </Button>
+                            {primaryStatusMessage ? (
+                              <div
+                                id="studio-primary-status"
+                                role="status"
+                                aria-live="polite"
+                                className={cn(
+                                  "flex items-start gap-2 rounded-[12px] px-3 py-2.5 text-left text-xs leading-5",
+                                  loading || modelGenerating
+                                    ? "border border-teal-200/90 bg-teal-50 text-teal-950"
+                                    : "border border-amber-200/90 bg-amber-50 text-amber-950"
+                                )}
+                              >
+                                <Info
+                                  className="mt-0.5 h-4 w-4 shrink-0 opacity-80"
+                                  aria-hidden
+                                />
+                                <span>{primaryStatusMessage}</span>
+                              </div>
+                            ) : null}
                             <p className="text-center text-xs font-medium tabular-nums text-slate-500">
                               {formatSaasPipelineCostKztRange()}
                             </p>
@@ -2264,17 +2599,51 @@ export function StudioShell({
 
                     {!isClothingMode ? (
                       <StudioWorkflowStep step={4} label="Готово" isLast>
-                        <Button
-                          className="w-full"
-                          size="lg"
-                          loading={loading}
-                          disabled={!canRunPrimary}
-                          title={primaryBlocker ?? undefined}
-                          onClick={handlePrimaryAction}
-                        >
-                          <PrimaryIcon className="h-5 w-5" />
-                          {primaryButtonLabel}
-                        </Button>
+                        <div className="space-y-3">
+                          <Button
+                            className="w-full"
+                            size="lg"
+                            loading={productCardPrimaryBusy}
+                            disabled={!canRunPrimary}
+                            aria-busy={productCardPrimaryBusy}
+                            aria-describedby={
+                              primaryStatusMessage
+                                ? "studio-primary-status-product"
+                                : undefined
+                            }
+                            onClick={handlePrimaryAction}
+                          >
+                            {!productCardPrimaryBusy ? (
+                              <PrimaryIcon className="h-5 w-5" />
+                            ) : null}
+                            {primaryButtonLabel}
+                          </Button>
+                          {primaryStatusMessage ? (
+                            <div
+                              id="studio-primary-status-product"
+                              role="status"
+                              aria-live="polite"
+                              className={cn(
+                                "flex items-start gap-2 rounded-[12px] px-3 py-2.5 text-left text-xs leading-5",
+                                loading
+                                  ? "border border-teal-200/90 bg-teal-50 text-teal-950"
+                                  : "border border-amber-200/90 bg-amber-50 text-amber-950"
+                              )}
+                            >
+                              <Info
+                                className="mt-0.5 h-4 w-4 shrink-0 opacity-80"
+                                aria-hidden
+                              />
+                              <span>{primaryStatusMessage}</span>
+                            </div>
+                          ) : null}
+                          {maskEditorOpen && isProductShotMode ? (
+                            <p className="text-center text-[11px] leading-5 text-slate-500">
+                              Нарисуйте рамку на шаге 2 — «Сохранить рамку»,
+                              затем «Создать карточку».
+                            </p>
+                          ) : null}
+                        </div>
                       </StudioWorkflowStep>
                     ) : null}
               </StudioWorkflowRail>
@@ -2291,6 +2660,15 @@ export function StudioShell({
             )}
           >
             <div className="space-y-4">
+              {productCardResetNotice && isProductShotMode ? (
+                <div
+                  role="status"
+                  className="rounded-[20px] border border-teal-200 bg-teal-50 px-4 py-3 text-sm leading-6 text-teal-950"
+                >
+                  {productCardResetNotice}
+                </div>
+              ) : null}
+
               {error ? (
                 <div
                   role="alert"

@@ -1,8 +1,18 @@
 import type { ModelGenerationSettings } from "@/components/studio/types";
 import type { GenerateModelRequest } from "@/lib/ai/modelGenerationSchemas";
 import type { ResolvedModelAngle } from "@/lib/ai/modelAngles";
+import {
+  MODEL_CAMERA_ANGLE_PROMPT_MAX,
+  PRODUCT_POSE_DESCRIPTION_RU_MAX,
+} from "@/lib/ai/modelCustomParams";
 import type { PromptLocale } from "@/lib/ai/promptLocaleSchema";
 import type { ModelOutputSizeSelection } from "@/lib/ai/modelOutputSizes";
+
+function clampOptional(text: string | undefined, max: number): string | undefined {
+  if (!text?.trim()) return undefined;
+  const trimmed = text.trim();
+  return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max - 1)}…`;
+}
 
 export function buildGenerateModelRequestBody(input: {
   settings: ModelGenerationSettings;
@@ -31,6 +41,9 @@ export function buildGenerateModelRequestBody(input: {
   cameraAnglePromptOverride?: string;
   productView?: GenerateModelRequest["productView"];
   resolvedModelPose?: GenerateModelRequest["resolvedModelPose"];
+  preferTextOnlyAngleFollowUp?: boolean;
+  modelIdentityLockEn?: string;
+  heroImageUrlForIdentity?: string | null;
 }): GenerateModelRequest {
   const {
     settings,
@@ -59,6 +72,9 @@ export function buildGenerateModelRequestBody(input: {
     cameraAnglePromptOverride,
     productView,
     resolvedModelPose,
+    preferTextOnlyAngleFollowUp,
+    modelIdentityLockEn,
+    heroImageUrlForIdentity,
   } = input;
 
   return {
@@ -81,7 +97,10 @@ export function buildGenerateModelRequestBody(input: {
     numImages: 1,
     seed,
     customDescription: modelDescription?.trim() || undefined,
-    cameraAnglePrompt: angle?.prompt ?? cameraAnglePromptOverride,
+    cameraAnglePrompt: clampOptional(
+      angle?.prompt ?? cameraAnglePromptOverride,
+      MODEL_CAMERA_ANGLE_PROMPT_MAX
+    ),
     sourceModelPromptEn,
     sourceModelSizeClass,
     sourceModelPose,
@@ -89,7 +108,10 @@ export function buildGenerateModelRequestBody(input: {
     sourceModelCameraAngle,
     sourceModelHandsPosition,
     sourceModelFraming,
-    productPoseDescriptionRu: productPoseDescriptionRu?.trim() || undefined,
+    productPoseDescriptionRu: clampOptional(
+      productPoseDescriptionRu,
+      PRODUCT_POSE_DESCRIPTION_RU_MAX
+    ),
     productDescriptionRu: productDescriptionRu?.trim() || undefined,
     shortAiSummaryEn: shortAiSummaryEn?.trim() || undefined,
     productSetType,
@@ -101,6 +123,9 @@ export function buildGenerateModelRequestBody(input: {
     productView,
     resolvedModelPose,
     referenceImageUrl: referenceImageUrl ?? undefined,
+    preferTextOnlyAngleFollowUp: preferTextOnlyAngleFollowUp || undefined,
+    modelIdentityLockEn: modelIdentityLockEn?.trim() || undefined,
+    heroImageUrlForIdentity: heroImageUrlForIdentity?.trim() || undefined,
     promptLocale,
   };
 }

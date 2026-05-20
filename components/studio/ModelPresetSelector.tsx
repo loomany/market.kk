@@ -26,6 +26,10 @@ import {
   type ModelOutputSizeSelection,
 } from "@/lib/ai/modelOutputSizes";
 import {
+  AspectRatioSelectField,
+  hintForAspectRatioOption,
+} from "@/components/studio/AspectRatioSelectField";
+import {
   MODEL_CUSTOM_SELECT_OPTION,
   MODEL_CUSTOM_TEXT_MAX,
   MODEL_PARAM_CUSTOM,
@@ -386,7 +390,10 @@ export function ModelPresetSelector({
   const isPromptLocked = settingsLocked;
 
   const aspectRatioDescription = outputSize.aspectRatio
-    ? hintForOption(FAL_MODEL_ASPECT_RATIO_OPTIONS, outputSize.aspectRatio)
+    ? hintForAspectRatioOption(
+        FAL_MODEL_ASPECT_RATIO_OPTIONS,
+        outputSize.aspectRatio
+      )
     : "Формат кадра для карточки.";
 
   return (
@@ -515,10 +522,8 @@ export function ModelPresetSelector({
           isPromptLocked && "pointer-events-none select-none opacity-50"
         )}
       >
-        <SelectField
-          label="Соотношение сторон"
+        <AspectRatioSelectField
           description={aspectRatioDescription}
-          placeholder="Выберите формат"
           value={outputSize.aspectRatio}
           options={FAL_MODEL_ASPECT_RATIO_OPTIONS}
           disabled={isPromptLocked}

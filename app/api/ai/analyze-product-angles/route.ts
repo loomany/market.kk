@@ -8,7 +8,7 @@ import {
   isPaidAiGuardError,
   paidAiGuardResponse,
 } from "@/lib/ai/paidAiGuard";
-import { MAX_PRODUCT_PHOTOS } from "@/lib/studio/productPhotos";
+import { MAX_CLOTHING_PRODUCT_SET } from "@/lib/studio/productPhotos";
 
 export const runtime = "nodejs";
 
@@ -55,12 +55,12 @@ export async function POST(request: Request) {
     );
   }
 
-  if (files.length > MAX_PRODUCT_PHOTOS) {
+  if (files.length > MAX_CLOTHING_PRODUCT_SET) {
     return NextResponse.json(
       {
         ok: false,
         errorCode: "VALIDATION_ERROR",
-        message: "Загрузите одно фото товара за раз.",
+        message: `Можно загрузить до ${MAX_CLOTHING_PRODUCT_SET} фото за раз.`,
       },
       { status: 400 }
     );
