@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
-import { Check, UserRound } from "lucide-react";
+import { useMemo, type ReactNode } from "react";
+import { UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
@@ -63,6 +63,8 @@ type ModelPresetSelectorProps = {
   settingsLockMessage?: string;
   /** Server will adapt framing to the uploaded on-model product photo */
   sourceProductZoneFramingActive?: boolean;
+  /** SaaS clothing: hide manual params; AI + product analysis keep state */
+  uiMode?: "full" | "saas";
 };
 
 export type ModelAdvancedControlsProps = {
@@ -91,6 +93,8 @@ export type ModelAdvancedControlsProps = {
   modelGenerationSeed?: number;
   tryOnSeed?: number;
   onOutputSizeChange?: (patch: Partial<ModelOutputSizeSelection>) => void;
+  /** SaaS clothing: only age in advanced block (resolution fixed 2K) */
+  uiMode?: "full" | "saas";
 };
 
 function SettingField({
@@ -171,84 +175,26 @@ function CustomParamInput({
   onChange,
   placeholder,
   disabled,
-  emptyHint = "Опишите своими словами, затем подтвердите галочкой",
-  pendingHint = "Нажмите галочку или Enter, чтобы применить",
-  savedHint = "Сохранено — учтём при генерации",
-  confirmAriaLabel = "Сохранить описание",
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
   disabled?: boolean;
-  emptyHint?: string;
-  pendingHint?: string;
-  savedHint?: string;
-  confirmAriaLabel?: string;
 }) {
-  const [lastConfirmed, setLastConfirmed] = useState<string | null>(null);
-  const trimmed = value.trim();
-  const canConfirm = trimmed.length > 0 && !disabled;
-  const isConfirmed = canConfirm && trimmed === lastConfirmed;
-
-  const handleConfirm = () => {
-    if (!canConfirm) return;
-    setLastConfirmed(trimmed);
-  };
-
   return (
-    <div className="space-y-1.5">
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={value}
-          disabled={disabled}
-          maxLength={MODEL_CUSTOM_TEXT_MAX}
-          placeholder={placeholder}
-          onChange={(event) => onChange(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && canConfirm) {
-              event.preventDefault();
-              handleConfirm();
-            }
-          }}
-          className={cn(
-            "min-h-[44px] min-w-0 flex-1 rounded-[12px] border bg-white px-3 py-2.5 text-base text-slate-900 shadow-sm outline-none transition sm:text-sm",
-            "hover:border-slate-300 focus:border-teal-400 focus:ring-2 focus:ring-teal-100",
-            "disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-600",
-            isConfirmed
-              ? "border-emerald-400 ring-2 ring-emerald-100"
-              : "border-border"
-          )}
-        />
-        <button
-          type="button"
-          disabled={!canConfirm}
-          aria-label={isConfirmed ? "Сохранено" : confirmAriaLabel}
-          aria-pressed={isConfirmed}
-          onClick={handleConfirm}
-          className={cn(
-            "flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-[12px] border shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-1",
-            isConfirmed
-              ? "border-emerald-500 bg-emerald-600 text-white"
-              : canConfirm
-                ? "border-teal-400 bg-teal-50 text-teal-800 hover:bg-teal-100 active:scale-[0.98]"
-                : "cursor-not-allowed border-border bg-slate-50 text-slate-300"
-          )}
-        >
-          <Check className="h-5 w-5" strokeWidth={isConfirmed ? 3 : 2} aria-hidden />
-        </button>
-      </div>
-      {isConfirmed ? (
-        <p className="flex items-center gap-1.5 px-0.5 text-xs font-medium text-emerald-700">
-          <Check className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          {savedHint}
-        </p>
-      ) : canConfirm ? (
-        <p className="px-0.5 text-xs text-slate-500">{pendingHint}</p>
-      ) : (
-        <p className="px-0.5 text-xs text-slate-500">{emptyHint}</p>
+    <input
+      type="text"
+      value={value}
+      disabled={disabled}
+      maxLength={MODEL_CUSTOM_TEXT_MAX}
+      placeholder={placeholder}
+      onChange={(event) => onChange(event.target.value)}
+      className={cn(
+        "min-h-[44px] w-full rounded-[12px] border border-border bg-white px-3 py-2.5 text-base text-slate-900 shadow-sm outline-none transition sm:text-sm",
+        "hover:border-slate-300 focus:border-teal-400 focus:ring-2 focus:ring-teal-100",
+        "disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-600"
       )}
-    </div>
+    />
   );
 }
 
@@ -316,7 +262,7 @@ const GENDER_OPTIONS: {
   {
     id: "female",
     label: "Женская",
-    hint: "Платья, блузы, женские комплекты и нижнее бельё для взрослых",
+    hint: "",
   },
   {
     id: "male",
@@ -383,7 +329,17 @@ export function ModelPresetSelector({
   settingsLocked = false,
   settingsLockMessage,
   sourceProductZoneFramingActive = false,
+  uiMode = "full",
 }: ModelPresetSelectorProps) {
+  if (uiMode === "saas") {
+    return (
+      <p className="text-xs leading-5 text-slate-600">
+        AI подберёт пол, фигуру, кадр и формат по фото товара. Ниже можно
+        указать свою модель.
+      </p>
+    );
+  }
+
   const patch = (partial: Partial<ModelGenerationSettings>) =>
     onSettingsChange(
       withLingerieModelDefaults(
@@ -454,9 +410,7 @@ export function ModelPresetSelector({
           AI-модель для одежды
         </h3>
         <p className="mt-1 text-xs leading-5 text-slate-500">
-          {isLingerieScenario
-            ? "AI создаст модель автоматически. Выберите национальность, тип фигуры, кадр и формат — затем нажмите «Создать фото на модели»."
-            : "AI создаст модель автоматически. Выберите пол, национальность, тип фигуры, кадр и формат — затем нажмите «Создать фото на модели»."}
+          AI создаст модель автоматически.
         </p>
       </header>
 
@@ -466,15 +420,9 @@ export function ModelPresetSelector({
           isPromptLocked && "pointer-events-none select-none opacity-50"
         )}
       >
-        <span className="block px-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-          Параметры съёмки
-        </span>
         <div className="flex flex-col gap-4">
           {onModelDescriptionChange ? (
-            <SettingField
-              label="Сцена и стиль фото"
-              description="Опишите, где и как должна выглядеть модель. AI учтёт это при создании модели, а товар будет надет отдельно."
-            >
+            <SettingField label="Сцена и стиль фото">
               <textarea
                 value={modelDescription ?? ""}
                 onChange={(event) =>
@@ -486,16 +434,13 @@ export function ModelPresetSelector({
                 autoComplete="off"
                 autoCorrect="off"
                 spellCheck={false}
-                placeholder="Например: у большого окна, мягкий дневной свет, дорогой интерьер, чистый студийный фон, пляжный кадр"
+                placeholder="Например: у большого окна, мягкий дневной свет, чистый студийный фон. Или: модель 30 лет, дорогой интерьер"
                 className={cn(
                   "min-h-[96px] w-full resize-y rounded-[12px] border border-border bg-white px-3 py-2.5 text-sm leading-6 text-slate-900 outline-none transition",
                   "hover:border-slate-300 focus:border-teal-400 focus:ring-2 focus:ring-teal-100",
                   "disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-600"
                 )}
               />
-              <p className="mt-2 px-0.5 text-[11px] leading-snug text-slate-500">
-                Для лучшей примерки выбирайте фронтальную позу с опущенными руками. Поднятые руки могут ухудшить посадку одежды.
-              </p>
             </SettingField>
           ) : null}
           {!isLingerieScenario ? (
@@ -516,8 +461,6 @@ export function ModelPresetSelector({
               value={settings.modelNationality}
               disabled={isPromptLocked}
               placeholder="Например: казахская, славянская, азиатская"
-              emptyHint="Необязательно — оставьте пустым для нейтральной внешности"
-              confirmAriaLabel="Сохранить национальность"
               onChange={(modelNationality) => patch({ modelNationality })}
             />
           </SettingField>
@@ -615,6 +558,7 @@ export function ModelAdvancedControls({
   showDevControls = false,
   modelGenerationSeed,
   tryOnSeed,
+  uiMode = "full",
 }: ModelAdvancedControlsProps) {
   const patch = (partial: Partial<ModelGenerationSettings>) =>
     onSettingsChange(
@@ -622,11 +566,36 @@ export function ModelAdvancedControls({
     );
   const isMinor = !isAdultModelAge(settings.modelAge);
   const isPromptLocked = Boolean(generating);
-  const outputSizeReady = isModelOutputSizeComplete(outputSize);
 
   const ageDescription = isMinor
     ? "До 18 лет недоступны сценарий «Бельё / купальники» и тип «Бикини / купальники»."
-    : "Влияет на лицо и пропорции: 21 — молодая 20+, 30 — зрелее. Для детской одежды укажите возраст ребёнка.";
+    : undefined;
+
+  if (uiMode === "saas") {
+    return (
+      <div className="space-y-4">
+        <SettingField label="Возраст модели" description={ageDescription}>
+          <input
+            id="model-age-saas"
+            type="number"
+            min={MODEL_AGE_MIN}
+            max={MODEL_AGE_MAX}
+            inputMode="numeric"
+            value={settings.modelAge}
+            disabled={isPromptLocked}
+            onChange={(event) => {
+              const next = parseInt(event.target.value, 10);
+              if (!Number.isFinite(next)) return;
+              patch({ modelAge: clampModelAge(next) });
+            }}
+            className="min-h-[42px] w-full rounded-[12px] border border-border bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-sm outline-none transition hover:border-slate-300 focus:border-teal-400 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-50"
+          />
+        </SettingField>
+      </div>
+    );
+  }
+
+  const outputSizeReady = isModelOutputSizeComplete(outputSize);
 
   const basePrompt = useMemo(
     () =>

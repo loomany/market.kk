@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Check, ImagePlus, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatFileSize } from "@/lib/ai/clientImageValidation";
+import { formatFileSize, validateImageFileClient } from "@/lib/ai/clientImageValidation";
 
 export type ModelSourceKind = "upload" | "saved" | null;
 
@@ -20,6 +20,8 @@ type ModelSourcePanelProps = {
   onFileSelect?: (file: File) => void;
   onClearFile?: () => void;
   className?: string;
+  /** SaaS: compact upload-only layout for «Своя модель» tab */
+  uiMode?: "default" | "saas";
 };
 
 export function ModelSourcePanel({
@@ -35,27 +37,48 @@ export function ModelSourcePanel({
   onFileSelect,
   onClearFile,
   className,
+  uiMode = "default",
 }: ModelSourcePanelProps) {
+  const isSaas = uiMode === "saas";
   const [dragActive, setDragActive] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const canUploadFile = Boolean(onFileSelect);
   const savedSelected = modelSource === "saved" && Boolean(savedModelUrl);
   const uploadSelected = modelSource === "upload";
 
-  const selectFile = (file: File | undefined) => {
-    if (!file || !onFileSelect) return;
+  const ingestFiles = (fileList: FileList | null | undefined) => {
+    if (!fileList?.length || !onFileSelect) return;
+    if (fileList.length > 1) {
+      setUploadError("Можно загрузить только одно фото за запуск.");
+      return;
+    }
+    const file = fileList.item(0);
+    if (!file) return;
+    const validationError = validateImageFileClient(file);
+    if (validationError) {
+      setUploadError(validationError);
+      return;
+    }
+    setUploadError(null);
     onFileSelect(file);
   };
 
   return (
-    <div className={cn("space-y-4", className)}>
-      <div>
-        <label className="text-sm font-semibold text-slate-950">{label}</label>
-        {hint ? (
-          <p className="mt-1 text-xs leading-5 text-slate-600">{hint}</p>
-        ) : null}
-      </div>
+    <div className={cn(isSaas ? "space-y-3" : "space-y-4", className)}>
+      {label || hint ? (
+        <div>
+          {label ? (
+            <label className="text-sm font-semibold text-slate-950">{label}</label>
+          ) : null}
+          {hint ? (
+            <p className={cn("text-xs leading-5 text-slate-600", label && "mt-1")}>
+              {hint}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
-      {savedModelUrl ? (
+      {savedModelUrl && !isSaas ? (
         <div
           className={cn(
             "overflow-hidden rounded-[16px] border transition",
@@ -121,16 +144,17 @@ export function ModelSourcePanel({
         </div>
       ) : null}
 
-      {savedModelUrl && canUploadFile ? (
+      {savedModelUrl && canUploadFile && !isSaas ? (
         <p className="text-center text-[11px] font-semibold uppercase tracking-wide text-slate-400">
           или загрузите своё фото
         </p>
       ) : null}
 
-      <div className="rounded-[18px] border border-teal-100 bg-teal-50/60 px-3 py-2 text-xs leading-5 text-teal-950">
-        JPEG, PNG или WEBP до 10MB. Загруженное фото передаётся в AI только
-        для обработки и не заменяет сохранённую AI-модель.
-      </div>
+      {uploadError ? (
+        <p className="rounded-[12px] border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          {uploadError}
+        </p>
+      ) : null}
 
       {canUploadFile && (
         <label
@@ -149,10 +173,11 @@ export function ModelSourcePanel({
           onDrop={(event) => {
             event.preventDefault();
             setDragActive(false);
-            selectFile(event.dataTransfer.files?.[0]);
+            ingestFiles(event.dataTransfer.files);
           }}
           className={cn(
-            "flex min-h-[148px] cursor-pointer flex-col items-center justify-center rounded-[22px] border-2 border-dashed px-4 py-6 text-center transition-colors",
+            "flex cursor-pointer flex-col items-center justify-center rounded-[22px] border-2 border-dashed px-4 py-6 text-center transition-colors",
+            isSaas ? "min-h-[120px] py-5" : "min-h-[148px]",
             uploadSelected && selectedFile
               ? "border-teal-500 bg-teal-50/80 ring-2 ring-teal-100"
               : dragActive
@@ -169,7 +194,7 @@ export function ModelSourcePanel({
             accept="image/jpeg,image/png,image/webp"
             className="hidden"
             onChange={(event) => {
-              selectFile(event.target.files?.[0]);
+              ingestFiles(event.target.files);
               event.target.value = "";
             }}
           />
@@ -194,7 +219,10 @@ export function ModelSourcePanel({
           {onClearFile ? (
             <button
               type="button"
-              onClick={onClearFile}
+              onClick={() => {
+                setUploadError(null);
+                onClearFile();
+              }}
               className="shrink-0 rounded-[12px] p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
               aria-label="Очистить выбранный файл"
             >

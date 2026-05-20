@@ -41,7 +41,7 @@ export function SaasPipelineCountdown({
   }, [totalSeconds]);
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-8 text-center">
+    <div className="flex h-full min-h-0 flex-col items-center justify-center gap-3 px-4 py-6 text-center">
       <p className="text-sm font-medium text-slate-800">{label}</p>
       <p
         className="font-mono text-4xl font-semibold tabular-nums tracking-tight text-teal-800"

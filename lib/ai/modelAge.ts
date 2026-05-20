@@ -14,6 +14,36 @@ export function clampModelAge(value: number): number {
   return Math.min(MODEL_AGE_MAX, Math.max(MODEL_AGE_MIN, Math.round(value)));
 }
 
+/** Parse an explicit model age from free-form scene/description text (RU/EN). */
+export function parseModelAgeFromDescription(text: string): number | null {
+  const normalized = text.trim();
+  if (!normalized) return null;
+
+  const patterns = [
+    /(?:^|[\s,.(])(?:возраст|age)\s*[:=]?\s*(\d{1,2})\b/i,
+    /\b(\d{1,2})\s*[-–]?\s*(?:лет(?:няя|ний|ние|него|ней)?|года|год|years?\s*old|y\.?\s*o\.?)\b/i,
+    /\b(?:модел[ьяи]|model)\s+(\d{1,2})\s*(?:лет|years?\s*old)?\b/i,
+  ] as const;
+
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    if (!match?.[1]) continue;
+    const age = Number.parseInt(match[1], 10);
+    if (!Number.isFinite(age)) continue;
+    if (age < MODEL_AGE_MIN || age > MODEL_AGE_MAX) continue;
+    return clampModelAge(age);
+  }
+
+  return null;
+}
+
+export function resolveModelAgeFromDescription(
+  description: string,
+  fallbackAge: number = DEFAULT_MODEL_AGE
+): number {
+  return parseModelAgeFromDescription(description) ?? clampModelAge(fallbackAge);
+}
+
 export function isAdultModelAge(age: number): boolean {
   return age >= MODEL_AGE_ADULT;
 }

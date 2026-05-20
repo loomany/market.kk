@@ -93,7 +93,7 @@ export function ModelReadyCard({
           onClick={onStartOver}
         >
           <RotateCcw className="h-4 w-4" />
-          Начать сначала
+          Заменить модель
         </Button>
       </div>
     </div>

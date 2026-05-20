@@ -39,6 +39,10 @@ export function ProductPhotosUploader({
 
   const ingestFiles = (fileList: FileList | null | undefined) => {
     if (!fileList?.length) return;
+    if (fileList.length > 1) {
+      setUploadError("Можно загрузить только одно фото за запуск.");
+      return;
+    }
     const file = fileList.item(0);
     if (!file) return;
     const validationError = validateImageFileClient(file);
@@ -57,11 +61,6 @@ export function ProductPhotosUploader({
         {hint ? (
           <p className="mt-1 text-xs leading-5 text-slate-600">{hint}</p>
         ) : null}
-      </div>
-
-      <div className="rounded-[18px] border border-teal-100 bg-teal-50/60 px-3 py-2 text-xs leading-5 text-teal-950">
-        Одно фото за запуск (JPEG, PNG, WEBP до 10MB). Для следующего товара
-        замените файл и снова нажмите «Создать фото на модели».
       </div>
 
       {uploadError ? (
@@ -116,7 +115,10 @@ export function ProductPhotosUploader({
             <p className="text-xs font-medium text-slate-600">Фото товара</p>
             <button
               type="button"
-              onClick={onClearAll}
+              onClick={() => {
+                setUploadError(null);
+                onClearAll();
+              }}
               className="text-xs font-medium text-slate-500 hover:text-slate-800"
             >
               Удалить
