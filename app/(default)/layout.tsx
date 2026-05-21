@@ -42,6 +42,13 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     images: [defaultOgImageUrl()],
   },
+  verification: {
+    google: process.env.NEXT_PUBLIC_GSC_VERIFICATION || undefined,
+    yandex: process.env.NEXT_PUBLIC_YANDEX_VERIFICATION || undefined,
+    other: {
+      "msvalidate.01": process.env.NEXT_PUBLIC_BING_VERIFICATION || "",
+    },
+  },
   ...createSiteIconsMetadata(),
 };
 
