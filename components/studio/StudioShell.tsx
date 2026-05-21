@@ -2774,7 +2774,6 @@ function StudioShellInner({
         open={tokenBilling !== null}
         payload={tokenBilling}
         onClose={() => setTokenBilling(null)}
-        locale={promptLocale as IndexableLocale}
       />
     </div>
   );

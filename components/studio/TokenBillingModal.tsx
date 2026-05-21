@@ -5,19 +5,14 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Coins, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import type { IndexableLocale } from "@/lib/i18n/localeConfig";
+import { formatStudioString } from "@/lib/studio/i18n";
 import { formatTokenBalanceDisplay } from "@/lib/tokens/formatTokens";
 import type { TokenBillingErrorPayload } from "@/lib/tokens/billingErrorPayload";
 import {
   openVitrinaLoginModal,
   type TokenBillingCta,
 } from "@/lib/tokens/billingErrorPayload";
-
-const BALANCE_HINT = {
-  ru: "Баланс: {balance} · нужно: {required}",
-  en: "Balance: {balance} · required: {required}",
-  kk: "Баланс: {balance} · қажет: {required}",
-} as const;
+import { useStudioCopy } from "./StudioLocaleContext";
 
 function normalizeCtas(
   cta: TokenBillingErrorPayload["cta"]
@@ -30,16 +25,16 @@ type TokenBillingModalProps = {
   open: boolean;
   payload: TokenBillingErrorPayload | null;
   onClose: () => void;
-  locale: IndexableLocale;
 };
 
 export function TokenBillingModal({
   open,
   payload,
   onClose,
-  locale,
 }: TokenBillingModalProps) {
   const router = useRouter();
+  const { locale, copy } = useStudioCopy();
+  const tb = copy.tokenBilling;
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -51,6 +46,17 @@ export function TokenBillingModal({
     [payload]
   );
 
+  const display = useMemo(() => {
+    if (!payload) return null;
+    if (payload.errorCode === "INSUFFICIENT_TOKENS") {
+      return { title: tb.insufficientTitle, message: tb.insufficientBody };
+    }
+    if (payload.errorCode === "GUEST_GENERATION_LIMIT") {
+      return { title: tb.guestUsedTitle, message: tb.guestUsedBody };
+    }
+    return { title: payload.title, message: payload.message };
+  }, [payload, tb]);
+
   const balanceHint = useMemo(() => {
     if (
       !payload ||
@@ -60,19 +66,19 @@ export function TokenBillingModal({
     ) {
       return null;
     }
-    const template = BALANCE_HINT[locale];
-    return template
-      .replace(
-        "{balance}",
-        formatTokenBalanceDisplay(payload.balanceTokens, locale)
-      )
-      .replace(
-        "{required}",
-        formatTokenBalanceDisplay(payload.requiredTokens, locale)
-      );
-  }, [payload, locale]);
+    return formatStudioString(tb.balanceHint, {
+      balance: formatTokenBalanceDisplay(payload.balanceTokens, locale),
+      required: formatTokenBalanceDisplay(payload.requiredTokens, locale),
+    });
+  }, [payload, locale, tb.balanceHint]);
 
-  if (!open || !payload || !mounted) return null;
+  const primaryActionLabel = useMemo(() => {
+    if (!payload) return tb.buyTokens;
+    if (payload.errorCode === "GUEST_GENERATION_LIMIT") return tb.buyTokens;
+    return tb.topUpBalance;
+  }, [payload, tb]);
+
+  if (!open || !payload || !display || !mounted) return null;
 
   const hrefCtas = ctas.filter(
     (c): c is Extract<TokenBillingCta, { href: string }> => "href" in c
@@ -103,16 +109,16 @@ export function TokenBillingModal({
                 id="token-billing-title"
                 className="text-lg font-semibold text-slate-950"
               >
-                {payload.title}
+                {display.title}
               </h2>
               <p className="mt-1 text-sm leading-6 text-slate-600">
-                {payload.message}
+                {display.message}
               </p>
             </div>
           </div>
           <button
             type="button"
-            aria-label="Закрыть"
+            aria-label={tb.close}
             onClick={onClose}
             className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
           >
@@ -136,7 +142,7 @@ export function TokenBillingModal({
                 openVitrinaLoginModal();
               }}
             >
-              {loginCta.label}
+              {tb.signIn}
             </Button>
           ) : null}
 
@@ -148,7 +154,7 @@ export function TokenBillingModal({
                 router.push(primaryHref.href);
               }}
             >
-              {primaryHref.label}
+              {primaryActionLabel}
             </Button>
           ) : null}
 
@@ -161,7 +167,7 @@ export function TokenBillingModal({
                 router.push(hrefCtas[0]!.href);
               }}
             >
-              {hrefCtas[0]!.label}
+              {tb.buyTokens}
             </Button>
           ) : null}
 
@@ -173,11 +179,7 @@ export function TokenBillingModal({
                 router.push(`/${locale}/tokens`);
               }}
             >
-              {locale === "en"
-                ? "Buy tokens"
-                : locale === "kk"
-                  ? "Токен сатып алу"
-                  : "Купить токены"}
+              {tb.buyTokens}
             </Button>
           ) : null}
         </div>

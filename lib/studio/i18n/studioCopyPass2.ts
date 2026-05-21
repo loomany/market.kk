@@ -138,6 +138,19 @@ export const pass2Ru = {
     backgroundRemoveFailed: "Не удалось убрать фон",
   },
   editorActions: { download: "Скачать", open: "Открыть", delete: "Удалить" },
+  tokenBilling: {
+    insufficientTitle: "Недостаточно токенов",
+    insufficientBody:
+      "Для этой AI-операции нужен 1 токен. Пополните баланс, чтобы продолжить.",
+    balanceHint: "Баланс: {balance} · нужно: {required}",
+    topUpBalance: "Пополнить баланс",
+    close: "Закрыть",
+    buyTokens: "Купить токены",
+    guestUsedTitle: "Бесплатная генерация уже использована",
+    guestUsedBody:
+      "Войдите в аккаунт и пополните баланс, чтобы продолжить без водяного знака.",
+    signIn: "Войти",
+  },
   postProcessingEditors: {
     kling: { title: "Kling — плавное видео", description: "Лучше для коротких видео из фото.", pros: "Стабильное движение, до 15 сек.", limitations: "Нет формата 4:5." },
     minimax: { title: "MiniMax — быстрое видео", description: "Короткий недорогой ролик ~6 сек.", pros: "Экономично, все основные форматы.", limitations: "Фиксированная длительность 6 сек." },
@@ -282,6 +295,19 @@ export const pass2En = {
   saasPreview: { previewAvailable: "Preview available", previewAria: "Preview" },
   warnings: { exactCardNoMask: "Exact card without manual mask", backgroundRemoveFailed: "Could not remove background" },
   editorActions: { download: "Download", open: "Open", delete: "Delete" },
+  tokenBilling: {
+    insufficientTitle: "Not enough tokens",
+    insufficientBody:
+      "This AI task requires 1 token. Top up your balance to continue.",
+    balanceHint: "Balance: {balance} · required: {required}",
+    topUpBalance: "Top up balance",
+    close: "Close",
+    buyTokens: "Buy tokens",
+    guestUsedTitle: "Free generation already used",
+    guestUsedBody:
+      "Sign in and top up your balance to continue without a watermark.",
+    signIn: "Sign in",
+  },
   postProcessingEditors: {
     kling: { title: "Kling — smooth video", description: "Best for short videos from a photo.", pros: "Stable motion, up to 15 sec.", limitations: "No 4:5 format." },
     minimax: { title: "MiniMax — fast video", description: "Short affordable clip ~6 sec.", pros: "Economical, all main formats.", limitations: "Fixed 6 sec duration." },
@@ -426,6 +452,19 @@ export const pass2Kk = {
   saasPreview: { previewAvailable: "Алдын ала қарау бар", previewAria: "Алдын ала қарау" },
   warnings: { exactCardNoMask: "Қолмен маскасыз нақты карточка", backgroundRemoveFailed: "Фон өшірілмеді" },
   editorActions: { download: "Жүктеп алу", open: "Ашу", delete: "Өшіру" },
+  tokenBilling: {
+    insufficientTitle: "Токен жеткіліксіз",
+    insufficientBody:
+      "Бұл AI әрекетіне 1 токен қажет. Жалғастыру үшін балансты толтырыңыз.",
+    balanceHint: "Баланс: {balance} · қажет: {required}",
+    topUpBalance: "Балансты толтыру",
+    close: "Жабу",
+    buyTokens: "Токен сатып алу",
+    guestUsedTitle: "Тегін генерация қолданылып қойды",
+    guestUsedBody:
+      "Су таңбасыз жалғастыру үшін аккаунтқа кіріп, балансты толтырыңыз.",
+    signIn: "Кіру",
+  },
   postProcessingEditors: {
     kling: { title: "Kling — тегіс видео", description: "Фотодан қысқа видео үшін жақсы.", pros: "Тұрақты қозғалыс, 15 сек дейін.", limitations: "4:5 форматы жоқ." },
     minimax: { title: "MiniMax — жылдам видео", description: "Қысқа арзан ролик ~6 сек.", pros: "Үнемді, негізгі форматтар.", limitations: "6 сек ұзақтығы." },
