@@ -244,12 +244,13 @@ export async function processSiteEvent(
     }
 
     const summaryDecision = shouldAllowSessionSummary(profile, event.sessionId, now);
-    const hadFirst =
-      profile.lastNotificationAtByType[`first_visit:${event.visitorId}`] ||
-      profile.lastNotificationAtByType[`return_visit:${event.visitorId}`] ||
-      profile.pageCount > 1;
+    const hadVisitAlert =
+      typeof profile.lastNotificationAtByType[`first_visit:${event.visitorId}`] ===
+        "number" ||
+      typeof profile.lastNotificationAtByType[`return_visit:${event.visitorId}`] ===
+        "number";
 
-    if (summaryDecision.allow && hadFirst) {
+    if (summaryDecision.allow && hadVisitAlert) {
       const sessionMinutes = (now - profile.sessionStartedAt) / 60_000;
       const text = formatSessionSummary(profile, traffic, sessionMinutes);
       const sent = await sendAndMark(text, profile, summaryDecision.notificationKey);

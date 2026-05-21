@@ -65,6 +65,8 @@ export function SiteTelegramTracker() {
         markFirstSeen();
         const visitType = isReturnVisitor() ? "return_visit" : "first_visit";
         await postSiteEvent(visitType, pathname, attribution);
+        // Skip page_view on first paint — avoids duplicate Telegram with session summary.
+        return;
       }
 
       await postSiteEvent("page_view", pathname, attribution);

@@ -101,6 +101,11 @@ export function getOrCreateVisitorProfile(
 
 export function touchVisitorPageView(profile: VisitorProfile, path: string) {
   const now = Date.now();
+  const last = profile.lastPaths[profile.lastPaths.length - 1];
+  if (last === path) {
+    profile.lastSeenAt = now;
+    return;
+  }
   profile.lastSeenAt = now;
   profile.pageCount += 1;
   profile.lastPaths = pushUnique(profile.lastPaths, path, MAX_PATHS);

@@ -126,6 +126,20 @@ export function shouldAllowImmediate(
   return { allow: false, notificationKey: type, reason: "not_immediate_type" };
 }
 
+const MIN_SUMMARY_SESSION_MS = 5 * 60 * 1000;
+const MIN_SUMMARY_PAGES = 3;
+
+export function wasVisitAlertSentRecently(
+  profile: VisitorProfile,
+  visitorId: string,
+  now: number
+): boolean {
+  return (
+    wasSentWithin(profile, `first_visit:${visitorId}`, MS.session_summary, now) ||
+    wasSentWithin(profile, `return_visit:${visitorId}`, MS.session_summary, now)
+  );
+}
+
 export function shouldAllowSessionSummary(
   profile: VisitorProfile,
   sessionId: string,
@@ -135,7 +149,17 @@ export function shouldAllowSessionSummary(
   if (wasSentWithin(profile, key, MS.session_summary, now)) {
     return { allow: false, notificationKey: key };
   }
-  if (profile.pageCount < 2) {
+  if (wasVisitAlertSentRecently(profile, profile.visitorId, now)) {
+    return { allow: false, notificationKey: key };
+  }
+  if (now - profile.sessionStartedAt < MIN_SUMMARY_SESSION_MS) {
+    return { allow: false, notificationKey: key };
+  }
+  if (profile.pageCount < MIN_SUMMARY_PAGES) {
+    return { allow: false, notificationKey: key };
+  }
+  const uniquePaths = new Set(profile.lastPaths).size;
+  if (uniquePaths < 2) {
     return { allow: false, notificationKey: key };
   }
   return { allow: true, notificationKey: key };
