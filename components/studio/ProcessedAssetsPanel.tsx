@@ -744,6 +744,11 @@ export function ProcessedAssetsPanel({
 
   const editorAsset = selectedAsset;
 
+  const showDesktopEditor =
+    !isMobileLayout &&
+    desktopEditorOpen &&
+    Boolean(processingMode && editorAsset);
+
   const mobileSheetTitle =
     processingMode === "video" ? pa.createVideo : pa.createImage;
 
@@ -1264,19 +1269,7 @@ export function ProcessedAssetsPanel({
 
   return (
     <div className="space-y-4">
-      <PostProcessingUploadSection
-        source={uploadedSource}
-        uploading={uploadBusy}
-        onUploadingChange={setUploadBusy}
-        onSourceChange={handleUploadSourceChange}
-        onSave={handleSaveUploadedSource}
-        disabled={generationLoading}
-      />
-
-      {!isMobileLayout &&
-      desktopEditorOpen &&
-      processingMode &&
-      editorAsset ? (
+      {showDesktopEditor && editorAsset && processingMode ? (
         <PostProcessingDesktopEditor
           asset={editorAsset}
           allAssets={assets}
@@ -1286,11 +1279,63 @@ export function ProcessedAssetsPanel({
           onBack={closeDesktopEditor}
           settings={settingsBody}
         />
-      ) : null}
-
-      {isMobileLayout ? (
+      ) : (
         <>
-          {assets.length === 0 ? (
+          <PostProcessingUploadSection
+            source={uploadedSource}
+            uploading={uploadBusy}
+            onUploadingChange={setUploadBusy}
+            onSourceChange={handleUploadSourceChange}
+            onSave={handleSaveUploadedSource}
+            disabled={generationLoading}
+          />
+
+          {isMobileLayout ? (
+            <>
+              {assets.length === 0 ? (
+                <Card className={postProcessingSectionCardClass}>
+                  <div className="border-b border-border/60 px-4 py-3">
+                    <StudioFilesSectionHeader title={d.galleryTitle} />
+                  </div>
+                  <CardContent className="p-4">
+                    <p className="text-sm leading-6 text-slate-600">
+                      {pa.emptyHint}
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <PostProcessingMobileGallery
+                  assets={assets}
+                  onCreateImage={(id) => openMobileWorkflow(id, "image")}
+                  onCreateVideo={(id) => openMobileWorkflow(id, "video")}
+                  onDownloadAsset={handleDownloadAsset}
+                  onDeleteAsset={onDeleteAsset}
+                  activeAssetId={mobileSheetOpen ? selectedAsset?.id : null}
+                  activeMode={
+                    mobileSheetOpen && processingMode ? processingMode : null
+                  }
+                />
+              )}
+              <PostProcessingMobileSheet
+                open={mobileSheetOpen}
+                title={mobileSheetTitle}
+                closeLabel={copy.studioFiles.mobileSheetHide}
+                onClose={closeMobileSheet}
+              >
+                <div className="space-y-6 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                  {settingsBody}
+                </div>
+              </PostProcessingMobileSheet>
+            </>
+          ) : assets.length > 0 ? (
+            <PostProcessingDesktopGallery
+              assets={assets}
+              onCreateImage={(id) => openDesktopEditor(id, "image")}
+              onCreateVideo={(id) => openDesktopEditor(id, "video")}
+              onDownloadAsset={handleDownloadAsset}
+              onDeleteAsset={onDeleteAsset}
+            />
+          ) : (
             <Card className={postProcessingSectionCardClass}>
               <div className="border-b border-border/60 px-4 py-3">
                 <StudioFilesSectionHeader title={d.galleryTitle} />
@@ -1299,47 +1344,8 @@ export function ProcessedAssetsPanel({
                 <p className="text-sm leading-6 text-slate-600">{pa.emptyHint}</p>
               </CardContent>
             </Card>
-          ) : (
-          <PostProcessingMobileGallery
-            assets={assets}
-            onCreateImage={(id) => openMobileWorkflow(id, "image")}
-            onCreateVideo={(id) => openMobileWorkflow(id, "video")}
-            onDownloadAsset={handleDownloadAsset}
-            onDeleteAsset={onDeleteAsset}
-            activeAssetId={mobileSheetOpen ? selectedAsset?.id : null}
-            activeMode={
-              mobileSheetOpen && processingMode ? processingMode : null
-            }
-          />
           )}
-          <PostProcessingMobileSheet
-            open={mobileSheetOpen}
-            title={mobileSheetTitle}
-            closeLabel={copy.studioFiles.mobileSheetHide}
-            onClose={closeMobileSheet}
-          >
-            <div className="space-y-6 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-              {settingsBody}
-            </div>
-          </PostProcessingMobileSheet>
         </>
-      ) : assets.length > 0 ? (
-        <PostProcessingDesktopGallery
-          assets={assets}
-          onCreateImage={(id) => openDesktopEditor(id, "image")}
-          onCreateVideo={(id) => openDesktopEditor(id, "video")}
-          onDownloadAsset={handleDownloadAsset}
-          onDeleteAsset={onDeleteAsset}
-        />
-      ) : (
-        <Card className={postProcessingSectionCardClass}>
-          <div className="border-b border-border/60 px-4 py-3">
-            <StudioFilesSectionHeader title={d.galleryTitle} />
-          </div>
-          <CardContent className="p-4">
-            <p className="text-sm leading-6 text-slate-600">{pa.emptyHint}</p>
-          </CardContent>
-        </Card>
       )}
     </div>
   );
