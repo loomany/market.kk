@@ -32,7 +32,9 @@
     "check:seo:examples": "npx tsx scripts/seo/check-seo-examples.ts",
     "check:seo:wave2": "npx tsx scripts/seo/check-seo-wave2.ts",
     "smoke:seo:hreflang": "npx tsx scripts/seo/smoke-hreflang-pairs.ts",
-    "smoke:seo:prelaunch": "npx tsx scripts/seo/smoke-prelaunch-gate.ts"
+    "smoke:seo:prelaunch": "npx tsx scripts/seo/smoke-prelaunch-gate.ts",
+    "check:seo:audience-pages": "npx tsx scripts/seo/check-seo-audience-pages.ts",
+    "audience:build": "node scripts/seo/build-audience-pages.mjs"
   },
   "dependencies": {
     "@fal-ai/client": "^1.10.1",

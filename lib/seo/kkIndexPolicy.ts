@@ -25,6 +25,24 @@ export const KK_APPROVED_TRUST_PAGE_KEYS = new Set<StaticRouteKey>([
   "faq",
 ]);
 
+/** Audience landing pages approved for kk index (10 segments). */
+export const KK_APPROVED_AUDIENCE_IDS = new Set([
+  "marketplace-sellers",
+  "clothing-sellers",
+  "jewelry-sellers",
+  "suppliers",
+  "showrooms",
+  "instagram-shops",
+  "online-stores",
+  "marketplace-managers",
+  "photographers-content-managers",
+  "small-ecommerce-teams",
+]);
+
+export function isKkAudienceApproved(audienceId: string): boolean {
+  return KK_APPROVED_AUDIENCE_IDS.has(audienceId);
+}
+
 export function isKkBlogTopicApproved(topicId: string): boolean {
   const match = /^blog_(\d+)$/.exec(topicId);
   if (!match) return false;
