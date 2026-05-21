@@ -62,7 +62,6 @@ import {
 } from "@/lib/studio/exactProductCard";
 import {
   estimateTryOnOnlyCostUsd,
-  formatSaasPipelineCostKztRange,
   STUDIO_PRODUCT_CARD_RESULT_COUNTDOWN_SEC,
 } from "@/lib/studio/clothingTryOnEstimates";
 import { mapSourceModelToGenerationSettings } from "@/lib/studio/mapSourceModelToGenerationSettings";
@@ -2532,9 +2531,6 @@ function StudioShellInner({
                                 <span>{primaryStatusMessage}</span>
                               </div>
                             ) : null}
-                            <p className="text-center text-xs font-medium tabular-nums text-slate-500">
-                              {formatSaasPipelineCostKztRange()}
-                            </p>
                             {showDevControls && pipelineDebug ? (
                               <details className="rounded-[12px] border border-slate-200 bg-slate-50 p-3 text-left text-xs text-slate-700">
                                 <summary className="cursor-pointer font-medium text-slate-900">
