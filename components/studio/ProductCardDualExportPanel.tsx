@@ -5,7 +5,9 @@ import { PreviewCard } from "./PreviewCard";
 import { TryOnResultActions } from "./TryOnResultActions";
 import { downloadImageFile } from "@/lib/studio/downloadImages";
 import { formatAspectBadgeFromDimensions } from "@/lib/studio/previewImageAspect";
+import { formatStudioString } from "@/lib/studio/i18n";
 import { cn } from "@/lib/utils";
+import { useStudioCopy } from "./StudioLocaleContext";
 
 type ExportTabId = "card" | "cutout";
 
@@ -51,10 +53,12 @@ function ExportTabButton({
 }
 
 function AspectBadge({ label }: { label: string }) {
+  const { copy } = useStudioCopy();
+
   return (
     <span
       className="inline-flex shrink-0 items-center rounded-lg bg-slate-100/90 px-2.5 py-1.5 ring-1 ring-slate-200/50"
-      aria-label={`Формат ${label}`}
+      aria-label={formatStudioString(copy.common.formatLabel, { label })}
     >
       <span className="font-mono text-[10px] font-semibold tabular-nums text-slate-700">
         {label}
@@ -131,11 +135,15 @@ export function ProductCardDualExportPanel({
   width,
   height,
   resultId,
-  imageLabel = "товар",
+  imageLabel,
   failedImages,
   onImageFail,
   onStartOver,
 }: ProductCardDualExportPanelProps) {
+  const { copy } = useStudioCopy();
+  const pc = copy.productCard;
+  const exp = copy.productCardExport;
+  const resolvedImageLabel = imageLabel ?? pc.imageLabelProduct;
   const [activeTab, setActiveTab] = useState<ExportTabId>("card");
   const cardFormatLabel = inferImageFormatLabel(cardUrl);
   const aspectLabel = formatAspectBadgeFromDimensions(width, height);
@@ -154,7 +162,7 @@ export function ProductCardDualExportPanel({
       <div className="mb-2 flex items-center gap-2">
         <div
           role="tablist"
-          aria-label="Формат выгрузки"
+          aria-label={pc.exportFormatAria}
           className="flex min-w-0 flex-1 gap-0.5 rounded-lg bg-slate-100/90 p-0.5 ring-1 ring-slate-200/50"
         >
           <ExportTabButton
@@ -163,7 +171,7 @@ export function ProductCardDualExportPanel({
             onClick={() => setActiveTab("card")}
           />
           <ExportTabButton
-            label="PNG без фона"
+            label={pc.pngNoBg}
             active={activeTab === "cutout"}
             onClick={() => setActiveTab("cutout")}
           />
@@ -194,8 +202,13 @@ export function ProductCardDualExportPanel({
                 src={activeTab === "card" ? cardUrl : cutoutUrl}
                 alt={
                   activeTab === "card"
-                    ? `${imageLabel}: ${cardFormatLabel}`
-                    : `${imageLabel}: PNG без фона`
+                    ? formatStudioString(exp.cardAlt, {
+                        label: resolvedImageLabel,
+                        format: cardFormatLabel,
+                      })
+                    : formatStudioString(exp.cutoutAlt, {
+                        label: resolvedImageLabel,
+                      })
                 }
                 className="block h-full w-full object-contain"
                 onError={() =>
@@ -211,8 +224,8 @@ export function ProductCardDualExportPanel({
           <TryOnResultActions
             onDownload={handleDownload}
             onStartOver={onStartOver}
-            startOverLabel="Создать ещё раз"
-            startOverTitle="Убрать готовую карточку. Фото, рамка и настройки останутся."
+            startOverLabel={exp.createAgain}
+            startOverTitle={exp.removeCardHint}
           />
         }
       />

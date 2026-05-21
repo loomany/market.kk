@@ -43,8 +43,7 @@ import {
   paidAiGuardResponse,
 
 } from "@/lib/ai/paidAiGuard";
-
-
+import { wrapAiPost } from "@/lib/tokens/wrapAiPost";
 
 export const runtime = "nodejs";
 
@@ -65,7 +64,10 @@ function isMockMode() {
 
 
 export async function POST(request: Request) {
+  return wrapAiPost(request, "model-generation", ROUTE_ID, handleGenerateModelPost);
+}
 
+async function handleGenerateModelPost(request: Request) {
   let body: unknown;
 
   try {

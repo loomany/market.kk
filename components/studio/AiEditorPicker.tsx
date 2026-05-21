@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
 import type { PostProcessingEditor } from "@/lib/studio/postProcessingEditors";
+import { useStudioCopy } from "./StudioLocaleContext";
 
 type AiEditorPickerProps = {
   title?: string;
@@ -13,15 +14,18 @@ type AiEditorPickerProps = {
 };
 
 export function AiEditorPicker({
-  title = "Выберите AI-редактор",
+  title,
   editors,
   value,
   onChange,
   disabled,
 }: AiEditorPickerProps) {
+  const { copy } = useStudioCopy();
+  const heading = title ?? copy.aiEditorPicker.title;
+
   return (
     <div className="space-y-3">
-      <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
+      <h3 className="text-sm font-semibold text-slate-950">{heading}</h3>
       <div className="grid gap-2">
         {editors.map((editor) => {
           const selected = value === editor.id;
@@ -46,7 +50,7 @@ export function AiEditorPicker({
                   {editor.title}
                 </p>
                 {editor.comingSoon ? (
-                  <Badge variant="outline">Скоро</Badge>
+                  <Badge variant="outline">{copy.processedAssets.comingSoon}</Badge>
                 ) : null}
               </div>
               <p className="mt-1.5 text-sm leading-6 text-slate-600">

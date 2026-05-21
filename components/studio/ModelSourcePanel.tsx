@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { Check, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { validateImageFileClient } from "@/lib/ai/clientImageValidation";
+import { validateStudioImageFile } from "@/lib/studio/i18n/validateStudioImageFile";
+import { useStudioCopy } from "./StudioLocaleContext";
 
 export type ModelSourceKind = "upload" | "saved" | null;
 
@@ -39,6 +40,11 @@ export function ModelSourcePanel({
   className,
   uiMode = "default",
 }: ModelSourcePanelProps) {
+  const { locale, copy } = useStudioCopy();
+  const ms = copy.modelSource;
+  const m = copy.model;
+  const up = copy.upload;
+
   const isSaas = uiMode === "saas";
   const [dragActive, setDragActive] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -50,12 +56,12 @@ export function ModelSourcePanel({
   const ingestFiles = (fileList: FileList | null | undefined) => {
     if (!fileList?.length || !onFileSelect) return;
     if (fileList.length > 1) {
-      setUploadError("Можно загрузить только одно фото за запуск.");
+      setUploadError(ms.oneFileLimit);
       return;
     }
     const file = fileList.item(0);
     if (!file) return;
-    const validationError = validateImageFileClient(file);
+    const validationError = validateStudioImageFile(file, locale);
     if (validationError) {
       setUploadError(validationError);
       return;
@@ -97,8 +103,10 @@ export function ModelSourcePanel({
     >
       <Upload className="mb-2 h-6 w-6 text-teal-700" />
       <span className="text-sm font-semibold text-slate-800">
-        Выберите файл или перетащите его сюда
+        {ms.uploadYourModel}
       </span>
+      <span className="mt-1 text-xs text-slate-500">{ms.orDragHere}</span>
+      <span className="mt-1 text-[11px] text-slate-400">{ms.jpegPngWebp}</span>
       <input
         type="file"
         accept="image/jpeg,image/png,image/webp"
@@ -144,7 +152,7 @@ export function ModelSourcePanel({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={savedModelUrl}
-                alt="Сохранённая AI-модель"
+                alt={m.sourceSavedTitle}
                 className="h-full w-full object-cover"
               />
             </div>
@@ -154,12 +162,10 @@ export function ModelSourcePanel({
                   className="h-4 w-4 shrink-0 text-teal-700"
                   aria-hidden
                 />
-                Сохранённая AI-модель
+                {m.sourceSavedTitle}
               </p>
               <p className="text-xs leading-5 text-slate-500">
-                {savedSelected
-                  ? "Выбрана для примерки"
-                  : "Нажмите, чтобы использовать"}
+                {savedSelected ? ms.savedUsesPrevious : m.sourceSelect}
               </p>
             </div>
             {savedSelected ? (
@@ -168,7 +174,7 @@ export function ModelSourcePanel({
               </span>
             ) : (
               <span className="shrink-0 rounded-full border border-border px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                Выбрать
+                {m.sourceSelect}
               </span>
             )}
           </button>
@@ -185,7 +191,7 @@ export function ModelSourcePanel({
                 className="flex w-full items-center justify-center gap-1.5 rounded-[12px] px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-red-50 hover:text-red-700"
               >
                 <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                Удалить сохранённую модель
+                {m.sourceDelete}
               </button>
             </div>
           ) : null}
@@ -194,7 +200,7 @@ export function ModelSourcePanel({
 
       {savedModelUrl && canUploadFile && !isSaas ? (
         <p className="text-center text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-          или загрузите своё фото
+          {up.dropzoneDrag}
         </p>
       ) : null}
 
@@ -210,14 +216,14 @@ export function ModelSourcePanel({
         ) : (
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-medium text-slate-600">Фото модели</p>
+              <p className="text-xs font-medium text-slate-600">{m.uploaded}</p>
               {onClearFile ? (
                 <button
                   type="button"
                   onClick={clearUploadedFile}
                   className="text-xs font-medium text-slate-500 hover:text-slate-800"
                 >
-                  Удалить
+                  {copy.common.delete}
                 </button>
               ) : null}
             </div>
@@ -227,13 +233,13 @@ export function ModelSourcePanel({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={previewUrl}
-                  alt="Предпросмотр загруженной модели"
+                  alt={m.uploaded}
                   className="w-full object-contain"
                 />
                 {onClearFile ? (
                   <button
                     type="button"
-                    aria-label="Удалить фото модели"
+                    aria-label={copy.common.delete}
                     onClick={clearUploadedFile}
                     className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-white/95 text-slate-600 shadow-sm hover:bg-slate-50"
                   >
@@ -244,7 +250,7 @@ export function ModelSourcePanel({
             ) : null}
 
             <label className="flex cursor-pointer items-center justify-center rounded-[14px] border border-border bg-white px-3 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:border-teal-300 hover:bg-teal-50/50">
-              Заменить фото
+              {up.replacePhoto}
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"

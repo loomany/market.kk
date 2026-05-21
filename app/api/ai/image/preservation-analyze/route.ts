@@ -17,6 +17,7 @@ import {
   isMockMode,
   isPaidAiGuardError,
 } from "@/lib/ai/paidAiGuard";
+import { wrapAiPost } from "@/lib/tokens/wrapAiPost";
 
 export const runtime = "nodejs";
 
@@ -35,6 +36,15 @@ function jsonError(
 }
 
 export async function POST(request: Request) {
+  return wrapAiPost(
+    request,
+    "preservation-analyze",
+    ROUTE_ID,
+    handlePreservationAnalyzePost
+  );
+}
+
+async function handlePreservationAnalyzePost(request: Request) {
   let parsedBody: unknown;
   try {
     parsedBody = await request.json();

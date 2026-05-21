@@ -400,8 +400,26 @@ function checkAssets() {
     }
   }
 
-  if (!existsSync("public/favicon.ico")) {
-    ok("No public/favicon.ico — Next app/icon.png serves favicon (acceptable)");
+  const iconChecks: Array<{ path: string; maxBytes: number }> = [
+    { path: "public/favicon.ico", maxBytes: 64_000 },
+    { path: "public/icon-192.png", maxBytes: 128_000 },
+    { path: "public/icon-512.png", maxBytes: 256_000 },
+    { path: "public/apple-touch-icon.png", maxBytes: 64_000 },
+    { path: "app/favicon.ico", maxBytes: 64_000 },
+    { path: "app/icon.png", maxBytes: 8_000 },
+    { path: "app/apple-icon.png", maxBytes: 64_000 },
+  ];
+  for (const { path, maxBytes } of iconChecks) {
+    if (!existsSync(path)) {
+      fail(`Missing brand icon: ${path}`);
+      continue;
+    }
+    const size = statSync(path).size;
+    if (size > maxBytes) {
+      fail(`${path} too large (${size} bytes) — run npm run icons:generate`);
+    } else {
+      ok(`${path} (${size} bytes)`);
+    }
   }
 
   const manifestSrc = readFileSync("app/manifest.ts", "utf8");

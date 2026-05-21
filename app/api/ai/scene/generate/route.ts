@@ -7,14 +7,21 @@ import {
   paidAiGuardResponse,
 } from "@/lib/ai/paidAiGuard";
 import { sceneGenerateRequestSchema } from "@/lib/ai/sceneSchemas";
+import { wrapAiPost } from "@/lib/tokens/wrapAiPost";
 
 export const runtime = "nodejs";
+
+const ROUTE_ID = "/api/ai/scene/generate";
 
 function isMockMode() {
   return process.env.AI_MOCK_MODE !== "0";
 }
 
 export async function POST(request: Request) {
+  return wrapAiPost(request, "scene", ROUTE_ID, handleSceneGeneratePost);
+}
+
+async function handleSceneGeneratePost(request: Request) {
   let body: unknown;
   try {
     body = await request.json();

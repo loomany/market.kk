@@ -2,12 +2,13 @@
 
 import { Download, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useStudioCopy } from "./StudioLocaleContext";
 
 export function TryOnResultActions({
   onDownload,
   onDownloadAll,
   onStartOver,
-  startOverLabel = "Начать сначала",
+  startOverLabel,
   startOverTitle,
 }: {
   onDownload: () => void;
@@ -17,6 +18,9 @@ export function TryOnResultActions({
   startOverLabel?: string;
   startOverTitle?: string;
 }) {
+  const { copy } = useStudioCopy();
+  const resetLabel = startOverLabel ?? copy.actions.startOver;
+
   return (
     <div className="space-y-2">
       {onDownloadAll ? (
@@ -27,7 +31,7 @@ export function TryOnResultActions({
           onClick={onDownloadAll}
         >
           <Download className="h-4 w-4" />
-          Скачать все
+          {copy.common.downloadAll}
         </Button>
       ) : null}
       <Button
@@ -37,7 +41,9 @@ export function TryOnResultActions({
         onClick={onDownload}
       >
         <Download className="h-4 w-4" />
-        {onDownloadAll ? "Скачать этот кадр" : "Скачать"}
+        {onDownloadAll
+          ? copy.resultActions.downloadThisFrame
+          : copy.common.download}
       </Button>
       <Button
         variant="outline"
@@ -47,7 +53,7 @@ export function TryOnResultActions({
         title={startOverTitle}
       >
         <RotateCcw className="h-4 w-4" />
-        {startOverLabel}
+        {resetLabel}
       </Button>
     </div>
   );

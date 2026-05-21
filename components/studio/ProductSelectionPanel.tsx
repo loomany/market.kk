@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { useStudioCopy } from "./StudioLocaleContext";
 import {
   ProductMaskEditor,
   type ProductMaskApplyResult,
@@ -37,6 +38,10 @@ export function ProductSelectionPanel({
   onCancelEditor,
   onClearSelection,
 }: ProductSelectionPanelProps) {
+  const { copy } = useStudioCopy();
+  const ps = copy.productSelection;
+  const mask = copy.mask;
+
   if (!active || !previewUrl) {
     return (
       <div className="rounded-[16px] border border-dashed border-slate-200 bg-slate-50/90 px-4 py-8 text-center">
@@ -44,15 +49,13 @@ export function ProductSelectionPanel({
           <ImageIcon className="h-6 w-6" aria-hidden />
         </span>
         <p className="mt-4 text-sm font-semibold text-slate-950">
-          Сначала загрузите фото товара
+          {ps.uploadFirstTitle}
         </p>
         <p className="mx-auto mt-2 max-w-sm text-xs leading-6 text-slate-500">
-          На шаге 1 добавьте изображение. На шаге 2 нарисуйте прямоугольник
-          вокруг товара — ИИ вырежет предмет внутри рамки (на модели: только
-          трусы/лиф, без всей фигуры).
+          {ps.uploadFirstHint}
         </p>
         <p className="mt-4 text-[11px] font-medium uppercase tracking-wide text-slate-500">
-          Обязательный шаг после загрузки фото
+          {ps.requiredStep}
         </p>
       </div>
     );
@@ -78,22 +81,20 @@ export function ProductSelectionPanel({
               <MousePointerClick className="h-5 w-5" aria-hidden />
             </span>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-slate-950">
-                Выделение товара
-              </p>
+              <p className="text-sm font-semibold text-slate-950">{mask.title}</p>
               <p className="mt-0.5 text-xs leading-5 text-slate-500">
-                Обязательный шаг · рамка вокруг товара
+                {ps.requiredStep}
               </p>
             </div>
           </div>
           {hasSelectedProduct ? (
             <Badge variant="success" className="shrink-0">
               <CheckCircle2 className="h-3.5 w-3.5" />
-              Готово
+              {mask.statusDone}
             </Badge>
           ) : (
             <Badge variant="warning" className="shrink-0">
-              Нужно выделить
+              {mask.statusNeeded}
             </Badge>
           )}
         </div>
@@ -103,12 +104,10 @@ export function ProductSelectionPanel({
         {!hasSelectedProduct && (
           <>
             <p className="text-sm leading-6 text-slate-600">
-              Нарисуйте прямоугольник вокруг товара. ИИ вырежет предмет внутри
-              рамки — не весь прямоугольник целиком.
+              {copy.maskEditor.instruction1}
             </p>
             <div className="rounded-[16px] border border-amber-200/90 bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-950">
-              Без рамки карточку создать нельзя. Рамка должна обхватывать только
-              товар, не всю модель и фон.
+              {copy.errors.maskRequired}
             </div>
             <Button
               type="button"
@@ -118,7 +117,7 @@ export function ProductSelectionPanel({
               onClick={onOpenEditor}
             >
               <PencilLine className="h-4 w-4" />
-              Нарисовать рамку на фото
+              {ps.drawFrame}
             </Button>
           </>
         )}
@@ -126,24 +125,20 @@ export function ProductSelectionPanel({
         {hasSelectedProduct && selectedProductPreviewUrl && (
           <>
             <p className="text-sm leading-6 text-slate-600">
-              Проверьте рамку: на карточке будет вырезка внутри неё. Если захватили
-              лишнее — измените рамку.
+              {copy.maskEditor.instruction3}
             </p>
 
             <div className="overflow-hidden rounded-[18px] border border-border">
               <div className="flex items-center justify-between gap-2 border-b border-border/70 bg-slate-50 px-3 py-2">
                 <span className="text-xs font-semibold text-slate-700">
-                  Выбранная область
-                </span>
-                <span className="text-[11px] text-slate-500">
-                  Фото с контуром выделения
+                  {mask.title}
                 </span>
               </div>
               <div className="flex min-h-[140px] items-center justify-center bg-slate-100 p-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={selectedProductPreviewUrl}
-                  alt="Выбранный товар на фото с выделением"
+                  alt={ps.selectedAlt}
                   className="max-h-44 w-full rounded-[12px] object-contain"
                 />
               </div>
@@ -157,7 +152,7 @@ export function ProductSelectionPanel({
                 onClick={onOpenEditor}
               >
                 <PencilLine className="h-4 w-4" />
-                Изменить рамку
+                {ps.editFrame}
               </Button>
               {onClearSelection && (
                 <Button
@@ -167,7 +162,7 @@ export function ProductSelectionPanel({
                   onClick={onClearSelection}
                 >
                   <RotateCcw className="h-4 w-4" />
-                  Сбросить
+                  {ps.clearSelection}
                 </Button>
               )}
             </div>

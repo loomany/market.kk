@@ -13,6 +13,8 @@ import {
   maskHasSelection,
 } from "@/lib/studio/productMask";
 import { Button } from "@/components/ui/Button";
+import { useStudioCopy } from "./StudioLocaleContext";
+import type { StudioCopyFull } from "@/lib/studio/i18n/studioCopyTypes";
 
 export type ProductMaskApplyResult = {
   file: File;
@@ -44,15 +46,18 @@ function getCanvasPoint(
   };
 }
 
-function rectangleCoverageHint(ratio: number): string | null {
+function rectangleCoverageHint(
+  ratio: number,
+  me: StudioCopyFull["maskEditor"]
+): { message: string; level: "error" | "warn" } | null {
   if (ratio > 0.45) {
-    return "Рамка слишком большая: оставьте внутри только товар (без всей фигуры модели и фона).";
+    return { message: me.coverageTooLarge, level: "error" };
   }
   if (ratio > 0.28) {
-    return "Рамка широкая — ИИ попытается вырезать товар внутри, но лучше сузить до самой ткани.";
+    return { message: me.coverageWide, level: "warn" };
   }
   if (ratio < 0.002) {
-    return "Рамка слишком маленькая — растяните её на весь товар.";
+    return { message: me.coverageSmall, level: "warn" };
   }
   return null;
 }
@@ -62,6 +67,10 @@ export function ProductMaskEditor({
   onApply,
   onCancel,
 }: ProductMaskEditorProps) {
+  const { copy } = useStudioCopy();
+  const me = copy.maskEditor;
+  const mask = copy.mask;
+
   const viewCanvasRef = useRef<HTMLCanvasElement>(null);
   const maskDataRef = useRef<HTMLCanvasElement | null>(null);
   const dimLayerRef = useRef<HTMLCanvasElement | null>(null);
@@ -74,7 +83,10 @@ export function ProductMaskEditor({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [displaySize, setDisplaySize] = useState({ width: 320, height: 320 });
   const [applyError, setApplyError] = useState<string | null>(null);
-  const [coverageHint, setCoverageHint] = useState<string | null>(null);
+  const [coverageHint, setCoverageHint] = useState<{
+    message: string;
+    level: "error" | "warn";
+  } | null>(null);
   const [imageReady, setImageReady] = useState(false);
   const [hasSelection, setHasSelection] = useState(false);
   const [isDrawingRect, setIsDrawingRect] = useState(false);
@@ -167,7 +179,7 @@ export function ProductMaskEditor({
         if (!cancelled) {
           setImageReady(false);
           setLoadError(
-            err instanceof Error ? err.message : "Не удалось загрузить фото"
+            err instanceof Error ? err.message : me.loadPhotoFailed
           );
         }
       })
@@ -183,7 +195,7 @@ export function ProductMaskEditor({
       dimLayerRef.current = null;
       tintLayerRef.current = null;
     };
-  }, [imageUrl]);
+  }, [imageUrl, me.loadPhotoFailed]);
 
   useLayoutEffect(() => {
     if (!imageReady || loading) return;
@@ -273,7 +285,7 @@ export function ProductMaskEditor({
     setIsDrawingRect(false);
 
     const ratio = getMaskCoverageRatio(dataCanvas);
-    setCoverageHint(rectangleCoverageHint(ratio));
+    setCoverageHint(rectangleCoverageHint(ratio, me));
     renderView();
   };
 
@@ -301,11 +313,11 @@ export function ProductMaskEditor({
     try {
       const filledCoverage = getMaskCoverageRatio(dataCanvas);
       if (filledCoverage < 0.001) {
-        setApplyError("Нарисуйте рамку вокруг товара на фото.");
+        setApplyError(me.drawFrameFirst);
         return;
       }
 
-      const hint = rectangleCoverageHint(filledCoverage);
+      const hint = rectangleCoverageHint(filledCoverage, me);
       if (hint && filledCoverage > 0.45) {
         setCoverageHint(hint);
         return;
@@ -316,7 +328,7 @@ export function ProductMaskEditor({
       exportMask.height = dataCanvas.height;
       const exportCtx = exportMask.getContext("2d");
       if (!exportCtx) {
-        throw new Error("Canvas не поддерживается");
+        throw new Error(copy.errors.canvasUnsupported);
       }
       exportCtx.drawImage(dataCanvas, 0, 0);
 
@@ -336,7 +348,7 @@ export function ProductMaskEditor({
       onApply({ file, previewUrl, coverageRatio: filledCoverage });
     } catch (err) {
       setApplyError(
-        err instanceof Error ? err.message : "Не удалось применить выделение"
+        err instanceof Error ? err.message : me.applyFailed
       );
     }
   };
@@ -348,18 +360,16 @@ export function ProductMaskEditor({
           type="button"
           onClick={onCancel}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-border bg-white text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
-          aria-label="Назад"
+          aria-label={copy.common.back}
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-slate-950">Рамка вокруг товара</p>
-          <p className="text-xs text-slate-500">
-            ИИ вырежет предмет внутри прямоугольника
-          </p>
+          <p className="text-sm font-semibold text-slate-950">{mask.title}</p>
+          <p className="text-xs text-slate-500">{me.instructionsIntro}</p>
         </div>
         <Badge variant="outline" className="shrink-0">
-          Шаг 2
+          {mask.stepBadge}
         </Badge>
       </div>
 
@@ -372,22 +382,11 @@ export function ProductMaskEditor({
 
         {!loadError && (
           <>
-            <div className="space-y-2">
-              <p
-                className="rounded-[12px] border border-teal-200/90 bg-teal-50 px-3 py-2.5 text-xs leading-5 text-teal-950"
-                role="status"
-              >
-                <strong>Как это работает:</strong> потяните мышью{" "}
-                <strong>прямоугольник</strong> вокруг товара. Внутри рамки ИИ
-                оставит только ткань/предмет, фон и лишнее уберёт. Рамка не
-                должна захватывать всю модель — только трусы, лиф или сам товар.
-              </p>
-              <ul className="rounded-[12px] border border-border/80 bg-slate-50/80 px-3 py-2.5 text-xs leading-5 text-slate-600">
-                <li>• Зелёная область — зона для ИИ (не итоговая карточка).</li>
-                <li>• Новая рамка заменяет предыдущую.</li>
-                <li>• После «Сохранить» станет доступно «Создать карточку».</li>
-              </ul>
-            </div>
+            <ul className="rounded-[12px] border border-border/80 bg-slate-50/80 px-3 py-2.5 text-xs leading-5 text-slate-600">
+              <li>• {me.instruction1}</li>
+              <li>• {me.instruction2}</li>
+              <li>• {me.instruction3}</li>
+            </ul>
 
             <div
               className="relative mx-auto max-w-full overflow-hidden rounded-[18px] border border-border bg-slate-100 shadow-inner"
@@ -395,7 +394,7 @@ export function ProductMaskEditor({
             >
               {loading && (
                 <div className="absolute inset-0 z-10 flex min-h-[200px] items-center justify-center bg-slate-100 text-sm text-slate-600">
-                  Загружаем изображение…
+                  {copy.status.analyzingProduct}
                 </div>
               )}
               <canvas
@@ -417,7 +416,7 @@ export function ProductMaskEditor({
               {!loading && !hasSelection && !isDrawingRect && (
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4">
                   <p className="rounded-[12px] bg-white/90 px-3 py-2 text-center text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200/80">
-                    Потяните от угла к углу — рамка вокруг товара
+                    {me.instruction1}
                   </p>
                 </div>
               )}
@@ -426,17 +425,17 @@ export function ProductMaskEditor({
             <div className="flex items-center justify-between gap-2 rounded-[14px] border border-border bg-slate-100/80 px-3 py-2.5">
               <span className="inline-flex items-center gap-2 text-xs font-semibold text-teal-900">
                 <Square className="h-4 w-4 shrink-0" aria-hidden />
-                Только прямоугольник
+                {me.instruction1}
               </span>
               <button
                 type="button"
                 onClick={handleClear}
                 disabled={!hasSelection}
                 className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-white hover:text-slate-900 disabled:opacity-40"
-                aria-label="Сбросить рамку"
+                aria-label={me.resetFrameAria}
               >
                 <RotateCcw className="h-3.5 w-3.5" />
-                Сбросить рамку
+                {mask.resetFrame}
               </button>
             </div>
 
@@ -449,13 +448,13 @@ export function ProductMaskEditor({
               <p
                 className={cn(
                   "text-xs leading-5",
-                  coverageHint.includes("слишком большая")
+                  coverageHint.level === "error"
                     ? "text-amber-900"
                     : "text-slate-600"
                 )}
                 role="status"
               >
-                {coverageHint}
+                {coverageHint.message}
               </p>
             )}
 
@@ -470,7 +469,7 @@ export function ProductMaskEditor({
                   onClick={handleApply}
                 >
                   <Check className="h-4 w-4 shrink-0" />
-                  Сохранить рамку
+                  {mask.saveFrame}
                 </Button>
                 <Button
                   type="button"
@@ -479,12 +478,9 @@ export function ProductMaskEditor({
                   className="w-full"
                   onClick={onCancel}
                 >
-                  Отменить
+                  {copy.common.cancel}
                 </Button>
               </div>
-              <p className="mt-2 text-center text-xs leading-5 text-slate-500">
-                На карточке останется вырезка внутри рамки, не весь прямоугольник
-              </p>
             </div>
           </>
         )}

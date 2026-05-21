@@ -19,19 +19,10 @@ import {
 import { ProductSetProgressRail } from "@/components/studio/ProductSetProgressRail";
 import type { ProductSetSlotProgress } from "@/lib/studio/productSetProgress";
 import { TryOnResultActions } from "@/components/studio/TryOnResultActions";
+import { formatStudioString } from "@/lib/studio/i18n";
+import { useStudioCopy } from "./StudioLocaleContext";
 
 export type ClothingPreviewTabId = "product" | "model" | "result";
-
-const MOBILE_TABS: { id: ClothingPreviewTabId; label: string }[] = [
-  { id: "product", label: "Товар" },
-  { id: "model", label: "Модель" },
-  { id: "result", label: "Итог" },
-];
-
-const DESKTOP_SOURCE_TABS: { id: "product" | "model"; label: string }[] = [
-  { id: "product", label: "Товар" },
-  { id: "model", label: "Модель" },
-];
 
 type ClothingPreviewPanelProps = {
   modelOutputAspect: FalModelAspectRatio;
@@ -79,6 +70,7 @@ function TabButton({
   onClick: () => void;
   size?: "default" | "mobile";
 }) {
+  const { copy } = useStudioCopy();
   const isMobile = size === "mobile";
   return (
     <button
@@ -107,7 +99,7 @@ function TabButton({
       {ready ? (
         <span
           className="h-1 w-1 shrink-0 rounded-full bg-teal-500"
-          aria-label="Есть превью"
+          aria-label={copy.common.hasPreview}
         />
       ) : null}
     </button>
@@ -115,10 +107,11 @@ function TabButton({
 }
 
 function AspectBadge({ label }: { label: string }) {
+  const { copy } = useStudioCopy();
   return (
     <span
       className="inline-flex shrink-0 items-center rounded-lg bg-slate-100/90 px-2.5 py-1.5 ring-1 ring-slate-200/50"
-      aria-label={`Формат ${label}`}
+      aria-label={formatStudioString(copy.common.formatLabel, { label })}
     >
       <span className="font-mono text-[10px] font-semibold tabular-nums text-slate-700">
         {label}
@@ -142,6 +135,7 @@ function PreviewTabBar({
   aspectLabel?: string;
   fullWidth?: boolean;
 }) {
+  const { copy } = useStudioCopy();
   return (
     <div
       className={cn(
@@ -151,7 +145,7 @@ function PreviewTabBar({
     >
       <div
         role="tablist"
-        aria-label="Превью пайплайна"
+        aria-label={copy.clothingPreview.previewPipeline}
         className={cn(
           "flex gap-0.5 bg-slate-100/90 ring-1 ring-slate-200/50",
           fullWidth
@@ -211,6 +205,21 @@ export function ClothingPreviewPanel({
   productSetSlots = [],
   productSetActiveIndex = 0,
 }: ClothingPreviewPanelProps) {
+  const { copy } = useStudioCopy();
+  const cp = copy.clothingPreview;
+  const common = copy.common;
+
+  const mobileTabs: { id: ClothingPreviewTabId; label: string }[] = [
+    { id: "product", label: common.product },
+    { id: "model", label: common.model },
+    { id: "result", label: common.result },
+  ];
+
+  const desktopSourceTabs: { id: "product" | "model"; label: string }[] = [
+    { id: "product", label: common.product },
+    { id: "model", label: common.model },
+  ];
+
   const syncCarousel =
     productCarouselItems.length > 1 ||
     modelCarouselItems.length > 1 ||
@@ -238,9 +247,9 @@ export function ClothingPreviewPanel({
     <PreviewCard
       {...previewPropsFor(productPreviewAspect)}
       className={mobilePreviewCardClass}
-      title="Товар"
+      title={common.product}
       url={productCarouselItems.length === 1 ? productUrl : null}
-      empty="Загрузите фото"
+      empty={copy.generationResults.uploadPhoto}
       content={
         productCarouselItems.length > 1 ? (
           <PreviewImageCarousel
@@ -271,18 +280,18 @@ export function ClothingPreviewPanel({
     productSetCountdownStartedAt ?? modelCountdownStartedAt;
   const modelCountdownText =
     productSetCountdownLabel ??
-    (productSetPipelineActive ? "Создаём комплект" : "Создаём AI-модель");
+    (productSetPipelineActive ? cp.creatingSet : cp.creatingAiModel);
 
   const modelCard = (
     <PreviewCard
       {...previewPropsFor(modelPreviewAspect)}
       className={mobilePreviewCardClass}
-      title="AI-модель"
+      title={common.model}
       url={modelCarouselItems.length === 1 ? modelUrl : null}
       empty={
         productSetPipelineActive && pipelineBusy
-          ? "Запускаем комплект…"
-          : "Появится после генерации"
+          ? cp.startingSet
+          : cp.afterGeneration
       }
       loading={modelPipelineLoading}
       loadingVariant={modelShowCountdown ? "countdown" : "spinner"}
@@ -314,7 +323,7 @@ export function ClothingPreviewPanel({
                 className="h-9 w-full text-xs"
                 onClick={onDownloadAllModels}
               >
-                Скачать все
+                {common.downloadAll}
               </Button>
             ) : null}
             <Button
@@ -325,7 +334,7 @@ export function ClothingPreviewPanel({
               onClick={onReplaceModel}
             >
               <RotateCcw className="h-3.5 w-3.5" />
-              Сменить модель
+              {cp.changeModel}
             </Button>
           </div>
         ) : undefined
@@ -342,9 +351,9 @@ export function ClothingPreviewPanel({
     <PreviewCard
       {...previewPropsFor(resultPreviewAspect)}
       className={mobilePreviewCardClass}
-      title="Итоговый результат"
+      title={cp.finalResult}
       url={resultCarouselItems.length === 1 ? resultUrl : null}
-      empty="Создайте фото на модели"
+      empty={cp.createOnModel}
       loading={pipelineBusy && !activeResultUrl}
       loadingVariant="countdown"
       countdownSeconds={
@@ -352,8 +361,8 @@ export function ClothingPreviewPanel({
       }
       countdownLabel={
         productSetPipelineActive
-          ? (tryOnProgress ?? "Создаём комплект")
-          : "Создаём фото на модели"
+          ? (tryOnProgress ?? cp.creatingSetProgress)
+          : copy.actions.createOnModel
       }
       countdownStartedAt={
         productSetCountdownStartedAt ?? pipelineCountdownStartedAt
@@ -407,7 +416,7 @@ export function ClothingPreviewPanel({
       <div className="hidden w-full max-w-[656px] items-start gap-4 lg:flex">
         <div className="w-[320px] shrink-0">
           <PreviewTabBar
-            tabs={DESKTOP_SOURCE_TABS}
+            tabs={desktopSourceTabs}
             activeTab={desktopSourceTab}
             tabReady={tabReady}
             aspectLabel={
@@ -425,18 +434,20 @@ export function ClothingPreviewPanel({
         <div className="w-[320px] shrink-0">
           <div className="mb-2 flex items-center gap-2">
             <div className="flex min-w-0 flex-1 items-center justify-center rounded-lg bg-slate-100/90 px-2.5 py-1.5 ring-1 ring-slate-200/50">
-              <span className="text-xs font-semibold text-slate-800">Итог</span>
+              <span className="text-xs font-semibold text-slate-800">
+                {common.result}
+              </span>
             </div>
             <AspectBadge label={resultPreviewAspect.badge} />
           </div>
-          <div aria-label="Итоговый результат">{resultCard}</div>
+          <div aria-label={cp.finalResultAria}>{resultCard}</div>
         </div>
       </div>
 
       {/* Mobile: full-width segmented tabs + preview */}
       <div className="flex w-full flex-col max-lg:-mx-4 max-lg:w-[calc(100%+2rem)] lg:hidden">
         <PreviewTabBar
-          tabs={MOBILE_TABS}
+          tabs={mobileTabs}
           activeTab={activeTab}
           tabReady={tabReady}
           onTabChange={onTabChange}

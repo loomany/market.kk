@@ -1,29 +1,24 @@
 "use client";
 
+import { useMemo } from "react";
 import { Select } from "@/components/ui/Select";
 import { VIDEO_MODELS, type VideoModelKey } from "@/lib/ai/videoModels";
+import type { SaasQualityTier } from "./ImageSettingsForm";
 import {
-  SAAS_QUALITY_OPTIONS,
-  type SaasQualityTier,
-} from "./ImageSettingsForm";
+  formatVideoDurationLabel,
+  getSaasQualityOptions,
+  getVideoFrameFormatOptions,
+  getVideoMotionPresets,
+} from "@/lib/studio/i18n/studioFormOptions";
+import { useStudioCopy } from "./StudioLocaleContext";
 
-export const VIDEO_MOTION_PRESETS = [
-  { id: "subtle-motion", label: "Мягкое движение камеры" },
-  { id: "model-turn", label: "Поворот модели" },
-  { id: "camera-push", label: "Приближение" },
-  { id: "product-fidelity", label: "Товар без искажений" },
-] as const;
-
-export type VideoMotionPresetId = (typeof VIDEO_MOTION_PRESETS)[number]["id"];
+export type VideoMotionPresetId =
+  | "subtle-motion"
+  | "model-turn"
+  | "camera-push"
+  | "product-fidelity";
 
 export type VideoAspectRatio = "1:1" | "4:5" | "9:16" | "16:9";
-
-const VIDEO_FRAME_OPTIONS = [
-  { value: "9:16", label: "9:16 — Reels / Stories" },
-  { value: "4:5", label: "4:5 — маркетплейсы / соцсети" },
-  { value: "1:1", label: "1:1 — квадрат" },
-  { value: "16:9", label: "16:9 — горизонтальное видео" },
-] as const;
 
 /** Pick closest API quality tier supported by the selected video model. */
 export function mapSaasQualityToVideoApi(
@@ -65,23 +60,37 @@ export function VideoSettingsForm({
   onMotionPresetChange,
   disabled,
 }: VideoSettingsFormProps) {
+  const { locale, copy } = useStudioCopy();
   const model = VIDEO_MODELS[modelKey];
-  const frameOptions = VIDEO_FRAME_OPTIONS.filter((opt) =>
+  const frameOptionsAll = useMemo(
+    () => getVideoFrameFormatOptions(locale),
+    [locale]
+  );
+  const qualityOptions = useMemo(
+    () => getSaasQualityOptions(locale),
+    [locale]
+  );
+  const motionPresets = useMemo(
+    () => getVideoMotionPresets(locale),
+    [locale]
+  );
+  const frameOptions = frameOptionsAll.filter((opt) =>
     model.aspectRatioOptions.includes(opt.value as VideoAspectRatio)
   );
+  const f = copy.form;
 
   return (
     <div className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2">
         <Select
-          label="Формат файла"
+          label={f.fileFormat}
           value="mp4"
           disabled
           onChange={() => undefined}
           options={[{ value: "mp4", label: "MP4" }]}
         />
         <Select
-          label="Формат кадра"
+          label={f.frameFormat}
           value={aspectRatio}
           disabled={disabled}
           onChange={(value) =>
@@ -89,35 +98,35 @@ export function VideoSettingsForm({
           }
           options={
             frameOptions.length > 0
-              ? [...frameOptions]
-              : [{ value: "9:16", label: "9:16 — Reels / Stories" }]
+              ? frameOptions
+              : [frameOptionsAll.find((o) => o.value === "9:16")!]
           }
         />
         <Select
-          label="Качество"
+          label={f.quality}
           value={quality}
           disabled={disabled}
           onChange={(value) => onQualityChange(value as SaasQualityTier)}
-          options={[...SAAS_QUALITY_OPTIONS]}
+          options={qualityOptions}
         />
         <Select
-          label="Длительность"
+          label={f.duration}
           value={String(durationSeconds)}
           disabled={disabled}
           onChange={(value) => onDurationChange(Number(value))}
           options={model.durationOptions.map((value) => ({
             value: String(value),
-            label: `${value} сек`,
+            label: formatVideoDurationLabel(locale, value),
           }))}
         />
         <Select
-          label="Движение"
+          label={f.motion}
           value={motionPreset}
           disabled={disabled}
           onChange={(value) =>
             onMotionPresetChange(value as VideoMotionPresetId)
           }
-          options={VIDEO_MOTION_PRESETS.map((preset) => ({
+          options={motionPresets.map((preset) => ({
             value: preset.id,
             label: preset.label,
           }))}

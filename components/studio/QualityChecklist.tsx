@@ -3,11 +3,12 @@
 import {
   isChecklistComplete,
   QUALITY_CHECKLIST_KEYS,
-  QUALITY_CHECKLIST_LABELS_RU,
 } from "@/lib/ai/qualityChecklist";
 import type { QualityChecklistKey, QualityChecklistState } from "./types";
 import { Badge } from "@/components/ui/Badge";
+import { formatStudioString } from "@/lib/studio/i18n";
 import { cn } from "@/lib/utils";
+import { useStudioCopy } from "./StudioLocaleContext";
 
 type QualityChecklistProps = {
   checklist: QualityChecklistState;
@@ -20,6 +21,8 @@ export function QualityChecklist({
   onChange,
   compact,
 }: QualityChecklistProps) {
+  const { copy } = useStudioCopy();
+  const c = copy.qualityChecklist;
   const completed = QUALITY_CHECKLIST_KEYS.filter((k) => checklist[k]).length;
   const total = QUALITY_CHECKLIST_KEYS.length;
   const complete = isChecklistComplete(checklist);
@@ -28,19 +31,17 @@ export function QualityChecklist({
     <div className={cn("space-y-2", compact && "text-sm")}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs font-medium text-slate-600">
-          Проверка качества · {completed}/{total}
+          {formatStudioString(c.header, { completed, total })}
         </span>
         {complete ? (
-          <Badge variant="success">Готово к скачиванию</Badge>
+          <Badge variant="success">{c.readyBadge}</Badge>
         ) : (
-          <Badge variant="outline">Проверьте перед публикацией</Badge>
+          <Badge variant="outline">{c.reviewBadge}</Badge>
         )}
       </div>
 
       {!complete && (
-        <p className="text-xs leading-5 text-amber-700">
-          Отметьте все пункты только если товар выглядит правильно.
-        </p>
+        <p className="text-xs leading-5 text-amber-700">{c.hint}</p>
       )}
 
       <ul className="space-y-1.5">
@@ -53,7 +54,7 @@ export function QualityChecklist({
                 onChange={(e) => onChange(key, e.target.checked)}
                 className="mt-1 h-4 w-4 rounded border-border accent-teal-700"
               />
-              <span>{QUALITY_CHECKLIST_LABELS_RU[key]}</span>
+              <span>{c[key]}</span>
             </label>
           </li>
         ))}

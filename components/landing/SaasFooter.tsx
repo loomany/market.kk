@@ -1,10 +1,7 @@
 import Link from "next/link";
-import { ArrowRight, Globe2 } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import type { Locale } from "@/lib/i18n/localeConfig";
-import { indexableLocales, supportedLocales } from "@/lib/i18n/localeConfig";
 import type { getLandingCopy } from "@/lib/i18n/translations";
-import { LocaleSwitchLink } from "@/components/i18n/LocaleSwitchLink";
-import { cn } from "@/lib/utils";
 
 type LandingCopy = ReturnType<typeof getLandingCopy>;
 
@@ -59,78 +56,6 @@ function FooterColumn({
   );
 }
 
-function FooterLanguageGrid({
-  locale,
-  title,
-  subtitle,
-}: {
-  locale: Locale;
-  title: string;
-  subtitle: string;
-}) {
-  return (
-    <div className="rounded-[22px] border border-border/80 bg-white p-5 shadow-sm sm:p-6">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
-            <Globe2 className="h-5 w-5" aria-hidden />
-          </span>
-          <div>
-            <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
-            <p className="mt-0.5 text-xs leading-5 text-slate-500">{subtitle}</p>
-          </div>
-        </div>
-        <p className="text-xs font-medium text-slate-400 sm:pb-0.5">
-          {indexableLocales.length}{" "}
-          {locale === "ru" ? "индексируемых локали" : "indexable locales"}
-        </p>
-      </div>
-
-      <div
-        className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
-        role="navigation"
-        aria-label={title}
-      >
-        {supportedLocales
-          .filter((item) => (indexableLocales as readonly Locale[]).includes(item.code))
-          .map((item) => {
-          const active = item.code === locale;
-          return (
-            <LocaleSwitchLink
-              key={item.code}
-              targetLocale={item.code}
-              active={active}
-              className={cn(
-                "group flex min-w-0 items-center gap-2 rounded-xl border px-3 py-2.5 transition-all",
-                active
-                  ? "border-teal-300 bg-teal-50 shadow-sm ring-1 ring-teal-500/10"
-                  : "border-border/70 bg-slate-50/60 hover:border-teal-200 hover:bg-white hover:shadow-sm"
-              )}
-            >
-              <span
-                className={cn(
-                  "shrink-0 text-xs font-bold uppercase tracking-wide",
-                  active ? "text-teal-800" : "text-slate-500 group-hover:text-teal-700"
-                )}
-              >
-                {item.code.toUpperCase()}
-              </span>
-              <span
-                className={cn(
-                  "truncate text-sm",
-                  active ? "font-medium text-slate-900" : "text-slate-600"
-                )}
-              >
-                {item.nativeLabel}
-              </span>
-            </LocaleSwitchLink>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 export function SaasFooter({
   locale,
   copy,
@@ -165,6 +90,10 @@ export function SaasFooter({
               {copy.nav.openStudio}
               <ArrowRight className="h-4 w-4" aria-hidden />
             </Link>
+            <p className="text-xs text-slate-500">
+              © {year} Vitrina AI Studio.{" "}
+              {isRu ? "Все права защищены." : "All rights reserved."}
+            </p>
           </div>
 
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
@@ -189,45 +118,6 @@ export function SaasFooter({
               title={isRu ? "Материалы" : "Resources"}
               links={resourceLinks}
             />
-          </div>
-        </div>
-
-        <div className="mt-10 lg:mt-12">
-          <FooterLanguageGrid
-            locale={locale}
-            title={isRu ? "Язык интерфейса" : "Interface language"}
-            subtitle={
-              isRu
-                ? "Переключение RU/EN сохраняет текущую страницу, если перевод опубликован."
-                : "RU/EN switching keeps the current page when a published translation exists."
-            }
-          />
-        </div>
-
-        <div className="mt-10 flex flex-col gap-4 border-t border-border/70 pt-6 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-slate-500">
-            © {year} Vitrina AI Studio.{" "}
-            {isRu ? "Все права защищены." : "All rights reserved."}
-          </p>
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <Link
-              href={`/${locale}/privacy`}
-              className="text-xs font-medium text-slate-500 transition-colors hover:text-teal-800"
-            >
-              {isRu ? "Приватность" : "Privacy"}
-            </Link>
-            <Link
-              href={`/${locale}/terms`}
-              className="text-xs font-medium text-slate-500 transition-colors hover:text-teal-800"
-            >
-              {isRu ? "Условия" : "Terms"}
-            </Link>
-            <Link
-              href="/llms.txt"
-              className="text-xs font-medium text-slate-500 transition-colors hover:text-teal-800"
-            >
-              llms.txt
-            </Link>
           </div>
         </div>
       </div>

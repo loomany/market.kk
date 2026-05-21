@@ -11,6 +11,7 @@ import {
   isPaidAiGuardError,
   paidAiGuardResponse,
 } from "@/lib/ai/paidAiGuard";
+import { wrapAiPost } from "@/lib/tokens/wrapAiPost";
 
 export const runtime = "nodejs";
 
@@ -34,6 +35,10 @@ function mockRefinement(): RefineProductMaskSuccessResponse {
 }
 
 export async function POST(request: Request) {
+  return wrapAiPost(request, "mask-refine", ROUTE_ID, handleRefineProductMaskPost);
+}
+
+async function handleRefineProductMaskPost(request: Request) {
   let formData: FormData;
   try {
     formData = await request.formData();

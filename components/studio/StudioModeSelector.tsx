@@ -2,7 +2,9 @@
 
 import { Clapperboard, Gem, Shirt } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { STUDIO_MODES, type StudioMode } from "./types";
+import { getStudioModes } from "@/lib/studio/i18n/studioOptionLists";
+import { useStudioCopy } from "./StudioLocaleContext";
+import type { StudioMode } from "./types";
 
 type StudioModeSelectorProps = {
   value: StudioMode;
@@ -19,9 +21,12 @@ export function StudioModeSelector({
   value,
   onChange,
 }: StudioModeSelectorProps) {
+  const { locale } = useStudioCopy();
+  const modes = getStudioModes(locale);
+
   return (
       <div className="grid gap-3 md:grid-cols-3">
-        {STUDIO_MODES.map((mode) => {
+        {modes.map((mode) => {
           const Icon = modeIcons[mode.id];
           const selected = value === mode.id;
 

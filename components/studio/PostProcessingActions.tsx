@@ -3,6 +3,7 @@
 import { Clapperboard, ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PostProcessingMode } from "@/lib/studio/postProcessingEditors";
+import { useStudioCopy } from "./StudioLocaleContext";
 
 type PostProcessingActionsProps = {
   value: PostProcessingMode | null;
@@ -10,23 +11,25 @@ type PostProcessingActionsProps = {
   disabled?: boolean;
 };
 
-const actions: {
-  id: PostProcessingMode;
-  label: string;
-  icon: typeof Clapperboard;
-}[] = [
-  { id: "image", label: "Изображение", icon: ImageIcon },
-  { id: "video", label: "Видео", icon: Clapperboard },
-];
-
 export function PostProcessingActions({
   value,
   onChange,
   disabled,
 }: PostProcessingActionsProps) {
+  const { copy } = useStudioCopy();
+  const p = copy.postProcessingActions;
+  const actions: {
+    id: PostProcessingMode;
+    label: string;
+    icon: typeof Clapperboard;
+  }[] = [
+    { id: "image", label: p.image, icon: ImageIcon },
+    { id: "video", label: p.video, icon: Clapperboard },
+  ];
+
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-semibold text-slate-950">Что создать?</h3>
+      <h3 className="text-sm font-semibold text-slate-950">{p.whatCreate}</h3>
       <div className="grid grid-cols-2 gap-2">
         {actions.map((action) => {
           const Icon = action.icon;

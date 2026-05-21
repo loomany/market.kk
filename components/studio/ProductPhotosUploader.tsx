@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { Upload, X } from "lucide-react";
-import { validateImageFileClient } from "@/lib/ai/clientImageValidation";
+import { formatStudioString } from "@/lib/studio/i18n";
+import { validateStudioImageFile } from "@/lib/studio/i18n/validateStudioImageFile";
 import {
   MAX_CLOTHING_PRODUCT_SET,
   type StudioProductPhoto,
 } from "@/lib/studio/productPhotos";
 import { cn } from "@/lib/utils";
+import { useStudioCopy } from "./StudioLocaleContext";
 
 type ProductPhotosUploaderProps = {
   label: string;
@@ -15,7 +17,6 @@ type ProductPhotosUploaderProps = {
   photos: StudioProductPhoto[];
   activePhotoId: string | null;
   maxPhotos?: number;
-  /** Товарная карточка: одно фото, другие подписи в зоне загрузки */
   singlePhotoMode?: boolean;
   onAddFiles: (files: File[]) => void;
   onSelectPhoto: (id: string) => void;
@@ -37,6 +38,7 @@ export function ProductPhotosUploader({
   onClearAll,
   className,
 }: ProductPhotosUploaderProps) {
+  const { locale, copy } = useStudioCopy();
   const [dragActive, setDragActive] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const activePhoto =
@@ -50,7 +52,7 @@ export function ProductPhotosUploader({
     for (let i = 0; i < fileList.length; i++) {
       const file = fileList.item(i);
       if (!file) continue;
-      const validationError = validateImageFileClient(file);
+      const validationError = validateStudioImageFile(file, locale);
       if (validationError) {
         setUploadError(validationError);
         return;
@@ -59,10 +61,11 @@ export function ProductPhotosUploader({
     }
     if (valid.length === 0) return;
 
-    const slotsLeft = maxPhotos - photos.length;
     if (photos.length === 0) {
       if (valid.length > maxPhotos) {
-        setUploadError(`Можно загрузить до ${maxPhotos} фото.`);
+        setUploadError(
+          formatStudioString(copy.upload.maxPhotos, { max: maxPhotos })
+        );
         onAddFiles(valid.slice(0, maxPhotos));
         return;
       }
@@ -119,13 +122,13 @@ export function ProductPhotosUploader({
           <Upload className="mb-2 h-6 w-6 text-teal-700" />
           <span className="text-sm font-semibold text-slate-800">
             {singlePhotoMode
-              ? "Выберите одно фото или перетащите сюда"
-              : `Выберите до ${maxPhotos} фото или перетащите сюда`}
+              ? copy.upload.dropzoneSingle
+              : formatStudioString(copy.upload.dropzoneMulti, { max: maxPhotos })}
           </span>
           <span className="mt-1 text-xs text-slate-500">
             {singlePhotoMode
-              ? "Товар крупно в кадре — на шаге 2 нарисуйте рамку вокруг него"
-              : "Фронт, спина, 3/4 — одним комплектом"}
+              ? copy.upload.dropzoneHintSingle
+              : copy.upload.dropzoneHintMulti}
           </span>
           <input
             type="file"
@@ -143,8 +146,10 @@ export function ProductPhotosUploader({
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-medium text-slate-600">
               {photos.length === 1
-                ? "1 фото товара"
-                : `Комплект: ${photos.length} фото`}
+                ? copy.upload.oneProductPhoto
+                : formatStudioString(copy.upload.setCount, {
+                    count: photos.length,
+                  })}
             </p>
             <button
               type="button"
@@ -153,9 +158,9 @@ export function ProductPhotosUploader({
                 onClearAll();
               }}
               className="text-xs font-medium text-red-600/90 hover:text-red-800"
-              title="Удалить фото, рамку и сбросить карточку"
+              title={copy.upload.clearAllTitle}
             >
-              Удалить всё
+              {copy.upload.clearAll}
             </button>
           </div>
 
@@ -176,7 +181,9 @@ export function ProductPhotosUploader({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={photo.previewUrl}
-                    alt={`Ракурс ${index + 1}`}
+                    alt={formatStudioString(copy.upload.angleAlt, {
+                      n: index + 1,
+                    })}
                     className="h-full w-full object-cover"
                   />
                   <span className="absolute bottom-0 left-0 right-0 bg-black/50 py-0.5 text-center text-[9px] font-medium text-white">
@@ -192,24 +199,24 @@ export function ProductPhotosUploader({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={activePhoto.previewUrl}
-                alt="Предпросмотр товара"
+                alt={copy.upload.previewAlt}
                 className="w-full object-contain"
               />
               <button
                 type="button"
-                aria-label="Удалить фото товара и сбросить рамку"
-                title="Удалить фото и рамку (не то же самое, что «Создать ещё раз»)"
                 onClick={() => onRemovePhoto(activePhoto.id)}
-                className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-white/95 text-slate-600 shadow-sm hover:bg-slate-50"
+                className="absolute right-2 top-2 rounded-full bg-black/55 p-1.5 text-white hover:bg-black/70"
+                aria-label={copy.common.delete}
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
           ) : null}
 
-          {!atLimit ? (
-            <label className="flex cursor-pointer items-center justify-center rounded-[14px] border border-border bg-white px-3 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:border-teal-300 hover:bg-teal-50/50">
-              Добавить ещё фото ({photos.length}/{maxPhotos})
+          {!atLimit && !singlePhotoMode ? (
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-[16px] border border-dashed border-border bg-white px-3 py-2.5 text-xs font-medium text-teal-800 hover:bg-teal-50/50">
+              <Upload className="h-4 w-4" />
+              {copy.upload.dropzoneSelect}
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
@@ -221,9 +228,9 @@ export function ProductPhotosUploader({
                 }}
               />
             </label>
-          ) : (
-            <label className="flex cursor-pointer items-center justify-center rounded-[14px] border border-border bg-white px-3 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:border-teal-300 hover:bg-teal-50/50">
-              {maxPhotos === 1 ? "Заменить фото" : "Заменить комплект"}
+          ) : singlePhotoMode ? (
+            <label className="flex cursor-pointer items-center justify-center rounded-[16px] border border-border bg-white px-3 py-2.5 text-xs font-semibold text-teal-800 hover:bg-teal-50/50">
+              {copy.upload.replacePhoto}
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
@@ -234,7 +241,7 @@ export function ProductPhotosUploader({
                 }}
               />
             </label>
-          )}
+          ) : null}
         </div>
       )}
     </div>

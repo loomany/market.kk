@@ -2,22 +2,28 @@
 
 import { Check, Circle, Loader2 } from "lucide-react";
 import type { ProductSetSlotProgress } from "@/lib/studio/productSetProgress";
+import { formatStudioString } from "@/lib/studio/i18n";
 import { cn } from "@/lib/utils";
+import { useStudioCopy } from "./StudioLocaleContext";
+import type { StudioCopyFull } from "@/lib/studio/i18n/studioCopyTypes";
 
-function phaseLabel(phase: ProductSetSlotProgress["phase"]): string {
+function phaseLabel(
+  phase: ProductSetSlotProgress["phase"],
+  p: StudioCopyFull["productSetProgress"]
+): string {
   switch (phase) {
     case "analyzing":
-      return "Анализ";
+      return p.analyze;
     case "model":
-      return "Модель";
+      return p.model;
     case "tryon":
-      return "Примерка";
+      return p.tryon;
     case "done":
-      return "Готово";
+      return p.done;
     case "error":
-      return "Ошибка";
+      return p.error;
     default:
-      return "Ожидание";
+      return p.waiting;
   }
 }
 
@@ -30,6 +36,9 @@ export function ProductSetProgressRail({
   activeIndex: number;
   detail?: string | null;
 }) {
+  const { copy } = useStudioCopy();
+  const p = copy.productSetProgress;
+
   if (slots.length < 2) return null;
 
   const done = slots.filter((s) => s.phase === "done").length;
@@ -38,7 +47,10 @@ export function ProductSetProgressRail({
     <div className="rounded-[14px] border border-slate-200 bg-slate-50/90 px-3 py-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-xs font-semibold text-slate-900">
-          Комплект: {done} из {slots.length} готово
+          {formatStudioString(p.setProgress, {
+            done,
+            total: slots.length,
+          })}
         </p>
         <p className="text-[11px] tabular-nums text-slate-500">
           {activeIndex + 1} / {slots.length}
@@ -74,16 +86,13 @@ export function ProductSetProgressRail({
                 {slot.label}
               </span>
               <span className="shrink-0 text-slate-500">
-                {phaseLabel(slot.phase)}
+                {phaseLabel(slot.phase, p)}
               </span>
             </li>
           );
         })}
       </ul>
-      <p className="mt-2 text-[11px] leading-4 text-slate-500">
-        Ракурсы обрабатываются по очереди (не параллельно) — так сохраняется
-        одно лицо модели.
-      </p>
+      <p className="mt-2 text-[11px] leading-4 text-slate-500">{p.serialHint}</p>
     </div>
   );
 }

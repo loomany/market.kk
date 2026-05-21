@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { SaasMicButton } from "@/components/ui/SaasMicButton";
 import type { Locale } from "@/lib/i18n/locales";
 import { speechRecognitionLang } from "@/lib/voice/speechRecognitionLocale";
+import { useStudioCopy } from "./StudioLocaleContext";
 
 const DESCRIPTION_MAX = 1000;
 
@@ -26,6 +27,8 @@ export function ModelPromptComposer({
   disabled = false,
   dictationLocale = "ru",
 }: ModelPromptComposerProps) {
+  const { copy } = useStudioCopy();
+  const p = copy.modelPrompt;
   const hasSavedDescription = Boolean(description.trim());
   const [additionOpen, setAdditionOpen] = useState(false);
   const [draft, setDraft] = useState(description);
@@ -70,12 +73,9 @@ export function ModelPromptComposer({
     <div className="space-y-3">
       <div className="space-y-0.5 px-0.5">
         <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-          Итоговый промт (превью)
+          {p.previewTitle}
         </span>
-        <p className="text-xs leading-5 text-slate-500">
-          Краткое превью на русском. Можете описать детали своими словами — при
-          генерации промт проходит ИИ-улучшение и перевод для модели.
-        </p>
+        <p className="text-xs leading-5 text-slate-500">{p.previewHint}</p>
       </div>
 
       <div className="space-y-1.5">
@@ -97,25 +97,21 @@ export function ModelPromptComposer({
           onClick={() => setAdditionOpen(true)}
         >
           <Plus className="h-4 w-4" aria-hidden />
-          Добавить своё описание
+          {p.addDescription}
         </Button>
       ) : (
         <div className="relative space-y-2 rounded-[12px] bg-slate-50/90 p-3">
           <div className="flex items-start justify-between gap-2">
             <div className="space-y-0.5">
               <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Ваше дополнение
+                {p.additionTitle}
               </span>
-              <p className="text-xs leading-5 text-slate-500">
-                Опишите фон, свет или настроение своими словами — не меняет
-                возраст, тип фигуры и позу из базы. При генерации текст пройдёт
-                ИИ-улучшение.
-              </p>
+              <p className="text-xs leading-5 text-slate-500">{p.additionHint}</p>
             </div>
             <button
               type="button"
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-              aria-label="Свернуть"
+              aria-label={copy.form.collapse}
               disabled={disabled}
               onClick={() => setAdditionOpen(false)}
             >
@@ -148,7 +144,7 @@ export function ModelPromptComposer({
             data-lpignore="true"
             data-bwignore
             aria-autocomplete="none"
-            placeholder="Например: белый фон Wildberries, мягкая тень за моделью, уверенная поза, руки по бокам"
+            placeholder={p.additionPlaceholder}
             className={cn(
               "min-h-[112px] w-full resize-y rounded-[12px] border border-border bg-white px-3 py-2.5 text-sm leading-6 text-slate-900 outline-none transition",
               "hover:border-slate-300 focus:border-teal-400 focus:ring-2 focus:ring-teal-100",
@@ -171,7 +167,7 @@ export function ModelPromptComposer({
                 disabled={disabled}
                 onClick={handleClearAddition}
               >
-                Убрать
+                {p.remove}
               </Button>
             )}
           </div>
@@ -183,7 +179,7 @@ export function ModelPromptComposer({
           <div className="flex items-start gap-2.5">
             <div className="min-w-0 flex-1 space-y-1">
               <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Ваше дополнение
+                {p.additionTitle}
               </span>
               <p className="line-clamp-3 text-sm leading-6 text-slate-700">
                 {description.trim()}
@@ -195,7 +191,7 @@ export function ModelPromptComposer({
               disabled={disabled}
               onClick={() => setAdditionOpen(true)}
             >
-              Изменить
+              {p.edit}
             </button>
           </div>
         </div>

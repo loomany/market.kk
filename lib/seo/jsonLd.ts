@@ -1,4 +1,5 @@
 import { siteDescription, siteName, siteShortName, absoluteUrl } from "./site";
+import { siteLogoUrl } from "./siteIcons";
 
 export type JsonLd = Record<string, unknown>;
 
@@ -8,6 +9,7 @@ export function organizationJsonLd(): JsonLd {
     "@type": "Organization",
     name: siteName,
     url: absoluteUrl("/"),
+    logo: absoluteUrl(siteLogoUrl),
     brand: siteShortName,
     description: siteDescription,
   };
@@ -32,6 +34,7 @@ export function softwareApplicationJsonLd(): JsonLd {
     applicationCategory: "BusinessApplication",
     operatingSystem: "Web",
     url: absoluteUrl("/ru"),
+    image: absoluteUrl(siteLogoUrl),
     description: siteDescription,
     offers: {
       "@type": "Offer",

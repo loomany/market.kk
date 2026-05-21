@@ -8,6 +8,7 @@ import {
   type ResolvedModelAngle,
 } from "@/lib/ai/modelAngles";
 import { cn } from "@/lib/utils";
+import { useStudioCopy } from "./StudioLocaleContext";
 
 type ModelAnglesFieldProps = {
   customAngles: ModelCustomAngle[];
@@ -32,6 +33,8 @@ export function ModelAnglesField({
   onClearProductPose,
   onCustomAnglesChange,
 }: ModelAnglesFieldProps) {
+  const { copy } = useStudioCopy();
+  const m = copy.modelAngles;
   const text = customAngles[0]?.text ?? "";
   const poseFromProduct = useProductSampleAngles;
 
@@ -51,8 +54,7 @@ export function ModelAnglesField({
     <div className="space-y-3">
       {productPhotoCount === 0 ? (
         <p className="rounded-[14px] border border-dashed border-slate-200 bg-slate-50/80 px-3 py-2 text-xs leading-5 text-slate-600">
-          Сначала загрузите фото в шаге «Товар» выше — затем можно подобрать
-          позу с него.
+          {m.uploadFirst}
         </p>
       ) : (
         <ProductPoseFromPhotoCard
@@ -72,7 +74,7 @@ export function ModelAnglesField({
             disabled={disabled || analyzingProductAngles}
             maxLength={MODEL_CUSTOM_TEXT_MAX}
             rows={3}
-            placeholder="Или опишите позу вручную: три четверти, руки на бёдрах…"
+            placeholder={m.posePlaceholder}
             onChange={(event) => setText(event.target.value)}
             className={cn(
               "w-full resize-y rounded-[12px] border bg-white px-3 py-2.5 text-base text-slate-900 shadow-sm outline-none transition sm:text-sm",

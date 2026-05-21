@@ -51,6 +51,7 @@ import {
   type OutputImageCheck,
   type SourceImageCheck,
 } from "@/lib/ai/imageEnhanceDebug";
+import { wrapAiPost } from "@/lib/tokens/wrapAiPost";
 
 export const runtime = "nodejs";
 
@@ -114,6 +115,10 @@ function finalizeTrace(t: TraceBuilder): ImageEnhanceDebugTrace | undefined {
 }
 
 export async function POST(request: Request) {
+  return wrapAiPost(request, "enhance", ROUTE_ID, handleImageEnhancePost);
+}
+
+async function handleImageEnhancePost(request: Request) {
   const traceId = newImageEnhanceTraceId();
   const debugEnabled = isImageEnhanceDebugEnabled();
   const trace = newTrace(traceId, debugEnabled);

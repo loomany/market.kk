@@ -7,6 +7,7 @@ import {
   siteUrl,
 } from "./site";
 import { getRobotsPolicy, type SeoQualityInput } from "./qualityGate";
+import { createSiteIconsMetadata } from "./siteIcons";
 
 export type SeoMetadataInput = SeoQualityInput & {
   title: string;
@@ -82,12 +83,6 @@ export function createLayoutMetadata(): Metadata {
       card: "summary_large_image",
       images: [defaultOgImageUrl()],
     },
-    icons: {
-      icon: [
-        { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
-        { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
-      ],
-      apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
-    },
+    ...createSiteIconsMetadata(),
   };
 }

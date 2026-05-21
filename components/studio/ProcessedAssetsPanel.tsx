@@ -23,11 +23,14 @@ import {
   getAssetDisplayTitle,
   isVideoAsset,
 } from "@/lib/studio/assetDisplayLabels";
+import type { PostProcessingMode } from "@/lib/studio/postProcessingEditors";
 import {
-  VIDEO_EDITORS,
-  getImageEditors,
-  type PostProcessingMode,
-} from "@/lib/studio/postProcessingEditors";
+  getLocalizedImageEditors,
+  getLocalizedVideoEditors,
+} from "@/lib/studio/i18n/postProcessingEditorsI18n";
+import { formatStudioString } from "@/lib/studio/i18n";
+import { useStudioCopy } from "./StudioLocaleContext";
+import type { StudioCopyFull } from "@/lib/studio/i18n/studioCopyTypes";
 import {
   buildEnhancerUserPrompt,
   buildFallbackGenerationPrompt,
@@ -49,12 +52,16 @@ import {
   type SaasQualityTier,
 } from "./ImageSettingsForm";
 import { StudioAssetPreview } from "./StudioAssetPreview";
+import { TokenChargeHint } from "./TokenChargeHint";
+import { tryApplyTokenBillingError } from "@/lib/tokens/billingErrorPayload";
+import type { TokenBillingErrorPayload } from "@/lib/tokens/billingErrorPayload";
 
 type ProcessedAssetsPanelProps = {
   assets: StudioSessionAsset[];
   mockMode: boolean;
   paidAiRunsAllowed: boolean;
   promptLocale: Locale;
+  onTokenBillingError?: (payload: TokenBillingErrorPayload) => void;
   onDeleteAsset: (id: string) => void;
   onAssetCreated: (asset: StudioSessionAsset) => void;
   onUpdateAsset: (id: string, patch: Partial<StudioSessionAsset>) => void;
@@ -64,19 +71,22 @@ function newAssetId(): string {
   return crypto.randomUUID();
 }
 
-function friendlyPostProcessError(message: string | undefined | null): string {
+function friendlyPostProcessError(
+  message: string | undefined | null,
+  pa: StudioCopyFull["processedAssets"]
+): string {
   const text = (message ?? "").trim();
-  if (!text) return "Не удалось создать файл. Попробуйте ещё раз.";
+  if (!text) return pa.fileFailed;
 
   if (
     /real scene|real image|не включён|not configured|FAL_VIDEO_MODEL|PAID_AI_RUNS_DISABLED|disabled/i.test(
       text
     )
   ) {
-    return "Создание пока недоступно. Попробуйте позже или включите demo-режим.";
+    return pa.unavailable;
   }
   if (/FAL_KEY/i.test(text)) {
-    return "Ключ AI-провайдера не настроен. Обратитесь к администратору.";
+    return pa.falKeyMissing;
   }
   return text;
 }
@@ -86,13 +96,22 @@ export function ProcessedAssetsPanel({
   mockMode,
   paidAiRunsAllowed,
   promptLocale,
+  onTokenBillingError,
   onDeleteAsset,
   onAssetCreated,
   onUpdateAsset,
 }: ProcessedAssetsPanelProps) {
+  const { locale, copy } = useStudioCopy();
+  const pa = copy.processedAssets;
+  const ppe = copy.postProcessingEditors;
+
+  const videoEditors = useMemo(
+    () => getLocalizedVideoEditors(locale),
+    [locale]
+  );
   const imageEditors = useMemo(
-    () => getImageEditors({ mockMode, paidAiRunsAllowed }),
-    [mockMode, paidAiRunsAllowed]
+    () => getLocalizedImageEditors(locale, { mockMode, paidAiRunsAllowed }),
+    [locale, mockMode, paidAiRunsAllowed]
   );
   const selectableAssets = useMemo(
     () => assets.filter((a) => a.status !== "processing"),
@@ -167,7 +186,15 @@ export function ProcessedAssetsPanel({
         }),
       });
       const data = (await res.json()) as ProductPreservationResponse;
-      if (!data.ok) return null;
+      if (!data.ok) {
+        if (
+          onTokenBillingError &&
+          tryApplyTokenBillingError(data, onTokenBillingError)
+        ) {
+          return null;
+        }
+        return null;
+      }
 
       const snapshot: NonNullable<StudioSessionAsset["productPreservation"]> = {
         analysis: data.analysis,
@@ -315,11 +342,11 @@ export function ProcessedAssetsPanel({
 
   const handleGenerate = async () => {
     if (!selectedAsset || !sourceImageUrl || !processingMode) {
-      setError("Сначала выберите файл и что создать.");
+      setError(pa.selectFileFirst);
       return;
     }
     if (!canGenerate) {
-      setError("Напишите, что сделать с фото, и выберите доступный редактор.");
+      setError(pa.needPromptAndEditor);
       return;
     }
 
@@ -337,7 +364,7 @@ export function ProcessedAssetsPanel({
       createdAt: startedAt,
       startedAt,
       status: "processing",
-      label: isVideo ? "Видео" : "Изображение",
+      label: isVideo ? pa.modeVideo : pa.modeImage,
     });
 
     setGenerationLoading(true);
@@ -365,7 +392,17 @@ export function ProcessedAssetsPanel({
         });
         const data = (await res.json()) as VideoGenerateResponse;
         if (!data.ok) {
-          const msg = friendlyPostProcessError(data.message);
+          if (
+            onTokenBillingError &&
+            tryApplyTokenBillingError(data, onTokenBillingError)
+          ) {
+            onUpdateAsset(pendingId, {
+              status: "error",
+              errorMessage: data.message ?? pa.fileFailed,
+            });
+            return;
+          }
+          const msg = friendlyPostProcessError(data.message, pa);
           onUpdateAsset(pendingId, {
             status: "error",
             errorMessage: msg,
@@ -384,7 +421,7 @@ export function ProcessedAssetsPanel({
           height: data.video.height,
           duration: data.video.duration,
           format: data.video.format ?? "mp4",
-          label: "Видео",
+          label: pa.modeVideo,
           prompt: finalPrompt,
         });
         return;
@@ -434,7 +471,17 @@ export function ProcessedAssetsPanel({
       const data = (await res.json()) as ImageEnhanceResponse;
       if (!data.ok) {
         setLastImageEnhanceDebug(data.debug ?? null);
-        const msg = friendlyPostProcessError(data.error);
+        if (
+          onTokenBillingError &&
+          tryApplyTokenBillingError(data, onTokenBillingError)
+        ) {
+          onUpdateAsset(pendingId, {
+            status: "error",
+            errorMessage: data.error ?? pa.fileFailed,
+          });
+          return;
+        }
+        const msg = friendlyPostProcessError(data.error, pa);
         onUpdateAsset(pendingId, {
           status: "error",
           errorMessage: msg,
@@ -453,15 +500,15 @@ export function ProcessedAssetsPanel({
         requestId: data.requestId ?? undefined,
         estimatedCost: data.estimatedCostUsd ?? undefined,
         format: outputFormat,
-        label: "Улучшенное фото",
+        label: pa.enhancedPhoto,
         prompt: data.promptUsed,
       });
     } catch {
       onUpdateAsset(pendingId, {
         status: "error",
-        errorMessage: "Не удалось создать файл.",
+        errorMessage: pa.fileFailed,
       });
-      setError("Не удалось создать файл. Попробуйте ещё раз.");
+      setError(pa.fileFailed);
     } finally {
       setGenerationLoading(false);
     }
@@ -491,11 +538,10 @@ export function ProcessedAssetsPanel({
               <Layers className="h-7 w-7" />
             </div>
             <h2 className="mt-4 text-xl font-semibold text-slate-950">
-              Здесь появятся ваши файлы
+              {pa.emptyTitle}
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Сначала создайте фото в режимах «Одежда на модели» или «Товарная
-              карточка». Затем здесь можно прокачать фото или создать видео.
+              {pa.emptyHint}
             </p>
           </div>
         </CardContent>
@@ -515,19 +561,19 @@ export function ProcessedAssetsPanel({
 
       <Card>
         <CardHeader className="text-center">
-          <CardTitle>Проработка выбранного файла</CardTitle>
+          <CardTitle>{pa.panelTitle}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           {!canProcessSource && selectedAsset ? (
             <p className="rounded-[16px] border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              Для этого файла нет исходного изображения. Выберите фото слева.
+              {pa.selectFileFirst}
             </p>
           ) : null}
 
           {selectedAsset ? (
             <section className="space-y-2">
               <h3 className="text-sm font-semibold text-slate-950">
-                Выбранный файл
+                {pa.panelTitle}
               </h3>
               <div className="flex items-center gap-3 rounded-[18px] border border-border bg-slate-50 p-3">
                 <StudioAssetPreview
@@ -551,7 +597,7 @@ export function ProcessedAssetsPanel({
           {processingMode ? (
             <AiEditorPicker
               editors={
-                processingMode === "video" ? VIDEO_EDITORS : imageEditors
+                processingMode === "video" ? videoEditors : imageEditors
               }
               value={
                 processingMode === "video" ? videoEditorId : imageEditorId
@@ -581,6 +627,7 @@ export function ProcessedAssetsPanel({
                   capability.outputFormats as readonly string[]
                 ).includes(schemaFormat);
 
+                const reset = copy.processedAssetsEditorReset;
                 const resetMessages: string[] = [];
                 if (!aspectSupported) {
                   const fallbackAspect =
@@ -591,7 +638,10 @@ export function ProcessedAssetsPanel({
                       : (capability.aspectRatios[0] as ImageAspectRatio);
                   setImageAspectRatio(fallbackAspect as ImageAspectRatio);
                   resetMessages.push(
-                    `формат кадра ${imageAspectRatio} не поддерживается, переключили на ${fallbackAspect}`
+                    formatStudioString(reset.aspectUnsupported, {
+                      from: imageAspectRatio,
+                      to: fallbackAspect,
+                    })
                   );
                 }
                 if (!formatSupported) {
@@ -599,14 +649,19 @@ export function ProcessedAssetsPanel({
                   const fallbackFormat: ImageOutputFormat = "png";
                   setOutputFormat(fallbackFormat);
                   resetMessages.push(
-                    `формат файла ${outputFormat.toUpperCase()} не поддерживается, переключили на ${fallbackFormat.toUpperCase()}`
+                    formatStudioString(reset.formatUnsupported, {
+                      from: outputFormat.toUpperCase(),
+                      to: fallbackFormat.toUpperCase(),
+                    })
                   );
                 }
 
                 setImageEditorId(nextEditor);
                 setEditorSwitchHint(
                   resetMessages.length > 0
-                    ? `Этот редактор: ${resetMessages.join("; ")}.`
+                    ? formatStudioString(reset.editorNote, {
+                        messages: resetMessages.join("; "),
+                      })
                     : null
                 );
               }}
@@ -635,13 +690,11 @@ export function ProcessedAssetsPanel({
               />
               {mockMode ? (
                 <p className="rounded-[14px] border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
-                  Demo-режим: улучшение фото показывается на mock-результатах.
-                  Включите real-режим, чтобы запускать настоящее AI-улучшение.
+                  {ppe.nanoBanana.descriptionDemo} {ppe.nanoBanana.limitationsDemo}
                 </p>
               ) : !paidAiRunsAllowed ? (
                 <p className="rounded-[14px] border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
-                  Real AI-улучшение временно отключено администратором. Скоро
-                  будет доступно.
+                  {ppe.nanoBanana.disabled}
                 </p>
               ) : null}
             </>
@@ -665,14 +718,14 @@ export function ProcessedAssetsPanel({
           {processingMode ? (
             <section className="space-y-2">
               <label className="text-sm font-semibold text-slate-950">
-                Что сделать с фото?
+                {pa.whatToDo}
               </label>
               <textarea
                 value={prompt}
                 onChange={(event) => setPrompt(event.target.value)}
                 rows={4}
                 disabled={generationLoading}
-                placeholder="Например: мягкий студийный свет, дорогой интерьер, фон у окна, пляжный кадр, реалистичная кожа, убрать пластиковость."
+                placeholder={pa.promptPlaceholder}
                 className="w-full rounded-[18px] border border-border bg-white px-3 py-3 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-50"
               />
               {promptNormalization.warningForUi ? (
@@ -682,15 +735,15 @@ export function ProcessedAssetsPanel({
               ) : null}
               <p className="text-xs leading-5 text-slate-500">
                 {promptNormalization.promptType === "ai_prompt"
-                  ? "Мы используем ваш промт без повторного усиления — добавим только обязательные правила сохранения товара и качества."
-                  : "AI автоматически улучшит ваш промт перед созданием — вам не нужно писать технические термины."}
+                  ? pa.promptNoEnhance
+                  : copy.status.analyzingAi}
               </p>
             </section>
           ) : null}
 
           {analyzingPreservation && processingMode === "image" ? (
             <p className="rounded-[12px] border border-teal-200 bg-teal-50 px-3 py-2 text-xs leading-5 text-teal-900">
-              AI определяет товар, чтобы сохранить детали…
+              {copy.productCheck.analyzing}
             </p>
           ) : null}
 
@@ -996,20 +1049,28 @@ export function ProcessedAssetsPanel({
 
           {processingMode ? (
             <Button
-              className="w-full"
+              className="w-full justify-between gap-2 px-4 sm:gap-3 sm:px-5"
               size="lg"
               loading={generationLoading}
               disabled={!canGenerate}
               onClick={handleGenerate}
             >
-              {processingMode === "video" ? (
-                <Clapperboard className="h-5 w-5" />
-              ) : (
-                <Sparkles className="h-5 w-5" />
-              )}
-              {processingMode === "video"
-                ? "Создать видео"
-                : "Создать изображение"}
+              <span className="flex min-w-0 items-center gap-2">
+                {processingMode === "video" ? (
+                  <Clapperboard className="h-5 w-5 shrink-0" />
+                ) : (
+                  <Sparkles className="h-5 w-5 shrink-0" />
+                )}
+                <span className="truncate">
+                  {processingMode === "video" ? pa.createVideo : pa.createImage}
+                </span>
+              </span>
+              {!generationLoading ? (
+                <TokenChargeHint
+                  inline
+                  operation={processingMode === "video" ? "video" : "enhance"}
+                />
+              ) : null}
             </Button>
           ) : null}
 

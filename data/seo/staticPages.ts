@@ -372,35 +372,40 @@ const pricingPage: StaticSeoPage = {
           locale,
           {
             slug: getRouteSlug(locale, "cost"),
-            title: "Тарифы Vitrina AI — Vitrina AI Studio",
+            title: "Тарифы и токены Vitrina AI — Vitrina AI Studio",
             metaDescription:
-              "Тарифы Vitrina AI Studio: бесплатный тест, стартовый доступ и premium-опции для AI-фото товара, примерки на модели, фона и улучшения фото для маркетплейсов.",
-            h1: "Тарифы Vitrina AI",
+              "Токены Vitrina AI: 1 токен = $1, одна AI-задача = 1 токен, пополнение 10 токенов за $10. Демо без списаний, оплата через Lemon Squeezy.",
+            h1: "Тарифы и токены",
             intro:
-              "Vitrina AI Studio помогает готовить товарные фото и визуал для Kaspi, Wildberries, Ozon и других площадок. Тарифы зависят от режима (демо или real AI) и объёма генераций.",
+              "Оплата идёт токенами: 1 токен = $1. Каждая успешная AI-генерация в студии списывает 1 токен. Минимальное пополнение — 10 токенов за $10.",
             sections: [
               {
-                title: "Бесплатный тест",
-                body: "Демо-режим показывает интерфейс и workflow без списаний. Подходит, чтобы понять сценарии: одежда на модели, товарная карточка, фон и проверка качества.",
+                title: "Токены",
+                body: "1 токен = $1. Одна AI-задача (примерка, фон, карточка, улучшение и др.) = 1 токен. Баланс виден в шапке после входа.",
               },
               {
-                title: "Старт",
-                body: "Для регулярной подготовки карточек и каталога. Оплата за генерации или пакеты уточняются — финальные цены будут опубликованы до запуска billing.",
+                title: "Пополнение",
+                body: "Пакет 10 токенов за $10 через безопасную оплату Lemon Squeezy. После подтверждения платежа баланс обновляется автоматически (webhook), не по кнопке «успех» на сайте.",
               },
               {
-                title: "Premium",
-                body: "Для команд с большим объёмом контента: приоритетные сценарии, расширенные режимы и поддержка workflow контент-менеджера. Доступность функций зависит от roadmap продукта.",
+                title: "Гость без входа",
+                body: "Одна бесплатная генерация с водяным знаком vitrina.help на результате. Вторая гостевая генерация недоступна — войдите и пополните баланс.",
               },
               {
-                title: "Что входит",
-                body: "AI-фото товара, примерка одежды на взрослой модели, удаление/замена фона, точная карточка, ручная проверка качества. Видео и Reels — по мере выхода функций.",
+                title: "Демо-режим",
+                body: "При AI_MOCK_MODE демо показывает интерфейс без реальных списаний и без оплаты провайдеров — для обучения команды.",
               },
             ],
             faq: [
               {
-                question: "Сколько стоит генерация?",
+                question: "Сколько стоит одна генерация?",
                 answer:
-                  "В демо-режиме списаний нет. В real AI mode стоимость зависит от типа задачи и должна быть видна до запуска, когда pricing включён в интерфейсе.",
+                  "1 токен ($1) за одну успешную AI-задачу. Если генерация не удалась, токен не списывается.",
+              },
+              {
+                question: "Как купить токены?",
+                answer:
+                  "Войдите в аккаунт → страница «Токены» → «Купить 10 токенов» ($10). Не используйте сторонние share-ссылки оплаты.",
               },
               {
                 question: "Можно ли использовать для Kaspi?",
@@ -408,20 +413,15 @@ const pricingPage: StaticSeoPage = {
                   "Да, сервис помогает подготовить изображения для карточек, но не гарантирует принятие модерацией Kaspi. Правила площадки проверяет продавец.",
               },
               {
-                question: "Что входит в тариф?",
+                question: "Есть ли бесплатный пробный запуск?",
                 answer:
-                  "Подготовка товарного визуала: product shot, одежда на AI-модели, фон, чеклист качества. Конкретный набор режимов зависит от выбранного плана и статуса функций.",
-              },
-              {
-                question: "Можно ли попробовать бесплатно?",
-                answer:
-                  "Да. Откройте студию в демо-режиме, загрузите фото и проверьте workflow без оплаты.",
+                  "Да: одна гостевая генерация с watermark или демо-режим без списаний.",
               },
             ],
             relatedLinks: [
+              { label: "Пополнить токены", href: "/ru/tokens" },
               { label: "Как работает", href: "/ru/how-it-works" },
               { label: "FAQ", href: "/ru/faq" },
-              { label: "Качество AI", href: "/ru/quality" },
             ],
             status: "published" as TranslationStatus,
           },
@@ -433,35 +433,38 @@ const pricingPage: StaticSeoPage = {
           locale,
           {
             slug: getRouteSlug(locale, "cost"),
-            title: "Vitrina AI тарифтері — Vitrina AI Studio",
+            title: "Vitrina AI тарифтері және токендер — Vitrina AI Studio",
             metaDescription:
-              "Vitrina AI Studio тарифтері: тегін демо, старт және premium — AI тауар фотосы, модельде киім, фон. Kaspi/marketplace үшін қолмен тексеру міндетті.",
-            h1: "Vitrina AI тарифтері",
+              "Vitrina AI токендері: 1 токен = $1, бір AI тапсырмасы = 1 токен, 10 токен $10. Демо төлемсіз, Lemon Squeezy арқылы толтыру.",
+            h1: "Тарифтер және токендер",
             intro:
-              "Vitrina AI Studio Kaspi, Wildberries, Ozon және басқа арналарға тауар визуалын дайындауға көмектеседі. Тариф демо немесе real AI режиміне және генерация көлеміне байланысты.",
+              "Төлем токенмен: 1 токен = $1. Әр сәтті AI генерациясы 1 токен алады. Ең төмен толтыру — 10 токен, $10.",
             sections: [
               {
-                title: "Тегін тест",
-                body: "Демо-режим интерфейсті және workflow-ды ақша алмай көрсетеді: киім модельде, карточка, фон, сапа тексеруі.",
+                title: "Токендер",
+                body: "1 токен = $1. Бір AI тапсырмасы = 1 токен. Баланс кіргеннен кейін тақтада көрінеді.",
               },
               {
-                title: "Старт",
-                body: "Тұрақты карточка және каталог жаңартуы үшін. Нақты баға billing іске қосылғанға дейін жарияланады.",
+                title: "Толтыру",
+                body: "10 токен $10 — Lemon Squeezy. Төлем расталғаннан кейін баланс webhook арқылы жаңарады.",
               },
               {
-                title: "Premium",
-                body: "Үлкен көлемді командалар: кеңейтілген сценарийлер, контент-менеджер workflow. Функциялар roadmap-қа тәуелді.",
+                title: "Қонақ",
+                body: "Бір тегін генерация — vitrina.help су белгісімен. Екінші қонақ генерация жабық.",
               },
               {
-                title: "Не кіреді",
-                body: "AI тауар фотосы, ересек модельде киім, фон алу/ауыстыру, нақты карточка, қолмен QA. Видео/Reels функциялар шыққан сайын.",
+                title: "Демо",
+                body: "Mock режимінде нақты төлем және токен есебі жоқ — командаға үйрету үшін.",
               },
             ],
             faq: [
               {
-                question: "Генерация қанша тұрады?",
-                answer:
-                  "Демо-режимде төлем жоқ. Real AI режимінде құн тапсырмаға байланысты; UI-да баға көрсетілгенге дейін тексеріңіз.",
+                question: "Бір генерация қанша?",
+                answer: "1 токен ($1), тек сәтті нәтиже үшін.",
+              },
+              {
+                question: "Токенді қалай сатып аламын?",
+                answer: "Аккаунтқа кіріңіз → «Токендер» → 10 токен сатып алу ($10).",
               },
               {
                 question: "Kaspi үшін пайдалануға бола ма?",
@@ -469,19 +472,14 @@ const pricingPage: StaticSeoPage = {
                   "Иә, студия карточка суретін дайындауға көмектеседі, бірақ Kaspi модерациясын кепілдемейді. Ережелерді сатушы өзі тексереді.",
               },
               {
-                question: "Тарифке не кіреді?",
-                answer:
-                  "Тауар визуалы: product shot, модельде киім, фон, сапа тізімі. Нақты режимдер тариф пен функция статусына байланысты.",
-              },
-              {
-                question: "Тегін сынауға бола ма?",
-                answer: "Иә. Демо-режимде студияны ашып, workflow-ды төлемсіз тексеріңіз.",
+                question: "Тегін сынау бар ма?",
+                answer: "Иә: бір қонақ генерация немесе демо режим.",
               },
             ],
             relatedLinks: [
+              { label: "Токен сатып алу", href: "/kk/tokens" },
               { label: "Қалай жұмыс істейді", href: "/kk/how-it-works" },
               { label: "FAQ", href: "/kk/faq" },
-              { label: "AI сапасы", href: "/kk/quality" },
             ],
             status: "published" as TranslationStatus,
           },
@@ -493,35 +491,40 @@ const pricingPage: StaticSeoPage = {
           locale,
           {
             slug: getRouteSlug(locale, "cost"),
-            title: "Vitrina AI pricing — Vitrina AI Studio",
+            title: "Vitrina AI pricing & tokens — Vitrina AI Studio",
             metaDescription:
-              "Vitrina AI Studio pricing: free demo, starter access, and premium options for AI product photos, on-model try-on, backgrounds, and marketplace-ready visuals.",
-            h1: "Vitrina AI pricing",
+              "Vitrina AI tokens: 1 token = $1, one AI task = 1 token, top up 10 tokens for $10. Demo mode has no charges; checkout via Lemon Squeezy.",
+            h1: "Pricing & tokens",
             intro:
-              "Vitrina AI Studio helps prepare product visuals for Kaspi, Wildberries, Ozon, and other channels. Pricing depends on demo vs real AI mode and generation volume.",
+              "You pay with tokens: 1 token = $1. Each successful AI task in the studio costs 1 token. Minimum top-up is 10 tokens for $10.",
             sections: [
               {
-                title: "Free test",
-                body: "Demo mode shows the interface and workflow without charges. Use it to explore on-model clothing, product cards, backgrounds, and quality review.",
+                title: "Tokens",
+                body: "1 token = $1. One AI task (try-on, background, product card, enhance, etc.) = 1 token. Balance appears in the header after sign-in.",
               },
               {
-                title: "Starter",
-                body: "For regular listing and catalog work. Pay-per-generation or bundles are being finalized — final prices will be published before billing goes live.",
+                title: "Top up",
+                body: "10 tokens for $10 via Lemon Squeezy. Balance updates after payment confirmation (webhook), not from the success URL alone.",
               },
               {
-                title: "Premium",
-                body: "For higher-volume teams: priority workflows, extended modes, and content-manager use cases. Feature availability depends on the product roadmap.",
+                title: "Guest without sign-in",
+                body: "One free generation with a vitrina.help watermark. A second guest run is blocked — sign in and top up to continue.",
               },
               {
-                title: "What's included",
-                body: "AI product photos, adult on-model clothing try-on, background removal/replacement, exact product cards, and manual quality review. Video and Reels roll out as features ship.",
+                title: "Demo mode",
+                body: "With AI mock mode enabled, the studio runs without token charges or paid provider calls — for training only.",
               },
             ],
             faq: [
               {
-                question: "How much does a generation cost?",
+                question: "How much is one generation?",
                 answer:
-                  "Demo mode has no charges. In real AI mode, cost depends on the task type and should be visible before launch when pricing is enabled in the UI.",
+                  "1 token ($1) per successful AI task. Failed runs are not charged.",
+              },
+              {
+                question: "How do I buy tokens?",
+                answer:
+                  "Sign in → Tokens page → Buy 10 tokens ($10). Use in-app checkout only.",
               },
               {
                 question: "Can I use it for Kaspi?",
@@ -529,20 +532,15 @@ const pricingPage: StaticSeoPage = {
                   "Yes, the studio helps prepare listing images, but it does not guarantee Kaspi moderation acceptance. Sellers must verify current platform rules.",
               },
               {
-                question: "What is included in a plan?",
+                question: "Is there a free trial?",
                 answer:
-                  "Product visual preparation: product shots, on-model clothing, backgrounds, and quality checklist. Exact modes depend on the selected plan and feature status.",
-              },
-              {
-                question: "Can I try it for free?",
-                answer:
-                  "Yes. Open the studio in demo mode, upload a photo, and review the workflow without payment.",
+                  "Yes: one guest generation with watermark, or demo mode without charges.",
               },
             ],
             relatedLinks: [
+              { label: "Buy tokens", href: "/en/tokens" },
               { label: "How it works", href: "/en/how-it-works" },
               { label: "FAQ", href: "/en/faq" },
-              { label: "AI quality", href: "/en/quality" },
             ],
             status: "published" as TranslationStatus,
           },

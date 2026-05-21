@@ -1,3 +1,5 @@
+"use client";
+
 import type { ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import type { FalModelAspectRatio } from "@/lib/ai/modelOutputSizes";
@@ -8,7 +10,9 @@ import {
   SaasPipelineCountdown,
   SAAS_PIPELINE_COUNTDOWN_SEC,
 } from "@/components/studio/SaasPipelineCountdown";
+import { formatStudioString } from "@/lib/studio/i18n";
 import { cn } from "@/lib/utils";
+import { useStudioCopy } from "./StudioLocaleContext";
 
 /** Общая шапка колонки студии (как у шага «Фото товара») */
 export const studioColumnHeaderClass =
@@ -202,6 +206,8 @@ export function PreviewCard({
   viewportAspectRatio,
   className,
 }: PreviewCardProps) {
+  const { copy } = useStudioCopy();
+  const pc = copy.previewCard;
   const resolvedAspect =
     viewportAspect ?? (catalogViewport ? ("3:4" as FalModelAspectRatio) : undefined);
   const useFixedViewport = Boolean(resolvedAspect || viewportAspectRatio);
@@ -213,10 +219,10 @@ export function PreviewCard({
     (resolvedAspect ? undefined : 3 / 4);
 
   const hasPreview = Boolean(content || url);
-  const loadingText = loadingDetail?.trim() || "Генерируем…";
+  const loadingText = loadingDetail?.trim() || pc.generating;
   const subdetail =
     loadingSubdetail?.trim() ||
-    (loading && hasPreview ? "Остальные ракурсы ещё генерируются…" : null);
+    (loading && hasPreview ? pc.moreAngles : null);
 
   const previewBody = content ? (
     <div className="flex h-full min-h-0 flex-1 flex-col">{content}</div>
@@ -225,7 +231,7 @@ export function PreviewCard({
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={url}
-        alt={`Предпросмотр: ${title}`}
+        alt={formatStudioString(pc.previewAlt, { title })}
         className="h-full w-full object-contain"
       />
     </div>
@@ -325,11 +331,14 @@ export function PreviewCard({
   );
 }
 
-export function ResultCompareSkeleton({ title = "Результат" }: { title?: string }) {
+export function ResultCompareSkeleton({ title }: { title?: string }) {
+  const { copy } = useStudioCopy();
+  const resolvedTitle = title ?? copy.previewCard.resultTitle;
+
   return (
     <div className="flex min-h-0 flex-col overflow-hidden rounded-[20px] border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-100/80">
       <div className={cn(studioColumnHeaderClass, "shrink-0")}>
-        <p className={studioColumnTitleClass}>{title}</p>
+        <p className={studioColumnTitleClass}>{resolvedTitle}</p>
       </div>
       <div className="border-t border-slate-100/90 bg-slate-50 p-4">
         <div className="aspect-[3/4] w-full animate-pulse rounded-[18px] bg-slate-200" />

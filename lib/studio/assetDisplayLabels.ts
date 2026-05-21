@@ -1,37 +1,27 @@
 import type { StudioSessionAsset } from "@/components/studio/types";
+import { toStudioLocale } from "@/lib/studio/i18n";
+import {
+  getAssetDisplayTitle as getAssetDisplayTitleI18n,
+  getAssetTypeBadge as getAssetTypeBadgeI18n,
+} from "@/lib/studio/i18n/assetDisplayLabels";
+import type { StudioLocale } from "@/lib/studio/i18n/studioCopyTypes";
 
-const ANGLE_LABELS_TO_HIDE = new Set(["Стандартная поза"]);
-
-/** User-facing type badge for file list (ignores technical try-on angle labels). */
-export function getAssetTypeBadge(asset: StudioSessionAsset): string {
-  switch (asset.type) {
-    case "video":
-      return "Видео";
-    case "tryon":
-      return "Фото на модели";
-    case "exact-card":
-      return "Товарная карточка";
-    case "creative-card":
-      return "Рекламный кадр";
-    case "background-removed":
-      return "Фон заменён";
-    case "scene":
-      return "Сцена";
-    default:
-      return "Фото";
-  }
+export function getAssetTypeBadge(
+  asset: StudioSessionAsset,
+  locale?: StudioLocale
+): string {
+  return getAssetTypeBadgeI18n(asset, locale ?? toStudioLocale("ru"));
 }
 
 export function getAssetStatusBadge(_asset: StudioSessionAsset): string | null {
   return null;
 }
 
-/** Short title under preview — never show internal angle names. */
-export function getAssetDisplayTitle(asset: StudioSessionAsset): string {
-  if (asset.label && !ANGLE_LABELS_TO_HIDE.has(asset.label)) {
-    return asset.label;
-  }
-  return getAssetTypeBadge(asset);
+export function getAssetDisplayTitle(
+  asset: StudioSessionAsset,
+  locale?: StudioLocale
+): string {
+  return getAssetDisplayTitleI18n(asset, locale ?? toStudioLocale("ru"));
 }
 
 export function isVideoAsset(asset: StudioSessionAsset): boolean {
@@ -46,7 +36,6 @@ export function assetPreviewUrl(asset: StudioSessionAsset): string | null {
   return asset.sourceImageUrl ?? null;
 }
 
-/** Image URL suitable as source for video/scene APIs. */
 export function assetProcessingSourceUrl(asset: StudioSessionAsset): string | null {
   if (isVideoAsset(asset)) {
     return asset.sourceImageUrl ?? null;

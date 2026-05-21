@@ -8,7 +8,9 @@ import {
   downloadImageFile,
   previewImageFilename,
 } from "@/lib/studio/downloadImages";
+import { formatStudioString } from "@/lib/studio/i18n";
 import { cn } from "@/lib/utils";
+import { useStudioCopy } from "./StudioLocaleContext";
 
 export type PreviewCarouselItem = {
   id: string;
@@ -36,6 +38,8 @@ export function PreviewImageCarousel({
   activeIndex: controlledIndex,
   onActiveIndexChange,
 }: PreviewImageCarouselProps) {
+  const { copy } = useStudioCopy();
+  const c = copy.previewCarousel;
   const trackRef = useRef<HTMLDivElement>(null);
   const [internalIndex, setInternalIndex] = useState(0);
   const [downloadingAll, setDownloadingAll] = useState(false);
@@ -112,7 +116,10 @@ export function PreviewImageCarousel({
       {showNav ? (
         <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/60 bg-white px-3 py-2">
           <p className="min-w-0 truncate text-xs font-medium text-slate-600">
-            {safeIndex + 1} из {items.length}
+            {formatStudioString(c.indexOf, {
+              current: safeIndex + 1,
+              total: items.length,
+            })}
             <span className="mx-1.5 text-slate-300">·</span>
             <span className="text-slate-800">{activeItem.label}</span>
           </p>
@@ -136,7 +143,7 @@ export function PreviewImageCarousel({
               }
             >
               <Download className="h-3.5 w-3.5" />
-              Скачать
+              {copy.editorActions.download}
             </Button>
             <Button
               type="button"
@@ -152,7 +159,7 @@ export function PreviewImageCarousel({
               }}
             >
               <Download className="h-3.5 w-3.5" />
-              Скачать все
+              {copy.common.downloadAll}
             </Button>
           </div>
           ) : null}
@@ -168,7 +175,7 @@ export function PreviewImageCarousel({
             "[scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300"
           )}
         >
-          {items.map((item) => (
+          {items.map((item, index) => (
             <div
               key={item.id}
               className="flex w-full shrink-0 snap-start snap-always flex-col"
@@ -195,7 +202,7 @@ export function PreviewImageCarousel({
           <>
             <button
               type="button"
-              aria-label="Предыдущий ракурс"
+              aria-label={c.prevAngle}
               disabled={activeIndex === 0}
               onClick={() => scrollToIndex(activeIndex - 1)}
               className={cn(
@@ -207,7 +214,7 @@ export function PreviewImageCarousel({
             </button>
             <button
               type="button"
-              aria-label="Следующий ракурс"
+              aria-label={c.nextAngle}
               disabled={activeIndex >= items.length - 1}
               onClick={() => scrollToIndex(activeIndex + 1)}
               className={cn(
@@ -228,7 +235,10 @@ export function PreviewImageCarousel({
             <button
               key={item.id}
               type="button"
-              aria-label={`${item.label}, слайд ${index + 1}`}
+              aria-label={formatStudioString(c.slideAria, {
+                label: item.label,
+                n: index + 1,
+              })}
               aria-current={index === activeIndex ? "true" : undefined}
               onClick={() => scrollToIndex(index)}
               className={cn(
