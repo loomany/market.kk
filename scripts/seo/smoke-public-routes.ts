@@ -28,6 +28,7 @@ function readSitemapModule() {
   const source = readFileSync("app/sitemap.ts", "utf8");
   assert(source.includes("indexableLocales"), "sitemap must use indexableLocales");
   assert(source.includes('sectionPaths("cost")'), "sitemap must include pricing routes");
+  assert(source.includes('sectionPaths("tokens")'), "sitemap must include tokens routes");
 }
 
 function checkPricingPage() {

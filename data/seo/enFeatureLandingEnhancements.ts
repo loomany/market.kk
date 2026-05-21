@@ -61,6 +61,8 @@ export const enFeatureLandingEnhancements: Partial<
       { label: "AI quality", href: "/en/quality" },
       { label: "How AI helps sellers", href: "/en/blog/how-ai-helps-marketplace-sellers" },
       { label: "Check AI card quality", href: "/en/blog/how-to-check-the-quality-of-ai-product-cards" },
+      { label: "AI photos or a photoshoot", href: "/en/blog/ai-product-photos-or-a-photoshoot-what-to-choose" },
+      { label: "AI summary", href: "/en/ai-summary" },
     ],
   },
   productPhotoForMarketplaces: {
@@ -96,10 +98,13 @@ export const enFeatureLandingEnhancements: Partial<
     faq: commonFaq,
     internalLinks: [
       { label: "Open studio", href: "/studio" },
+      { label: "Pricing", href: "/en/cost" },
+      { label: "AI photos or a photoshoot", href: "/en/blog/ai-product-photos-or-a-photoshoot-what-to-choose" },
       { label: "Photo mistakes", href: "/en/blog/product-photo-mistakes-that-hurt-sales" },
       { label: "Amazon photos", href: "/en/blog/product-photos-for-amazon" },
       { label: "How it works", href: "/en/how-it-works" },
       { label: "AI quality", href: "/en/quality" },
+      { label: "AI summary", href: "/en/ai-summary" },
     ],
   },
   backgroundGenerator: {

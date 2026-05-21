@@ -35,6 +35,7 @@
     "smoke:seo:hreflang": "npx tsx scripts/seo/smoke-hreflang-pairs.ts",
     "smoke:seo:prelaunch": "npx tsx scripts/seo/smoke-prelaunch-gate.ts",
     "check:seo:audience-pages": "npx tsx scripts/seo/check-seo-audience-pages.ts",
+    "check:seo:llms": "npx tsx scripts/seo/check-seo-llms.ts",
     "audience:build": "node scripts/seo/build-audience-pages.mjs",
     "check:studio:i18n": "npx tsx scripts/studio/check-studio-i18n.ts",
     "icons:generate": "node scripts/seo/generate-site-icons.mjs"

@@ -66,6 +66,8 @@ export const ruFeatureLandingEnhancements: Partial<
       { label: "Качество AI", href: "/ru/quality" },
       { label: "Как AI помогает продавцам", href: "/ru/blog/how-ai-helps-marketplace-sellers" },
       { label: "Проверка AI-карточек", href: "/ru/blog/how-to-check-the-quality-of-ai-product-cards" },
+      { label: "AI или фотосессия", href: "/ru/blog/ai-foto-ili-fotosessiya-chto-vybrat" },
+      { label: "AI summary", href: "/ru/ai-summary" },
     ],
   },
   productPhotoForMarketplaces: {
@@ -101,10 +103,13 @@ export const ruFeatureLandingEnhancements: Partial<
     faq: commonFaq,
     internalLinks: [
       { label: "Открыть студию", href: "/studio" },
+      { label: "Стоимость", href: "/ru/cost" },
       { label: "Kaspi", href: "/ru/platforms/kaspi-foto-tovarov" },
+      { label: "AI или фотосессия", href: "/ru/blog/ai-foto-ili-fotosessiya-chto-vybrat" },
       { label: "Ошибки в товарных фото", href: "/ru/blog/product-photo-mistakes-that-hurt-sales" },
       { label: "Фото для Amazon", href: "/ru/blog/product-photos-for-amazon" },
       { label: "Как работает", href: "/ru/how-it-works" },
+      { label: "AI summary", href: "/ru/ai-summary" },
       { label: "Качество AI", href: "/ru/quality" },
     ],
   },

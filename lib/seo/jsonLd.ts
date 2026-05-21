@@ -22,7 +22,7 @@ export function websiteJsonLd(): JsonLd {
     name: siteName,
     url: absoluteUrl("/"),
     description: siteDescription,
-    inLanguage: ["ru", "en"],
+    inLanguage: ["ru", "en", "kk"],
   };
 }
 

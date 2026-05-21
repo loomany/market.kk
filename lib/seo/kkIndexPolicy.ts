@@ -57,6 +57,11 @@ export function isKkTrustPageApproved(key: StaticRouteKey): boolean {
   return KK_APPROVED_TRUST_PAGE_KEYS.has(key);
 }
 
+/** AI summary page approved for kk index + hreflang (Stage 17). */
+export function isKkAiSummaryApproved(): boolean {
+  return true;
+}
+
 /** KK home landing is approved for index when translation status is published. */
 export function isKkHomeApproved(status: string): boolean {
   return status === "published";

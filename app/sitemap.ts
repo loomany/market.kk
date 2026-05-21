@@ -8,6 +8,7 @@ import { audiencePages } from "@/data/seo/audiencePages";
 import { audiencePathByLocale as audienceIndexPaths } from "@/lib/seo/audiencePagePaths";
 import { useCasePages } from "@/data/seo/useCases";
 import { indexableLocales, type Locale } from "@/lib/i18n/localeConfig";
+import { isKkAiSummaryApproved } from "@/lib/seo/kkIndexPolicy";
 import { shouldIndexPage } from "@/lib/seo/qualityGate";
 import { absoluteUrl, buildLanguageAlternates } from "@/lib/seo/site";
 
@@ -64,6 +65,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const blog = sectionPaths("blog");
   const aiSummary = sectionPaths("ai-summary");
   const cost = sectionPaths("cost");
+  const tokens = sectionPaths("tokens");
 
   for (const locale of indexableLocales) {
     items.push(entry(locale, home, 1, "weekly"));
@@ -71,8 +73,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     items.push(entry(locale, platforms, 0.8));
     items.push(entry(locale, useCases, 0.8));
     items.push(entry(locale, blog, 0.75));
-    items.push(entry(locale, aiSummary, 0.65));
+    if (locale !== "kk" || isKkAiSummaryApproved()) {
+      items.push(entry(locale, aiSummary, 0.65));
+    }
     items.push(entry(locale, cost, 0.72));
+    items.push(entry(locale, tokens, 0.68));
   }
 
   for (const page of staticSeoPages) {

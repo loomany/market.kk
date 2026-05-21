@@ -40,6 +40,15 @@ export function getMarketingFooterProps(locale: Locale) {
       },
       {
         label:
+          locale === "ru"
+            ? "AI summary"
+            : locale === "kk"
+              ? "AI summary"
+              : "AI summary",
+        href: `/${locale}/ai-summary`,
+      },
+      {
+        label:
           locale === "ru" ? "Файл для AI" : locale === "kk" ? "AI файлы" : "File for AI",
         href: "/llms.txt",
       },
