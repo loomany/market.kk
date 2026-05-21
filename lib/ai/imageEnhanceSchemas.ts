@@ -11,7 +11,7 @@ export const IMAGE_ENHANCE_ASPECT_RATIOS = [
   "16:9",
 ] as const;
 
-export const IMAGE_ENHANCE_OUTPUT_FORMATS = ["png", "jpg", "webp"] as const;
+export const IMAGE_ENHANCE_OUTPUT_FORMATS = ["png", "jpg"] as const;
 
 export const IMAGE_ENHANCE_QUALITY_TIERS = ["fast", "balanced", "high"] as const;
 
@@ -31,13 +31,15 @@ export const IMAGE_ENHANCE_EDITORS = [
 export const IMAGE_EDITOR_CAPABILITIES = {
   "nano-banana-pro": {
     aspectRatios: ["9:16", "4:5", "1:1", "3:4", "4:3", "16:9"],
-    outputFormats: ["png", "jpg", "webp"],
+    outputFormats: ["png", "jpg"],
     supportsQuality: true,
+    supportsNegativePrompt: true,
   },
   "flux-kontext-pro": {
     aspectRatios: ["9:16", "1:1", "3:4", "4:3", "16:9"],
     outputFormats: ["png", "jpg"],
     supportsQuality: false,
+    supportsNegativePrompt: true,
   },
 } as const satisfies Record<
   (typeof IMAGE_ENHANCE_EDITORS)[number],
@@ -45,6 +47,8 @@ export const IMAGE_EDITOR_CAPABILITIES = {
     aspectRatios: readonly (typeof IMAGE_ENHANCE_ASPECT_RATIOS)[number][];
     outputFormats: readonly (typeof IMAGE_ENHANCE_OUTPUT_FORMATS)[number][];
     supportsQuality: boolean;
+    /** Exclusions merged into main prompt (Fal has no negative_prompt on image editors). */
+    supportsNegativePrompt: boolean;
   }
 >;
 
@@ -89,6 +93,10 @@ export const imageEnhanceRequestSchema = z.object({
     .max(2000)
     .nullable()
     .optional(),
+  useNegativePrompt: z.boolean().optional().default(false),
+  negativePrompt: z.string().trim().max(1000).optional(),
+  /** When true, skip OpenAI packaging (user pasted a full AI prompt). */
+  skipPromptPackage: z.boolean().optional().default(false),
 });
 
 export type ImageEnhanceRequest = z.infer<typeof imageEnhanceRequestSchema>;

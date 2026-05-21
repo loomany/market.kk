@@ -2,7 +2,10 @@ import {
   maxAiTestSpendUsd,
   paidAiRunsAllowed,
 } from "@/lib/ai/paidAiGuard";
-import { estimateVideoCostUsd, type VideoModelKey } from "@/lib/ai/videoModels";
+import {
+  estimateVideoCostUsd,
+  type VideoVariantId,
+} from "@/lib/ai/videoCatalog";
 
 export { maxAiTestSpendUsd, paidAiRunsAllowed };
 
@@ -11,10 +14,10 @@ export function estimateSceneCostUsd(mode: "exact-background" | "creative-scene"
 }
 
 export function estimateVideoOrThrow(
-  modelKey: VideoModelKey,
+  variantId: VideoVariantId,
   durationSeconds: number
 ) {
-  return estimateVideoCostUsd(modelKey, durationSeconds);
+  return estimateVideoCostUsd(variantId, durationSeconds);
 }
 
 export function canSpendEstimated(cost?: number) {

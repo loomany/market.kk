@@ -4,26 +4,19 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Clapperboard, Download, ImageIcon, Trash2 } from "lucide-react";
 import type { PostProcessingMode } from "@/lib/studio/postProcessingEditors";
 import { Badge } from "@/components/ui/Badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import type { StudioSessionAsset } from "./types";
 import { StudioAssetPreview } from "./StudioAssetPreview";
 import { StudioFilesPagination } from "./StudioFilesPagination";
+import { StudioFilesSectionHeader } from "./StudioFilesSectionHeader";
 import {
-  getAssetDisplayTitle,
   getAssetStatusBadge,
   isVideoAsset,
 } from "@/lib/studio/assetDisplayLabels";
-import type { StudioLocale } from "@/lib/studio/i18n/studioCopyTypes";
 import { useStudioCopy } from "./StudioLocaleContext";
 import { useStudioMobileLayout } from "./useStudioMobileLayout";
 
 const PAGE_SIZE = 4;
-
-const DATE_LOCALE: Record<StudioLocale, string> = {
-  ru: "ru-RU",
-  en: "en-US",
-  kk: "kk-KZ",
-};
 
 type StudioFilesListProps = {
   assets: StudioSessionAsset[];
@@ -46,7 +39,7 @@ export function StudioFilesList({
   onMobileCreateVideo,
   mobileActiveMode = null,
 }: StudioFilesListProps) {
-  const { locale, copy } = useStudioCopy();
+  const { copy } = useStudioCopy();
   const sf = copy.studioFiles;
   const pa = copy.processedAssets;
   const isMobileLayout = useStudioMobileLayout();
@@ -78,8 +71,8 @@ export function StudioFilesList({
 
   return (
     <Card>
-      <CardHeader className="space-y-3 text-center">
-        <CardTitle>{sf.title}</CardTitle>
+      <CardHeader className="space-y-3 border-b border-border/60 px-4 py-3">
+        <StudioFilesSectionHeader title={sf.title} />
         <StudioFilesPagination
           page={page}
           totalPages={totalPages}
@@ -114,9 +107,6 @@ export function StudioFilesList({
             >
               <StudioAssetPreview asset={asset} />
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <Badge variant="outline">
-                  {getAssetDisplayTitle(asset, locale)}
-                </Badge>
                 {statusBadge ? (
                   <Badge
                     variant={
@@ -157,16 +147,6 @@ export function StudioFilesList({
                   <Trash2 className="h-3.5 w-3.5" />
                   {sf.delete}
                 </button>
-                {!isMobileLayout ? (
-                  <span className="ml-auto text-xs font-semibold text-slate-500">
-                    {new Date(asset.createdAt).toLocaleString(DATE_LOCALE[locale], {
-                      day: "numeric",
-                      month: "short",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                ) : null}
               </div>
               {showMobileActions ? (
                 <div

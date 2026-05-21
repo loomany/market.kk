@@ -3,6 +3,8 @@
 export const pass2RemainderRu = {
   form: {
     fileFormat: "Формат файла",
+    fileFormatPngDesc: "Без потерь — чётче детали, удобно для карточек и доработки",
+    fileFormatJpegDesc: "Файл легче — быстрее открывается в соцсетях и на телефоне",
     frameFormat: "Формат кадра",
     quality: "Качество",
     duration: "Длительность",
@@ -22,11 +24,80 @@ export const pass2RemainderRu = {
     qualityFast: "Быстро",
     qualityBalanced: "Стандарт",
     qualityHigh: "Максимум",
+    qualityUltra: "4K",
     preserveProduct: "Сохранять товар точно",
     preserveProductHint:
       "AI изменит только сцену, свет и фон — сам товар останется как есть.",
+    negativePromptToggleLabel: "Что исключить из кадра",
+    negativePromptToggleHint: "",
+    negativePromptIntro:
+      "В поле «Что сделать с фото?» — желаемый результат. Здесь — что не добавлять в кадр.",
+    negativePromptFieldLabel: "Перечислите через запятую",
+    negativePromptPlaceholder:
+      "пластиковая кожа, лишний текст, размытие, смена цвета товара, водяные знаки",
+  },
+  videoProviders: {
+    kling: { label: "Kling", hint: "Анимация из фото — выбор версии модели" },
+    klingMotion: {
+      label: "Kling Motion Control",
+      hint: "Движение с референс-видео (нужен MP4)",
+    },
+    minimax: { label: "MiniMax", hint: "Быстрый недорогой ролик ~6 сек" },
+    veo: { label: "Veo", hint: "Премиум-качество для рекламы" },
+  },
+  videoVariants: {
+    "kling-v3-standard": {
+      label: "Kling 3.0 Standard",
+      hint: "3–15 сек · image-to-video",
+    },
+    "kling-v3-pro": {
+      label: "Kling 3.0 Pro",
+      hint: "3–15 сек · image-to-video",
+    },
+    "kling-v2.6-pro": {
+      label: "Kling 2.6 Pro",
+      hint: "5 или 10 сек · без аудио",
+    },
+    "kling-v1.5-pro": {
+      label: "Kling 1.5 Pro",
+      hint: "5 или 10 сек · 1:1 / 9:16 / 16:9",
+    },
+    "kling-v2.6-motion-control": {
+      label: "Kling 2.6 Motion Control Standard",
+      hint: "Референс MP4 · до 10/30 сек",
+    },
+    "kling-v2.6-motion-pro": {
+      label: "Kling 2.6 Motion Control Pro",
+      hint: "Референс MP4 · сложные движения",
+    },
+    "kling-v3-motion-standard": {
+      label: "Kling 3.0 Motion Control",
+      hint: "Референс MP4 · лицо при ориентации «как в видео»",
+    },
+    "minimax-hailuo-02": {
+      label: "Hailuo 02 Standard",
+      hint: "6 сек, 512P или 768P",
+    },
+    "veo-3.1": {
+      label: "VEO 3.1 Premium",
+      hint: "4–8 сек · до 4K · максимальное качество",
+    },
+    "veo-3.1-fast": {
+      label: "VEO 3.1 стандартная",
+      hint: "4–8 сек · до 4K · быстрее и дешевле",
+    },
+    "veo-3-fast": {
+      label: "VEO 3 · базовая",
+      hint: "4–8 сек · до 1080p · без 4K · самый экономичный",
+    },
   },
   videoSettings: {
+    modelLabel: "Модель",
+    referenceVideo: "Референс-видео (URL)",
+    referenceVideoHint: "Прямая ссылка на MP4 с нужным движением (до ~30 сек).",
+    motionOrientationLabel: "Ориентация движения",
+    motionOrientImage: "Как на фото (до ~10 сек)",
+    motionOrientVideo: "Как в видео (до ~30 сек)",
     aspect9x16: "9:16 — Reels / Stories",
     aspect4x5: "4:5 — маркетплейсы / соцсети",
     aspect1x1: "1:1 — квадрат",
@@ -36,6 +107,26 @@ export const pass2RemainderRu = {
     motionTurn: "Поворот модели",
     motionPush: "Приближение",
     motionFidelity: "Товар без искажений",
+    advancedToggleLabel: "Дополнительные параметры",
+    advancedToggleHint: "Негатив-промпт и звук — только если модель поддерживает",
+    advancedIntro:
+      "Включите нужные опции. Если галочка недоступна для выбранной модели — API её не принимает.",
+    generateAudioLabel: "Генерировать звук",
+    generateAudioHint: "",
+    soundPromptFieldLabel: "Какой звук нужен",
+    soundPromptPlaceholder:
+      "например: тихая студийная атмосфера, шелест ткани, без музыки",
+    keepReferenceSoundLabel: "Звук из референс-видео",
+    keepReferenceSoundHint: "",
+    negativePromptToggleLabel: "Что исключить из ролика",
+    negativePromptToggleHint: "",
+    negativePromptIntro:
+      "В поле «Что сделать с фото?» вы описываете желаемый результат. Здесь — наоборот: что модели нельзя добавлять и чего избегать в кадре.",
+    negativePromptFieldLabel: "Перечислите через запятую",
+    negativePromptPlaceholder:
+      "размытие, дрожание камеры, лишние люди, текст на фоне, смена цвета или формы товара",
+    negativePromptFieldHint:
+      "Модель постарается не показывать перечисленное. Пустое поле — только автозащита товара (форма, цвет, принт, без водяных знаков).",
   },
   processedAssetsEditorReset: {
     aspectUnsupported:
@@ -182,6 +273,14 @@ export const pass2RemainderRu = {
     previewAlt: "Предпросмотр: {title}",
     resultTitle: "Результат",
   },
+  postProcessingDesktop: {
+    backToFiles: "Назад к файлам",
+    galleryTitle: "Мои файлы",
+    continueScene: "Продолжить сцену",
+    continueSceneSoon: "Скоро",
+    carouselPrev: "Предыдущее фото",
+    carouselNext: "Следующее фото",
+  },
   studioFiles: {
     title: "Мои файлы",
     download: "Скачать",
@@ -227,6 +326,8 @@ export const pass2RemainderRu = {
 export const pass2RemainderEn = {
   form: {
     fileFormat: "File format",
+    fileFormatPngDesc: "Lossless — sharper detail, best for cards and re-editing",
+    fileFormatJpegDesc: "Smaller file — faster to open on social and mobile",
     frameFormat: "Frame format",
     quality: "Quality",
     duration: "Duration",
@@ -246,11 +347,80 @@ export const pass2RemainderEn = {
     qualityFast: "Fast",
     qualityBalanced: "Standard",
     qualityHigh: "Maximum",
+    qualityUltra: "4K",
     preserveProduct: "Preserve product exactly",
     preserveProductHint:
       "AI changes only scene, light, and background — the product stays as-is.",
+    negativePromptToggleLabel: "What to exclude from the frame",
+    negativePromptToggleHint: "",
+    negativePromptIntro:
+      "In “What to do with the photo?” describe the desired result. Here — what must not appear.",
+    negativePromptFieldLabel: "List items, comma-separated",
+    negativePromptPlaceholder:
+      "plastic skin, extra text, blur, product color change, watermarks",
+  },
+  videoProviders: {
+    kling: { label: "Kling", hint: "Animate from photo — pick a model version" },
+    klingMotion: {
+      label: "Kling Motion Control",
+      hint: "Motion from reference video (MP4 required)",
+    },
+    minimax: { label: "MiniMax", hint: "Fast affordable ~6 sec clip" },
+    veo: { label: "Veo", hint: "Premium quality for ads" },
+  },
+  videoVariants: {
+    "kling-v3-standard": {
+      label: "Kling 3.0 Standard",
+      hint: "3–15 sec · image-to-video",
+    },
+    "kling-v3-pro": {
+      label: "Kling 3.0 Pro",
+      hint: "3–15 sec · image-to-video",
+    },
+    "kling-v2.6-pro": {
+      label: "Kling 2.6 Pro",
+      hint: "5 or 10 sec · no audio",
+    },
+    "kling-v1.5-pro": {
+      label: "Kling 1.5 Pro",
+      hint: "5 or 10 sec · 1:1 / 9:16 / 16:9",
+    },
+    "kling-v2.6-motion-control": {
+      label: "Kling 2.6 Motion Control Standard",
+      hint: "Reference MP4 · up to 10/30 sec",
+    },
+    "kling-v2.6-motion-pro": {
+      label: "Kling 2.6 Motion Control Pro",
+      hint: "Reference MP4 · complex motion",
+    },
+    "kling-v3-motion-standard": {
+      label: "Kling 3.0 Motion Control",
+      hint: "Reference MP4 · better face with “match video” orientation",
+    },
+    "minimax-hailuo-02": {
+      label: "Hailuo 02 Standard",
+      hint: "6 sec, 512P or 768P",
+    },
+    "veo-3.1": {
+      label: "VEO 3.1 Premium",
+      hint: "4–8 sec · up to 4K · best quality",
+    },
+    "veo-3.1-fast": {
+      label: "VEO 3.1 Standard",
+      hint: "4–8 sec · up to 4K · faster and cheaper",
+    },
+    "veo-3-fast": {
+      label: "VEO 3 · Basic",
+      hint: "4–8 sec · up to 1080p · no 4K · most affordable",
+    },
   },
   videoSettings: {
+    modelLabel: "Model",
+    referenceVideo: "Reference video (URL)",
+    referenceVideoHint: "Direct MP4 link with the motion to copy (up to ~30 sec).",
+    motionOrientationLabel: "Motion orientation",
+    motionOrientImage: "Match photo (up to ~10 sec)",
+    motionOrientVideo: "Match video (up to ~30 sec)",
     aspect9x16: "9:16 — Reels / Stories",
     aspect4x5: "4:5 — marketplaces / social",
     aspect1x1: "1:1 — square",
@@ -260,6 +430,26 @@ export const pass2RemainderEn = {
     motionTurn: "Model turn",
     motionPush: "Camera push-in",
     motionFidelity: "Product fidelity",
+    advancedToggleLabel: "Advanced options",
+    advancedToggleHint: "Negative prompt and audio — only when the model supports it",
+    advancedIntro:
+      "Enable only what you need. Unavailable options mean the API does not support them for this model.",
+    generateAudioLabel: "Generate audio",
+    generateAudioHint: "",
+    soundPromptFieldLabel: "Desired sound",
+    soundPromptPlaceholder:
+      "e.g. quiet studio ambience, fabric rustle, no music",
+    keepReferenceSoundLabel: "Keep reference video sound",
+    keepReferenceSoundHint: "",
+    negativePromptToggleLabel: "What to exclude from the clip",
+    negativePromptToggleHint: "",
+    negativePromptIntro:
+      "In “What to do with the photo?” you describe what you want. Here — what the model must not add and what to avoid in the frame.",
+    negativePromptFieldLabel: "List items, comma-separated",
+    negativePromptPlaceholder:
+      "blur, camera shake, extra people, text in the background, changing product color or shape",
+    negativePromptFieldHint:
+      "The model will try to avoid these. Leave empty — only automatic product protection (shape, color, pattern, no watermarks).",
   },
   processedAssetsEditorReset: {
     aspectUnsupported:
@@ -406,6 +596,14 @@ export const pass2RemainderEn = {
     previewAlt: "Preview: {title}",
     resultTitle: "Result",
   },
+  postProcessingDesktop: {
+    backToFiles: "Back to files",
+    galleryTitle: "My files",
+    continueScene: "Continue scene",
+    continueSceneSoon: "Coming soon",
+    carouselPrev: "Previous photo",
+    carouselNext: "Next photo",
+  },
   studioFiles: {
     title: "My files",
     download: "Download",
@@ -451,6 +649,8 @@ export const pass2RemainderEn = {
 export const pass2RemainderKk = {
   form: {
     fileFormat: "Файл форматы",
+    fileFormatPngDesc: "Сапасы сақталады — карточкаға және өңдеуге ыңғайлы",
+    fileFormatJpegDesc: "Файл жеңіл — әлеуметтік желіде тез ашылады",
     frameFormat: "Кадр форматы",
     quality: "Сапа",
     duration: "Ұзақтығы",
@@ -470,11 +670,80 @@ export const pass2RemainderKk = {
     qualityFast: "Жылдам",
     qualityBalanced: "Стандарт",
     qualityHigh: "Максимум",
+    qualityUltra: "4K",
     preserveProduct: "Тауарды дәл сақтау",
     preserveProductHint:
       "AI тек сценарий, жарық және фонды өзгертеді — тауар өзгертілмейді.",
+    negativePromptToggleLabel: "Кадрдан не алып тастау",
+    negativePromptToggleHint: "",
+    negativePromptIntro:
+      "«Фотомен не істеу керек?» — қалаған нәтиже. Мұнда — кадрға қоспау керек нәрсе.",
+    negativePromptFieldLabel: "Үтірмен жазыңыз",
+    negativePromptPlaceholder:
+      "пластик тері, артық мәтін, бұлыңқылық, тауар түсінің өзгеруі",
+  },
+  videoProviders: {
+    kling: { label: "Kling", hint: "Фотодан анимация — модель нұсқасын таңдаңыз" },
+    klingMotion: {
+      label: "Kling Motion Control",
+      hint: "Референс видеодан қозғалыс (MP4 керек)",
+    },
+    minimax: { label: "MiniMax", hint: "Жылдам арзан ~6 сек ролик" },
+    veo: { label: "Veo", hint: "Жарнамаға премиум сапа" },
+  },
+  videoVariants: {
+    "kling-v3-standard": {
+      label: "Kling 3.0 Standard",
+      hint: "3–15 сек · image-to-video",
+    },
+    "kling-v3-pro": {
+      label: "Kling 3.0 Pro",
+      hint: "3–15 сек · image-to-video",
+    },
+    "kling-v2.6-pro": {
+      label: "Kling 2.6 Pro",
+      hint: "5 немесе 10 сек · дыбыс жоқ",
+    },
+    "kling-v1.5-pro": {
+      label: "Kling 1.5 Pro",
+      hint: "5 немесе 10 сек · 1:1 / 9:16 / 16:9",
+    },
+    "kling-v2.6-motion-control": {
+      label: "Kling 2.6 Motion Control Standard",
+      hint: "Референс MP4 · 10/30 сек дейін",
+    },
+    "kling-v2.6-motion-pro": {
+      label: "Kling 2.6 Motion Control Pro",
+      hint: "Референс MP4 · күрделі қозғалыс",
+    },
+    "kling-v3-motion-standard": {
+      label: "Kling 3.0 Motion Control",
+      hint: "Референс MP4 · «видеодағыдай» бағытта бет",
+    },
+    "minimax-hailuo-02": {
+      label: "Hailuo 02 Standard",
+      hint: "6 сек, 512P немесе 768P",
+    },
+    "veo-3.1": {
+      label: "VEO 3.1 Premium",
+      hint: "4–8 сек · 4K-ға дейін · ең жоғары сапа",
+    },
+    "veo-3.1-fast": {
+      label: "VEO 3.1 стандартты",
+      hint: "4–8 сек · 4K-ға дейін · жылдамырақ және арзанырақ",
+    },
+    "veo-3-fast": {
+      label: "VEO 3 · базалық",
+      hint: "4–8 сек · 1080p-ға дейін · 4K жоқ · ең арзан",
+    },
   },
   videoSettings: {
+    modelLabel: "Модель",
+    referenceVideo: "Референс видео (URL)",
+    referenceVideoHint: "Қажетті қозғалысы бар MP4 сілтемесі (~30 сек дейін).",
+    motionOrientationLabel: "Қозғалыс бағыты",
+    motionOrientImage: "Фотодағыдай (~10 сек)",
+    motionOrientVideo: "Видеодағыдай (~30 сек)",
     aspect9x16: "9:16 — Reels / Stories",
     aspect4x5: "4:5 — маркетплейс / әлеуметтік",
     aspect1x1: "1:1 — шаршы",
@@ -484,6 +753,26 @@ export const pass2RemainderKk = {
     motionTurn: "Модель бұрылысы",
     motionPush: "Жақындату",
     motionFidelity: "Тауар бұрмаланбайды",
+    advancedToggleLabel: "Қосымша параметрлер",
+    advancedToggleHint: "Негатив промпт және дыбыс — модель қолдаса ғана",
+    advancedIntro:
+      "Керек опцияларды қосыңыз. Қолжетімсіз опция — API оны қабылдамайды.",
+    generateAudioLabel: "Дыбыс генерациялау",
+    generateAudioHint: "",
+    soundPromptFieldLabel: "Қандай дыбыс керек",
+    soundPromptPlaceholder:
+      "мысалы: тыныш студия, мата шуы, музыкасыз",
+    keepReferenceSoundLabel: "Референс видео дыбысы",
+    keepReferenceSoundHint: "",
+    negativePromptToggleLabel: "Роликтен не алып тастау",
+    negativePromptToggleHint: "",
+    negativePromptIntro:
+      "«Фотомен не істеу керек?» өрісінде қалаған нәтижені жазасыз. Мұнда — керісінше: модель кадрға не қосуы және неден аулақ болуы керек.",
+    negativePromptFieldLabel: "Үтірмен жазыңыз",
+    negativePromptPlaceholder:
+      "бұлыңқар, камера дірілі, артық адамдар, фондағы мәтін, тауар түсі немесе пішінінің өзгеруі",
+    negativePromptFieldHint:
+      "Модель мұны көрсетпеуге тырысатын болады. Бос қалдырсаңыз — тек тауарды автоматты қорғау (пішін, түс, өрнек, су белгісіз).",
   },
   processedAssetsEditorReset: {
     aspectUnsupported:
@@ -629,6 +918,14 @@ export const pass2RemainderKk = {
     moreAngles: "Басқа ракурстар әлі генерацияда…",
     previewAlt: "Алдын ала қарау: {title}",
     resultTitle: "Нәтиже",
+  },
+  postProcessingDesktop: {
+    backToFiles: "Файлдарға қайту",
+    galleryTitle: "Менің файлдарым",
+    continueScene: "Сценарийді жалғастыру",
+    continueSceneSoon: "Жақында",
+    carouselPrev: "Алдыңғы фото",
+    carouselNext: "Келесі фото",
   },
   studioFiles: {
     title: "Менің файлдарым",

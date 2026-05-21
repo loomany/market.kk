@@ -51,6 +51,8 @@ import {
   type OutputImageCheck,
   type SourceImageCheck,
 } from "@/lib/ai/imageEnhanceDebug";
+import { prepareImagePromptPackage } from "@/lib/ai/imagePromptPackage";
+import { defaultLocale } from "@/lib/i18n/localeConfig";
 import { wrapAiPost } from "@/lib/tokens/wrapAiPost";
 
 export const runtime = "nodejs";
@@ -199,6 +201,43 @@ async function handleImageEnhancePost(request: Request) {
 
   const estimatedCost = estimateCostForEditor(editor, data.quality);
 
+  let packagedGenerationPrompt: string;
+  try {
+    const packaged = await prepareImagePromptPackage({
+      userPrompt: data.userPrompt,
+      negativePrompt: data.negativePrompt,
+      useNegativePrompt: Boolean(data.useNegativePrompt),
+      preserveProduct: data.preserveProduct,
+      selectedEditor: editor,
+      locale: data.locale ?? defaultLocale,
+      mockMode: isMockMode(),
+      skipOpenAiPackage: Boolean(data.skipPromptPackage),
+    });
+    packagedGenerationPrompt = packaged.generationPrompt;
+  } catch (error) {
+    if (isPaidAiGuardError(error)) {
+      return jsonError(error.status, {
+        ok: false,
+        error:
+          "Подготовка промпта для фото отключена. Включите ALLOW_PAID_AI_RUNS=true после approval бюджета.",
+        code: "PAID_AI_RUNS_DISABLED",
+        providerError: isDev() ? error.message : undefined,
+        debug: finalizeTrace(trace),
+      });
+    }
+    console.error("[image prompt package]", error);
+    return jsonError(502, {
+      ok: false,
+      error:
+        "Не удалось подготовить промпт для фото. Упростите текст и попробуйте снова.",
+      code: "UNKNOWN_ERROR",
+      debug: finalizeTrace(trace),
+    });
+  }
+
+  const promptForBuilders =
+    data.enhancedPrompt?.trim() || packagedGenerationPrompt;
+
   /**
    * Build the FLUX prompt. The second call (after a dark-output retry) reuses
    * the same inputs with `brightenForRetry: true` so the prompt text changes
@@ -207,7 +246,7 @@ async function handleImageEnhancePost(request: Request) {
   function buildFluxPrompt(brightenForRetry: boolean): string {
     return buildFluxKontextEditPrompt({
       userPrompt: data.userPrompt,
-      enhancedPrompt: data.enhancedPrompt ?? null,
+      enhancedPrompt: promptForBuilders,
       preserveProduct: data.preserveProduct,
       productPreservationBlock: data.productPreservationBlock ?? null,
       brightenForRetry,
@@ -219,7 +258,7 @@ async function handleImageEnhancePost(request: Request) {
       ? buildFluxPrompt(false)
       : buildNanoBananaEnhancePrompt({
           userPrompt: data.userPrompt,
-          enhancedPrompt: data.enhancedPrompt ?? null,
+          enhancedPrompt: promptForBuilders,
           preserveProduct: data.preserveProduct,
           productPreservationBlock: data.productPreservationBlock ?? null,
         });
@@ -238,7 +277,7 @@ async function handleImageEnhancePost(request: Request) {
   const promptDebug = summarizePromptStages({
     userPrompt: data.userPrompt,
     normalizedUserIntent: data.userPrompt,
-    enhancedPrompt: data.enhancedPrompt ?? null,
+    enhancedPrompt: promptForBuilders,
     productPreservationBlock: data.productPreservationBlock ?? null,
     finalPromptBeforeFalSanitize: builderOutput,
     finalPromptSentToFal: finalPrompt,

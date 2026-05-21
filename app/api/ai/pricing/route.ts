@@ -7,7 +7,19 @@ export const runtime = "nodejs";
 const pricingRequestSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("video"),
-    modelKey: z.enum(["kling", "minimax", "veo"]),
+    variantId: z.enum([
+      "kling-v3-standard",
+      "kling-v3-pro",
+      "kling-v2.6-pro",
+      "kling-v1.5-pro",
+      "kling-v2.6-motion-control",
+      "kling-v2.6-motion-pro",
+      "kling-v3-motion-standard",
+      "minimax-hailuo-02",
+      "veo-3.1",
+      "veo-3.1-fast",
+      "veo-3-fast",
+    ]),
     durationSeconds: z.number().int().min(3).max(15),
   }),
   z.object({
@@ -43,7 +55,7 @@ export async function POST(request: Request) {
   const data = parsed.data;
   const estimatedCost =
     data.type === "video"
-      ? estimateVideoOrThrow(data.modelKey, data.durationSeconds)
+      ? estimateVideoOrThrow(data.variantId, data.durationSeconds)
       : estimateSceneCostUsd(data.mode);
 
   return NextResponse.json({

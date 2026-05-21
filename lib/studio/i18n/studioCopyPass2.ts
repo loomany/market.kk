@@ -82,6 +82,10 @@ export const pass2Ru = {
     whatToDo: "Что сделать с фото?",
     promptPlaceholder: "Например: мягкий студийный свет, дорогой интерьер, фон у окна, пляжный кадр, реалистичная кожа, убрать пластиковость.",
     promptNoEnhance: "Мы используем ваш промт без повторного усиления — добавим только обязательные правила сохранения товара и качества.",
+    videoPromptAiNotice:
+      "Перед генерацией наш ИИ соберёт основной промпт, звук (если включён) и исключения в один запрос для модели — смысл ролика не меняем, только формулировки.",
+    imagePromptAiNotice:
+      "Перед созданием наш ИИ соберёт основной промпт и исключения в один запрос для модели — смысл кадра не меняем, только формулировки.",
     createVideo: "Создать видео",
     createImage: "Создать изображение",
     enhancedPhoto: "Улучшенное фото",
@@ -121,7 +125,7 @@ export const pass2Ru = {
     savedUsesPrevious: "Используется ранее сохранённая модель",
     uploadYourModel: "Загрузите свою модель",
     orDragHere: "или перетащите сюда",
-    jpegPngWebp: "JPEG, PNG или WEBP до 10 MB",
+    jpegPngWebp: "JPEG или PNG до 10 MB",
   },
   modelScenario: {
     general: "Универсально",
@@ -161,6 +165,7 @@ export const pass2Ru = {
   },
   postProcessingEditors: {
     kling: { title: "Kling — плавное видео", description: "Лучше для коротких видео из фото.", pros: "Стабильное движение, до 15 сек.", limitations: "Нет формата 4:5." },
+    klingMotion: { title: "Kling Motion Control", description: "Движение с референс-видео на ваше фото.", pros: "Танец, жесты, сложная мимика.", limitations: "Нужна ссылка на MP4." },
     minimax: { title: "MiniMax — быстрое видео", description: "Короткий недорогой ролик ~6 сек.", pros: "Экономично, все основные форматы.", limitations: "Фиксированная длительность 6 сек." },
     veo: { title: "Veo — премиум видео", description: "Максимальное качество для рекламы.", pros: "Топ качество, точная передача движения.", limitations: "Только 9:16 и 16:9, дороже." },
     nanoBanana: { title: "Nano Banana Pro", pros: "Реалистичная кожа, ткань и свет. Сохраняет товар.", descriptionReal: "Реалистичные фото, улучшение света, фона и деталей.", limitationsCost: "Стоимость зависит от качества (Быстро / Стандарт / Максимум).", descriptionDemo: "Demo: показывает работу улучшения фото на mock-результатах.", limitationsDemo: "В demo-режиме результат — пример. Включите real-режим для настоящего AI.", disabled: "Real-режим временно отключён администратором. Скоро будет доступен." },
@@ -250,6 +255,10 @@ export const pass2En = {
     whatToDo: "What to do with the photo?",
     promptPlaceholder: "e.g. soft studio light, premium interior, window background, beach shot, realistic skin, less plastic look.",
     promptNoEnhance: "We use your prompt as-is — only mandatory product preservation and quality rules are added.",
+    videoPromptAiNotice:
+      "Before generation, our AI merges your main prompt, sound (if enabled), and exclusions into one model request — we do not change what happens in the clip, only wording.",
+    imagePromptAiNotice:
+      "Before creation, our AI merges your main prompt and exclusions into one model request — we do not change the shot’s meaning, only wording.",
     createVideo: "Create video",
     createImage: "Create image",
     enhancedPhoto: "Enhanced photo",
@@ -289,7 +298,7 @@ export const pass2En = {
     savedUsesPrevious: "Using previously saved model",
     uploadYourModel: "Upload your model",
     orDragHere: "or drag here",
-    jpegPngWebp: "JPEG, PNG, or WEBP up to 10 MB",
+    jpegPngWebp: "JPEG or PNG up to 10 MB",
   },
   modelScenario: {
     general: "General",
@@ -326,6 +335,7 @@ export const pass2En = {
   },
   postProcessingEditors: {
     kling: { title: "Kling — smooth video", description: "Best for short videos from a photo.", pros: "Stable motion, up to 15 sec.", limitations: "No 4:5 format." },
+    klingMotion: { title: "Kling Motion Control", description: "Motion from reference video onto your photo.", pros: "Dance, gestures, complex motion.", limitations: "MP4 URL required." },
     minimax: { title: "MiniMax — fast video", description: "Short affordable clip ~6 sec.", pros: "Economical, all main formats.", limitations: "Fixed 6 sec duration." },
     veo: { title: "Veo — premium video", description: "Maximum quality for ads.", pros: "Top quality, accurate motion.", limitations: "9:16 and 16:9 only, pricier." },
     nanoBanana: { title: "Nano Banana Pro", pros: "Realistic skin, fabric, and light. Preserves product.", descriptionReal: "Realistic photos, better light, background, and detail.", limitationsCost: "Cost depends on quality (Fast / Standard / Maximum).", descriptionDemo: "Demo: shows photo enhancement on mock results.", limitationsDemo: "Demo output is a sample. Enable real mode for actual AI.", disabled: "Real mode disabled by admin. Coming soon." },
@@ -415,6 +425,10 @@ export const pass2Kk = {
     whatToDo: "Фотомен не істеу керек?",
     promptPlaceholder: "Мысалы: жұмсақ студия жарығы, премиум интерьер, терезе фоны, пляж кадры",
     promptNoEnhance: "Сіздің промптіңізді өзгертпейміз — тек тауарды сақтау ережелері қосылады.",
+    videoPromptAiNotice:
+      "Генерациядан бұрын ИИ негізгі промпт, дыбыс (қосылған болса) және алып тастауды бір сұранысқа жинайды — ролик мазмұнын өзгертпейміз.",
+    imagePromptAiNotice:
+      "Жасау алдында ИИ негізгі промпт пен алып тастауды бір сұранысқа жинайды — кадр мазмұнын өзгертпейміз.",
     createVideo: "Видео жасау",
     createImage: "Сурет жасау",
     enhancedPhoto: "Жақсартылған фото",
@@ -454,7 +468,7 @@ export const pass2Kk = {
     savedUsesPrevious: "Бұрын сақталған модель қолданылады",
     uploadYourModel: "Өз моделіңізді жүктеңіз",
     orDragHere: "немесе осында сүйреңіз",
-    jpegPngWebp: "JPEG, PNG немесе WEBP 10 MB дейін",
+    jpegPngWebp: "JPEG немесе PNG 10 MB дейін",
   },
   modelScenario: {
     general: "Жалпы",
@@ -491,6 +505,7 @@ export const pass2Kk = {
   },
   postProcessingEditors: {
     kling: { title: "Kling — тегіс видео", description: "Фотодан қысқа видео үшін жақсы.", pros: "Тұрақты қозғалыс, 15 сек дейін.", limitations: "4:5 форматы жоқ." },
+    klingMotion: { title: "Kling Motion Control", description: "Референс видеодан қозғалысты фотоға.", pros: "Би, қимыл, күрделі мимика.", limitations: "MP4 сілтемесі керек." },
     minimax: { title: "MiniMax — жылдам видео", description: "Қысқа арзан ролик ~6 сек.", pros: "Үнемді, негізгі форматтар.", limitations: "6 сек ұзақтығы." },
     veo: { title: "Veo — премиум видео", description: "Жарнама үшін максимал сапа.", pros: "Жоғары сапа, дәл қозғалыс.", limitations: "Тек 9:16 және 16:9." },
     nanoBanana: { title: "Nano Banana Pro", pros: "Реалистік тері, мата, жарық. Тауарды сақтайды.", descriptionReal: "Реалистік фото, жарық, фон, деталь.", limitationsCost: "Құны сапаға байланысты.", descriptionDemo: "Demo: mock нәтижелер.", limitationsDemo: "Demo — сынақ. Real режим қосыңыз.", disabled: "Real режим өшірілген. Жақында." },

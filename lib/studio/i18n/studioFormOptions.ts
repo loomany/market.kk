@@ -1,8 +1,27 @@
-import type { ImageAspectRatio } from "@/components/studio/ImageSettingsForm";
-import type { SaasQualityTier } from "@/components/studio/ImageSettingsForm";
+import type {
+  ImageAspectRatio,
+  ImageOutputFormat,
+  SaasQualityTier,
+} from "@/components/studio/ImageSettingsForm";
 import type { VideoAspectRatio } from "@/components/studio/VideoSettingsForm";
 import type { VideoMotionPresetId } from "@/components/studio/VideoSettingsForm";
 import { formatStudioString, getStudioCopy, type StudioLocale } from "./index";
+
+export function getImageFileFormatOptions(locale: StudioLocale) {
+  const f = getStudioCopy(locale).form;
+  return [
+    {
+      value: "png" as ImageOutputFormat,
+      label: "PNG",
+      description: f.fileFormatPngDesc,
+    },
+    {
+      value: "jpeg" as ImageOutputFormat,
+      label: "JPG",
+      description: f.fileFormatJpegDesc,
+    },
+  ];
+}
 
 export function getSaasQualityOptions(locale: StudioLocale) {
   const s = getStudioCopy(locale).imageSettings;
@@ -10,6 +29,7 @@ export function getSaasQualityOptions(locale: StudioLocale) {
     { value: "fast" as const, label: s.qualityFast },
     { value: "balanced" as const, label: s.qualityBalanced },
     { value: "high" as const, label: s.qualityHigh },
+    { value: "ultra" as const, label: s.qualityUltra },
   ];
 }
 

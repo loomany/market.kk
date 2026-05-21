@@ -7,10 +7,13 @@ import {
   isPaidAiGuardError,
   paidAiGuardResponse,
 } from "@/lib/ai/paidAiGuard";
-import { getVideoModel } from "@/lib/ai/videoModels";
-import { videoGenerateRequestSchema } from "@/lib/ai/videoSchemas";
+import { getVideoVariant } from "@/lib/ai/videoCatalog";
+import {
+  resolveVideoVariantId,
+  videoGenerateRequestSchema,
+} from "@/lib/ai/videoSchemas";
 import { defaultLocale } from "@/lib/i18n/localeConfig";
-import { translatePromptToEnglish } from "@/lib/ai/promptTranslate";
+import { prepareVideoPromptPackage } from "@/lib/ai/videoPromptPackage";
 import { wrapAiPost } from "@/lib/tokens/wrapAiPost";
 
 export const runtime = "nodejs";
@@ -49,38 +52,121 @@ async function handleVideoGeneratePost(request: Request) {
     );
   }
 
-  const data = parsed.data;
+  const variantId = resolveVideoVariantId(parsed.data);
+  if (!variantId) {
+    return NextResponse.json(
+      {
+        ok: false,
+        errorCode: "VALIDATION_ERROR",
+        message: "Unknown video model variant",
+      },
+      { status: 400 }
+    );
+  }
+
+  const variant = getVideoVariant(variantId);
+  const caps = variant.capabilities;
+  const data = {
+    ...parsed.data,
+    variantId,
+    generateAudio: caps.supportsNativeAudio
+      ? Boolean(parsed.data.generateAudio)
+      : false,
+    useNegativePrompt: caps.supportsNegativePrompt
+      ? Boolean(parsed.data.useNegativePrompt)
+      : false,
+    negativePrompt: caps.supportsNegativePrompt
+      ? parsed.data.negativePrompt
+      : undefined,
+    keepReferenceSound: caps.supportsReferenceVideoSound
+      ? Boolean(parsed.data.keepReferenceSound)
+      : false,
+    soundPrompt: caps.supportsNativeAudio ? parsed.data.soundPrompt : undefined,
+  };
   const promptLocale = data.promptLocale ?? defaultLocale;
 
   let generationData = data;
   try {
-    const generationPrompt = await translatePromptToEnglish(
-      data.prompt,
-      promptLocale,
-      "/api/ai/video/generate"
-    );
-    generationData = { ...data, prompt: generationPrompt };
+    const packaged = await prepareVideoPromptPackage({
+      userPrompt: data.prompt,
+      soundPrompt: data.soundPrompt,
+      negativePrompt: data.negativePrompt,
+      useNegativePrompt: data.useNegativePrompt,
+      generateAudio: data.generateAudio,
+      motionPreset: data.motionPreset,
+      targetPlatform:
+        data.aspectRatio === "9:16" ? "reels" : "marketplace",
+      locale: promptLocale,
+      mockMode: isMockMode(),
+    });
+    generationData = {
+      ...data,
+      prompt: packaged.generationPrompt,
+      negativePrompt: packaged.negativePromptForApi ?? data.negativePrompt,
+    };
   } catch (error) {
     if (isPaidAiGuardError(error)) {
       return NextResponse.json(paidAiGuardResponse(error), {
         status: error.status,
       });
     }
-    throw error;
+    console.error("[video prompt package]", error);
+    return NextResponse.json(
+      {
+        ok: false,
+        errorCode: "VIDEO_PROMPT_PACKAGE_FAILED",
+        message:
+          "Не удалось подготовить промпт для видео. Попробуйте упростить текст и повторить.",
+      },
+      { status: 502 }
+    );
   }
-  const model = getVideoModel(data.modelKey);
-  const estimatedCost = estimateVideoOrThrow(data.modelKey, data.durationSeconds);
+
+  const estimatedCost = estimateVideoOrThrow(variantId, data.durationSeconds);
+  const { capabilities } = variant;
 
   if (
-    !model.durationOptions.includes(data.durationSeconds) ||
-    !model.aspectRatioOptions.includes(data.aspectRatio) ||
-    !model.qualityOptions.some((option) => option.id === data.quality)
+    capabilities.supportsDuration &&
+    variant.durationOptions.length > 0 &&
+    !variant.durationOptions.includes(data.durationSeconds)
   ) {
     return NextResponse.json(
       {
         ok: false,
         errorCode: "VALIDATION_ERROR",
-        message: "Эта видео-модель не поддерживает выбранные настройки.",
+        message: "Эта видео-модель не поддерживает выбранную длительность.",
+        estimatedCost,
+      },
+      { status: 400 }
+    );
+  }
+
+  if (
+    capabilities.supportsAspectRatio &&
+    variant.aspectRatioOptions.length > 0 &&
+    !variant.aspectRatioOptions.includes(data.aspectRatio)
+  ) {
+    return NextResponse.json(
+      {
+        ok: false,
+        errorCode: "VALIDATION_ERROR",
+        message: "Эта видео-модель не поддерживает выбранный формат кадра.",
+        estimatedCost,
+      },
+      { status: 400 }
+    );
+  }
+
+  if (
+    capabilities.supportsQuality &&
+    variant.qualityOptions.length > 0 &&
+    !variant.qualityOptions.some((option) => option.id === data.quality)
+  ) {
+    return NextResponse.json(
+      {
+        ok: false,
+        errorCode: "VALIDATION_ERROR",
+        message: "Эта видео-модель не поддерживает выбранное качество.",
         estimatedCost,
       },
       { status: 400 }
@@ -91,7 +177,7 @@ async function handleVideoGeneratePost(request: Request) {
     return NextResponse.json({
       ok: true,
       provider: "mock",
-      model: model.id,
+      model: variant.falEndpoint,
       video: {
         url: "/demo/video-placeholder.svg",
         posterUrl: data.sourceImageUrl,
@@ -120,7 +206,7 @@ async function handleVideoGeneratePost(request: Request) {
     throw error;
   }
 
-  if (!model.realSchemaVerified) {
+  if (!variant.realSchemaVerified) {
     return NextResponse.json(
       {
         ok: false,
@@ -139,8 +225,28 @@ async function handleVideoGeneratePost(request: Request) {
       route: "/api/ai/video/generate",
       estimatedCostUsd: estimatedCost,
     });
-    const result = await fal.subscribe(model.id, {
-      input: model.inputMapper(generationData),
+    let falInput: Record<string, unknown>;
+    try {
+      falInput = variant.inputMapper(generationData);
+    } catch (mapError) {
+      const msg =
+        mapError instanceof Error ? mapError.message : "Invalid video input";
+      return NextResponse.json(
+        {
+          ok: false,
+          errorCode: "VALIDATION_ERROR",
+          message:
+            msg === "REFERENCE_VIDEO_REQUIRED"
+              ? "Для Motion Control нужна ссылка на референс-видео."
+              : msg,
+          estimatedCost,
+        },
+        { status: 400 }
+      );
+    }
+
+    const result = await fal.subscribe(variant.falEndpoint, {
+      input: falInput,
       logs: true,
       onQueueUpdate(update) {
         if (update.status === "IN_PROGRESS") {
@@ -160,7 +266,7 @@ async function handleVideoGeneratePost(request: Request) {
     return NextResponse.json({
       ok: true,
       provider: "fal",
-      model: model.id,
+      model: variant.falEndpoint,
       video: {
         url: resultData.video.url,
         width: resultData.video.width,

@@ -299,7 +299,7 @@ const mockScenario: Scenario = {
       body: {
         sourceImageUrl: commonImageUrl,
         prompt: "модель плавно поворачивается, товар не меняется",
-        modelKey: "kling",
+        variantId: "kling-v3-standard",
         quality: "balanced",
         durationSeconds: 5,
         aspectRatio: "9:16",
@@ -334,7 +334,7 @@ const mockScenario: Scenario = {
       path: "/api/ai/pricing",
       body: {
         type: "video",
-        modelKey: "kling",
+        variantId: "kling-v3-standard",
         durationSeconds: 5,
       },
     },

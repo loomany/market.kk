@@ -7,12 +7,14 @@ import {
   type ImageEditorId,
 } from "@/lib/ai/imageEnhanceSchemas";
 import {
+  getImageFileFormatOptions,
   getImageFrameFormatOptions,
   getSaasQualityOptions,
 } from "@/lib/studio/i18n/studioFormOptions";
+import { ImageAdvancedSettings } from "./ImageAdvancedSettings";
 import { useStudioCopy } from "./StudioLocaleContext";
 
-export type ImageOutputFormat = "png" | "jpeg" | "webp";
+export type ImageOutputFormat = "png" | "jpeg";
 export type ImageAspectRatio =
   | "1:1"
   | "4:5"
@@ -20,21 +22,10 @@ export type ImageAspectRatio =
   | "3:4"
   | "4:3"
   | "16:9";
-export type SaasQualityTier = "fast" | "balanced" | "high";
+export type SaasQualityTier = "fast" | "balanced" | "high" | "ultra";
 
-const IMAGE_FILE_FORMAT_OPTIONS_ALL: {
-  value: ImageOutputFormat;
-  label: string;
-}[] = [
-  { value: "png", label: "PNG" },
-  { value: "jpeg", label: "JPG" },
-  { value: "webp", label: "WEBP" },
-];
-
-/** UI ImageOutputFormat (jpeg/png/webp) → schema enum (jpg/png/webp). */
-function toSchemaOutputFormat(
-  format: ImageOutputFormat
-): "png" | "jpg" | "webp" {
+/** UI ImageOutputFormat (jpeg/png) → schema enum (jpg/png). */
+function toSchemaOutputFormat(format: ImageOutputFormat): "png" | "jpg" {
   if (format === "jpeg") return "jpg";
   return format;
 }
@@ -46,10 +37,14 @@ type ImageSettingsFormProps = {
   aspectRatio: ImageAspectRatio;
   quality: SaasQualityTier;
   preserveProduct: boolean;
+  useNegativePrompt: boolean;
+  negativePrompt: string;
   onOutputFormatChange: (format: ImageOutputFormat) => void;
   onAspectRatioChange: (ratio: ImageAspectRatio) => void;
   onQualityChange: (tier: SaasQualityTier) => void;
   onPreserveProductChange: (value: boolean) => void;
+  onUseNegativePromptChange: (value: boolean) => void;
+  onNegativePromptChange: (value: string) => void;
   disabled?: boolean;
 };
 
@@ -59,10 +54,14 @@ export function ImageSettingsForm({
   aspectRatio,
   quality,
   preserveProduct,
+  useNegativePrompt,
+  negativePrompt,
   onOutputFormatChange,
   onAspectRatioChange,
   onQualityChange,
   onPreserveProductChange,
+  onUseNegativePromptChange,
+  onNegativePromptChange,
   disabled,
 }: ImageSettingsFormProps) {
   const { locale, copy } = useStudioCopy();
@@ -72,19 +71,18 @@ export function ImageSettingsForm({
     [locale]
   );
   const qualityOptions = useMemo(
-    () => getSaasQualityOptions(locale),
+    () => getSaasQualityOptions(locale).filter((o) => o.value !== "ultra"),
     [locale]
   );
 
-  const outputFormatOptions = useMemo(
-    () =>
-      IMAGE_FILE_FORMAT_OPTIONS_ALL.filter((opt) =>
-        (capability.outputFormats as readonly string[]).includes(
-          toSchemaOutputFormat(opt.value)
-        )
-      ),
-    [capability.outputFormats]
-  );
+  const outputFormatOptions = useMemo(() => {
+    const all = getImageFileFormatOptions(locale);
+    return all.filter((opt) =>
+      (capability.outputFormats as readonly string[]).includes(
+        toSchemaOutputFormat(opt.value)
+      )
+    );
+  }, [capability.outputFormats, locale]);
 
   const aspectRatioOptions = useMemo(
     () =>
@@ -128,6 +126,16 @@ export function ImageSettingsForm({
           />
         ) : null}
       </div>
+
+      {capability.supportsNegativePrompt ? (
+        <ImageAdvancedSettings
+          useNegativePrompt={useNegativePrompt}
+          negativePrompt={negativePrompt}
+          onUseNegativePromptChange={onUseNegativePromptChange}
+          onNegativePromptChange={onNegativePromptChange}
+          disabled={disabled}
+        />
+      ) : null}
 
       <div className="flex items-center gap-3 rounded-[18px] border border-border bg-white p-3">
         <button

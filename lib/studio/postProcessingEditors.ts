@@ -1,9 +1,9 @@
-import type { VideoModelKey } from "@/lib/ai/videoModels";
+import type { VideoProviderId } from "@/lib/ai/videoCatalog";
 import type { ImageEditorId as ImageEnhanceEditorId } from "@/lib/ai/imageEnhanceSchemas";
 
 export type PostProcessingMode = "video" | "image";
 
-export type VideoEditorId = VideoModelKey;
+export type VideoEditorId = VideoProviderId;
 
 export type ImageEditorId = ImageEnhanceEditorId;
 
@@ -26,9 +26,19 @@ export const VIDEO_EDITORS: PostProcessingEditor[] = [
     mode: "video",
     title: "Kling — плавное видео",
     description: "Лучше для коротких видео из фото.",
-    technicalModel: "fal-ai/kling-video/o3/standard/image-to-video",
+    technicalModel: "fal-ai/kling-video/v3/standard/image-to-video",
     pros: "Стабильное движение, до 15 сек.",
     limitations: "Нет формата 4:5.",
+    available: true,
+  },
+  {
+    id: "kling-motion",
+    mode: "video",
+    title: "Kling Motion Control",
+    description: "Перенос движения с референс-видео на фото.",
+    technicalModel: "fal-ai/kling-video/v2.6/standard/motion-control",
+    pros: "Танец, жесты, сложная мимика с MP4.",
+    limitations: "Нужна прямая ссылка на референс-видео.",
     available: true,
   },
   {

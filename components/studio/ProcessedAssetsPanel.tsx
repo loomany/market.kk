@@ -4,8 +4,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Clapperboard, ImageIcon, Layers, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { VIDEO_MODELS, type VideoModelKey } from "@/lib/ai/videoModels";
-import type { PromptEnhanceResponse } from "@/lib/ai/promptEnhanceSchemas";
+import {
+  clampVideoSettingsToVariant,
+  DEFAULT_VARIANT_BY_PROVIDER,
+  getVideoVariant,
+  type KlingMotionOrientation,
+  type VideoProviderId,
+  type VideoVariantId,
+} from "@/lib/ai/videoCatalog";
 import type { VideoGenerateResponse } from "@/lib/ai/videoSchemas";
 import {
   IMAGE_EDITOR_CAPABILITIES,
@@ -17,30 +23,25 @@ import type { ImageEnhanceDebugTrace } from "@/lib/ai/imageEnhanceDebugTypes";
 import type { ProductPreservationResponse } from "@/lib/ai/productPreservationSchemas";
 import type { Locale } from "@/lib/i18n/localeConfig";
 import type { StudioSessionAsset } from "./types";
-import { downloadImageFile } from "@/lib/studio/downloadImages";
+import { downloadImageFile, downloadVideoFile } from "@/lib/studio/downloadImages";
 import {
   assetProcessingSourceUrl,
-  getAssetDisplayTitle,
   isVideoAsset,
 } from "@/lib/studio/assetDisplayLabels";
 import type { PostProcessingMode } from "@/lib/studio/postProcessingEditors";
-import {
-  getLocalizedImageEditors,
-  getLocalizedVideoEditors,
-} from "@/lib/studio/i18n/postProcessingEditorsI18n";
+import { getLocalizedImageEditors } from "@/lib/studio/i18n/postProcessingEditorsI18n";
 import { formatStudioString } from "@/lib/studio/i18n";
 import { useStudioCopy } from "./StudioLocaleContext";
 import type { StudioCopyFull } from "@/lib/studio/i18n/studioCopyTypes";
-import {
-  buildEnhancerUserPrompt,
-  buildFallbackGenerationPrompt,
-} from "@/lib/studio/imageEnhancementPrompts";
 import { normalizePostProcessPrompt } from "@/lib/studio/postProcessPromptNormalizer";
 import { PostProcessingMobileSheet } from "./PostProcessingMobileSheet";
 import { useStudioMobileLayout } from "./useStudioMobileLayout";
-import { StudioFilesList } from "./StudioFilesList";
+import { PostProcessingMobileGallery } from "./PostProcessingMobileGallery";
 import { PostProcessingActions } from "./PostProcessingActions";
-import { AiEditorPicker } from "./AiEditorPicker";
+import { PostProcessingDesktopGallery } from "./PostProcessingDesktopGallery";
+import { PostProcessingDesktopEditor } from "./PostProcessingDesktopEditor";
+import { ImageEditorSelect } from "./ImageEditorSelect";
+import { VideoProviderSelect } from "./VideoProviderSelect";
 import {
   VideoSettingsForm,
   mapSaasQualityToVideoApi,
@@ -53,7 +54,6 @@ import {
   type ImageOutputFormat,
   type SaasQualityTier,
 } from "./ImageSettingsForm";
-import { StudioAssetPreview } from "./StudioAssetPreview";
 import { TokenChargeHint } from "./TokenChargeHint";
 import { tryApplyTokenBillingError } from "@/lib/tokens/billingErrorPayload";
 import type { TokenBillingErrorPayload } from "@/lib/tokens/billingErrorPayload";
@@ -110,10 +110,6 @@ export function ProcessedAssetsPanel({
   const pa = copy.processedAssets;
   const ppe = copy.postProcessingEditors;
 
-  const videoEditors = useMemo(
-    () => getLocalizedVideoEditors(locale),
-    [locale]
-  );
   const imageEditors = useMemo(
     () => getLocalizedImageEditors(locale, { mockMode, paidAiRunsAllowed }),
     [locale, mockMode, paidAiRunsAllowed]
@@ -126,9 +122,16 @@ export function ProcessedAssetsPanel({
   const firstSelectableId = selectableAssets[0]?.id ?? assets[0]?.id ?? "";
   const [selectedAssetId, setSelectedAssetId] = useState(firstSelectableId);
   const [processingMode, setProcessingMode] = useState<PostProcessingMode | null>(
-    "image"
+    null
   );
-  const [videoEditorId, setVideoEditorId] = useState<VideoModelKey>("kling");
+  const [desktopEditorOpen, setDesktopEditorOpen] = useState(false);
+  const [videoProvider, setVideoProvider] = useState<VideoProviderId>("kling");
+  const [videoVariantId, setVideoVariantId] = useState<VideoVariantId>(
+    DEFAULT_VARIANT_BY_PROVIDER.kling
+  );
+  const [referenceVideoUrl, setReferenceVideoUrl] = useState("");
+  const [characterOrientation, setCharacterOrientation] =
+    useState<KlingMotionOrientation>("image");
   const [imageEditorId, setImageEditorId] = useState<ImageEditorId>("nano-banana-pro");
   /** Inline hint shown when switching editor reset incompatible options. */
   const [editorSwitchHint, setEditorSwitchHint] = useState<string | null>(null);
@@ -147,6 +150,13 @@ export function ProcessedAssetsPanel({
   const [preserveProduct, setPreserveProduct] = useState(true);
   const [outputFormat, setOutputFormat] = useState<ImageOutputFormat>("png");
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  const [videoGenerateAudio, setVideoGenerateAudio] = useState(false);
+  const [videoSoundPrompt, setVideoSoundPrompt] = useState("");
+  const [videoUseNegativePrompt, setVideoUseNegativePrompt] = useState(false);
+  const [videoNegativePrompt, setVideoNegativePrompt] = useState("");
+  const [videoKeepReferenceSound, setVideoKeepReferenceSound] = useState(false);
+  const [imageUseNegativePrompt, setImageUseNegativePrompt] = useState(false);
+  const [imageNegativePrompt, setImageNegativePrompt] = useState("");
 
   /**
    * In-memory cache for product preservation analyses, keyed by asset id.
@@ -270,80 +280,58 @@ export function ProcessedAssetsPanel({
     [prompt, imageEditorId, processingMode, preserveProduct]
   );
 
+  const activeVideoVariant = getVideoVariant(videoVariantId);
+
+  useEffect(() => {
+    const variantProvider = activeVideoVariant.provider;
+    if (variantProvider !== videoProvider) {
+      setVideoProvider(variantProvider);
+    }
+  }, [activeVideoVariant.provider, videoProvider]);
+  const videoGenerationReady =
+    activeVideoVariant.capabilities.requiresReferenceVideo
+      ? referenceVideoUrl.trim().length > 8
+      : promptNormalization.normalizedUserIntent.length >= 4;
+
   const canGenerate = Boolean(
     selectedAsset &&
       processingMode &&
       sourceImageUrl &&
-      promptNormalization.normalizedUserIntent.length >= 4 &&
       !generationLoading &&
-      (processingMode === "video" || imageEditorReady)
+      (processingMode === "video" ? videoGenerationReady : imageEditorReady)
   );
 
-  /**
-   * Calls /api/ai/prompt/enhance to expand the raw user prompt into a richer
-   * English prompt. The server-side image-enhance route applies the final
-   * photorealism + preservation guardrails on top of the result.
-   *
-   * `userIntent` is the already-normalized intent (see
-   * `normalizePostProcessPrompt`) — pre-baked AI prompts and mode-mismatched
-   * phrases are stripped before this point, so the enhancer receives a
-   * clean, single-intent string.
-   */
-  const enhancePromptViaApi = async (
-    task: "image" | "video",
-    userIntent: string
-  ): Promise<string | null> => {
-    const wrapped = buildEnhancerUserPrompt({
-      userPrompt: userIntent,
-      task,
-      preserveProduct,
+  const applyVideoVariant = (nextVariantId: VideoVariantId) => {
+    const nextVariant = getVideoVariant(nextVariantId);
+    const clamped = clampVideoSettingsToVariant(nextVariantId, {
+      durationSeconds,
+      aspectRatio: videoAspectRatio,
+      quality: saasQuality,
     });
-
-    try {
-      const res = await fetch("/api/ai/prompt/enhance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          context: task === "video" ? "video" : "scene",
-          userPrompt: wrapped,
-          sourceImageDescription: selectedAsset
-            ? getAssetDisplayTitle(selectedAsset)
-            : undefined,
-          targetPlatform:
-            task === "video"
-              ? videoAspectRatio === "9:16"
-                ? "reels"
-                : "marketplace"
-              : imageAspectRatio === "9:16"
-                ? "social_static_vertical"
-                : "marketplace",
-          language: promptLocale,
-        }),
-      });
-      const data = (await res.json()) as PromptEnhanceResponse;
-      if (data.ok) {
-        return data.generationPrompt?.trim() || data.enhancedPrompt.trim();
-      }
-    } catch {
-      // fall through
+    setVideoVariantId(nextVariantId);
+    setDurationSeconds(clamped.durationSeconds);
+    setVideoAspectRatio(clamped.aspectRatio);
+    setSaasQuality(clamped.quality);
+    const c = nextVariant.capabilities;
+    if (!c.supportsNativeAudio) {
+      setVideoGenerateAudio(false);
+      setVideoSoundPrompt("");
     }
-    return null;
+    if (!c.supportsNegativePrompt) {
+      setVideoUseNegativePrompt(false);
+      setVideoNegativePrompt("");
+    }
+    if (!c.supportsReferenceVideoSound) setVideoKeepReferenceSound(false);
   };
 
-  /** Legacy: returns one final prompt string for routes that don't apply
-   *  server-side guardrails (currently the video route). */
-  const resolveFinalPrompt = async (
-    task: "image" | "video",
-    userIntent: string
-  ): Promise<string> => {
-    const enhanced = await enhancePromptViaApi(task, userIntent);
-    if (enhanced) return enhanced;
+  const handleVideoProviderChange = (provider: VideoProviderId) => {
+    setVideoProvider(provider);
+    applyVideoVariant(DEFAULT_VARIANT_BY_PROVIDER[provider]);
+  };
 
-    return buildFallbackGenerationPrompt({
-      userPrompt: userIntent,
-      task,
-      preserveProduct,
-    });
+  const handleVideoVariantChange = (nextVariantId: VideoVariantId) => {
+    setVideoProvider(getVideoVariant(nextVariantId).provider);
+    applyVideoVariant(nextVariantId);
   };
 
   const handleGenerate = async () => {
@@ -383,20 +371,29 @@ export function ProcessedAssetsPanel({
 
     try {
       if (isVideo) {
-        const finalPrompt = await resolveFinalPrompt("video", userIntent);
-        const apiQuality = mapSaasQualityToVideoApi(videoEditorId, saasQuality);
+        const apiQuality = mapSaasQualityToVideoApi(videoVariantId, saasQuality);
         const res = await fetch("/api/ai/video/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             sourceImageUrl,
-            prompt: finalPrompt,
-            modelKey: videoEditorId,
+            prompt: userIntent,
+            variantId: videoVariantId,
             quality: apiQuality,
             durationSeconds,
             aspectRatio: videoAspectRatio,
             motionPreset,
+            referenceVideoUrl: referenceVideoUrl.trim() || undefined,
+            characterOrientation,
             promptLocale,
+            generateAudio: videoGenerateAudio,
+            soundPrompt:
+              videoGenerateAudio && activeVideoVariant.capabilities.supportsNativeAudio
+                ? videoSoundPrompt.trim() || undefined
+                : undefined,
+            useNegativePrompt: videoUseNegativePrompt,
+            negativePrompt: videoNegativePrompt.trim() || undefined,
+            keepReferenceSound: videoKeepReferenceSound,
           }),
         });
         const data = (await res.json()) as VideoGenerateResponse;
@@ -431,18 +428,10 @@ export function ProcessedAssetsPanel({
           duration: data.video.duration,
           format: data.video.format ?? "mp4",
           label: pa.modeVideo,
-          prompt: finalPrompt,
+          prompt: userIntent,
         });
         return;
       }
-
-      // ai_prompt path: user pasted a ready-made AI prompt — skip the
-      // enhancer entirely so we don't stack a second set of guardrails on top
-      // of the already-stripped intent. The server builder will add exactly
-      // one canonical guardrail block.
-      const enhancedPrompt = promptNormalization.shouldRunEnhancer
-        ? await enhancePromptViaApi("image", userIntent)
-        : null;
 
       // Vision-based product preservation snapshot (cached per asset).
       // Only requested when the user keeps "Сохранять товар точно" on.
@@ -460,16 +449,18 @@ export function ProcessedAssetsPanel({
       const enhanceRequest: ImageEnhanceRequest = {
         sourceImageUrl,
         userPrompt: userIntent,
-        enhancedPrompt: enhancedPrompt ?? null,
         preserveProduct,
         aspectRatio: imageAspectRatio,
         outputFormat: apiOutputFormat,
-        quality: saasQuality,
+        quality: saasQuality === "ultra" ? "high" : saasQuality,
         locale: promptLocale,
         selectedEditor: imageEditorId,
         sourceAssetId: selectedAsset.id,
         productPreservationBlock:
           preservation?.externalPreservationBlock ?? null,
+        useNegativePrompt: imageUseNegativePrompt,
+        negativePrompt: imageNegativePrompt.trim() || undefined,
+        skipPromptPackage: !promptNormalization.shouldRunEnhancer,
       };
 
       const res = await fetch("/api/ai/image/enhance", {
@@ -532,25 +523,40 @@ export function ProcessedAssetsPanel({
     setMobileSheetOpen(true);
   };
 
+  const openDesktopEditor = (assetId: string, mode: PostProcessingMode) => {
+    setSelectedAssetId(assetId);
+    setProcessingMode(mode);
+    setDesktopEditorOpen(true);
+    setError(null);
+    setEditorSwitchHint(null);
+  };
+
+  const closeDesktopEditor = () => {
+    setDesktopEditorOpen(false);
+    setProcessingMode(null);
+    setEditorSwitchHint(null);
+    setError(null);
+  };
+
   const closeMobileSheet = () => setMobileSheetOpen(false);
 
   useEffect(() => {
     if (!isMobileLayout) setMobileSheetOpen(false);
   }, [isMobileLayout]);
 
+  useEffect(() => {
+    if (isMobileLayout) setDesktopEditorOpen(false);
+  }, [isMobileLayout]);
+
   const handleDownloadAsset = (asset: StudioSessionAsset) => {
     if (!asset.url) return;
+    const ext = asset.format ?? (isVideoAsset(asset) ? "mp4" : "png");
+    const filename = `${asset.id}.${ext}`;
     if (isVideoAsset(asset)) {
-      const anchor = document.createElement("a");
-      anchor.href = asset.url;
-      anchor.download = `${asset.id}.${asset.format ?? "mp4"}`;
-      anchor.rel = "noopener";
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
+      void downloadVideoFile(asset.url, filename);
       return;
     }
-    void downloadImageFile(asset.url, `${asset.id}.${asset.format ?? "png"}`);
+    void downloadImageFile(asset.url, filename);
   };
 
   if (assets.length === 0) {
@@ -584,60 +590,26 @@ export function ProcessedAssetsPanel({
             </p>
           ) : null}
 
-          {selectedAsset ? (
-            <section className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-950">
-                {pa.panelTitle}
-              </h3>
-              <div className="flex items-center gap-3 rounded-[18px] border border-border bg-slate-50 p-3">
-                <StudioAssetPreview
-                  asset={selectedAsset}
-                  circle
-                  className="h-14 w-14 shrink-0"
-                />
-                <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-950">
-                  {getAssetDisplayTitle(selectedAsset)}
-                </p>
-              </div>
-            </section>
-          ) : null}
-
-          {!isMobileLayout ? (
-            <PostProcessingActions
-              value={processingMode}
-              onChange={setProcessingMode}
-              disabled={!canProcessSource || generationLoading}
+          {processingMode === "video" ? (
+            <VideoProviderSelect
+              value={videoProvider}
+              onChange={handleVideoProviderChange}
+              disabled={generationLoading}
             />
           ) : null}
 
-          {processingMode ? (
-            <AiEditorPicker
-              editors={
-                processingMode === "video" ? videoEditors : imageEditors
-              }
-              value={
-                processingMode === "video" ? videoEditorId : imageEditorId
-              }
-              onChange={(id) => {
-                if (processingMode === "video") {
-                  const nextKey = id as VideoModelKey;
-                  const nextModel = VIDEO_MODELS[nextKey];
-                  setVideoEditorId(nextKey);
-                  setDurationSeconds(nextModel.durationOptions[0] ?? 5);
-                  setVideoAspectRatio(
-                    nextModel.aspectRatioOptions[0] ?? "9:16"
-                  );
-                  return;
-                }
-
-                const nextEditor = id as ImageEditorId;
+          {processingMode === "image" ? (
+            <ImageEditorSelect
+              editors={imageEditors}
+              value={imageEditorId}
+              onChange={(nextEditor) => {
                 if (nextEditor === imageEditorId) return;
 
                 const capability = IMAGE_EDITOR_CAPABILITIES[nextEditor];
                 const aspectSupported = (
                   capability.aspectRatios as readonly string[]
                 ).includes(imageAspectRatio);
-                const schemaFormat: "png" | "jpg" | "webp" =
+                const schemaFormat: "png" | "jpg" =
                   outputFormat === "jpeg" ? "jpg" : outputFormat;
                 const formatSupported = (
                   capability.outputFormats as readonly string[]
@@ -702,6 +674,10 @@ export function ProcessedAssetsPanel({
                 onAspectRatioChange={setImageAspectRatio}
                 onQualityChange={setSaasQuality}
                 onPreserveProductChange={setPreserveProduct}
+                useNegativePrompt={imageUseNegativePrompt}
+                negativePrompt={imageNegativePrompt}
+                onUseNegativePromptChange={setImageUseNegativePrompt}
+                onNegativePromptChange={setImageNegativePrompt}
                 disabled={generationLoading}
               />
               {mockMode ? (
@@ -718,15 +694,34 @@ export function ProcessedAssetsPanel({
 
           {processingMode === "video" ? (
             <VideoSettingsForm
-              modelKey={videoEditorId}
+              provider={videoProvider}
+              variantId={videoVariantId}
+              onVariantChange={handleVideoVariantChange}
               quality={saasQuality}
               durationSeconds={durationSeconds}
               aspectRatio={videoAspectRatio}
               motionPreset={motionPreset}
+              referenceVideoUrl={referenceVideoUrl}
+              characterOrientation={characterOrientation}
               onQualityChange={setSaasQuality}
               onDurationChange={setDurationSeconds}
               onAspectRatioChange={setVideoAspectRatio}
               onMotionPresetChange={setMotionPreset}
+              onReferenceVideoUrlChange={setReferenceVideoUrl}
+              onCharacterOrientationChange={setCharacterOrientation}
+              generateAudio={videoGenerateAudio}
+              soundPrompt={videoSoundPrompt}
+              useNegativePrompt={videoUseNegativePrompt}
+              negativePrompt={videoNegativePrompt}
+              keepReferenceSound={videoKeepReferenceSound}
+              onGenerateAudioChange={(on) => {
+                setVideoGenerateAudio(on);
+                if (!on) setVideoSoundPrompt("");
+              }}
+              onSoundPromptChange={setVideoSoundPrompt}
+              onUseNegativePromptChange={setVideoUseNegativePrompt}
+              onNegativePromptChange={setVideoNegativePrompt}
+              onKeepReferenceSoundChange={setVideoKeepReferenceSound}
               disabled={generationLoading}
             />
           ) : null}
@@ -749,11 +744,20 @@ export function ProcessedAssetsPanel({
                   {promptNormalization.warningForUi}
                 </p>
               ) : null}
-              <p className="text-xs leading-5 text-slate-500">
-                {promptNormalization.promptType === "ai_prompt"
-                  ? pa.promptNoEnhance
-                  : copy.status.analyzingAi}
-              </p>
+              {processingMode === "video" ? (
+                <p className="text-xs leading-5 text-slate-500">
+                  {pa.videoPromptAiNotice}
+                </p>
+              ) : processingMode === "image" &&
+                promptNormalization.promptType === "ai_prompt" ? (
+                <p className="text-xs leading-5 text-slate-500">
+                  {pa.promptNoEnhance}
+                </p>
+              ) : processingMode === "image" ? (
+                <p className="text-xs leading-5 text-slate-500">
+                  {pa.imagePromptAiNotice}
+                </p>
+              ) : null}
             </section>
           ) : null}
 
@@ -1092,48 +1096,60 @@ export function ProcessedAssetsPanel({
     </>
   );
 
-  return (
-    <div className="grid gap-6 lg:grid-cols-[0.92fr_1.08fr]">
-      <StudioFilesList
-        assets={assets}
-        selectedAssetId={selectedAsset?.id ?? ""}
-        onSelectAsset={setSelectedAssetId}
-        onDownloadAsset={handleDownloadAsset}
-        onDeleteAsset={onDeleteAsset}
-        onMobileCreateImage={(id) => openMobileWorkflow(id, "image")}
-        onMobileCreateVideo={(id) => openMobileWorkflow(id, "video")}
-        mobileActiveMode={
-          mobileSheetOpen
-            ? processingMode === "video"
-              ? "video"
-              : processingMode === "image"
-                ? "image"
-                : null
-            : null
+  if (
+    !isMobileLayout &&
+    desktopEditorOpen &&
+    processingMode &&
+    selectedAsset
+  ) {
+    return (
+      <PostProcessingDesktopEditor
+        asset={selectedAsset}
+        allAssets={assets}
+        title={
+          processingMode === "video" ? pa.createVideo : pa.createImage
         }
+        onBack={closeDesktopEditor}
+        settings={settingsBody}
       />
+    );
+  }
 
-      {!isMobileLayout ? (
-        <Card>
-          <CardHeader className="text-center">
-            <CardTitle>{pa.panelTitle}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">{settingsBody}</CardContent>
-        </Card>
-      ) : null}
-
+  return (
+    <>
       {isMobileLayout ? (
-        <PostProcessingMobileSheet
-          open={mobileSheetOpen}
-          title={mobileSheetTitle}
-          closeLabel={copy.studioFiles.mobileSheetHide}
-          onClose={closeMobileSheet}
-        >
-          <div className="space-y-6 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-            {settingsBody}
-          </div>
-        </PostProcessingMobileSheet>
-      ) : null}
-    </div>
+        <>
+          <PostProcessingMobileGallery
+            assets={assets}
+            onCreateImage={(id) => openMobileWorkflow(id, "image")}
+            onCreateVideo={(id) => openMobileWorkflow(id, "video")}
+            onDownloadAsset={handleDownloadAsset}
+            onDeleteAsset={onDeleteAsset}
+            activeAssetId={mobileSheetOpen ? selectedAsset?.id : null}
+            activeMode={
+              mobileSheetOpen && processingMode ? processingMode : null
+            }
+          />
+          <PostProcessingMobileSheet
+            open={mobileSheetOpen}
+            title={mobileSheetTitle}
+            closeLabel={copy.studioFiles.mobileSheetHide}
+            onClose={closeMobileSheet}
+          >
+            <div className="space-y-6 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+              {settingsBody}
+            </div>
+          </PostProcessingMobileSheet>
+        </>
+      ) : (
+        <PostProcessingDesktopGallery
+          assets={assets}
+          onCreateImage={(id) => openDesktopEditor(id, "image")}
+          onCreateVideo={(id) => openDesktopEditor(id, "video")}
+          onDownloadAsset={handleDownloadAsset}
+          onDeleteAsset={onDeleteAsset}
+        />
+      )}
+    </>
   );
 }

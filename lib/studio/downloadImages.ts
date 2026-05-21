@@ -15,10 +15,13 @@ export function previewImageFilename(prefix: string, label: string, index: numbe
   return `${prefix}-${String(index + 1).padStart(2, "0")}-${slug}.png`;
 }
 
-function sanitizeDownloadFilename(filename: string): string {
+function sanitizeDownloadFilename(
+  filename: string,
+  defaultExt = "png"
+): string {
   const trimmed = filename.trim().replace(/[^\w.\-()]+/g, "_").slice(0, 120);
-  if (!trimmed) return "image.png";
-  return trimmed.includes(".") ? trimmed : `${trimmed}.png`;
+  if (!trimmed) return `file.${defaultExt}`;
+  return trimmed.includes(".") ? trimmed : `${trimmed}.${defaultExt}`;
 }
 
 function triggerBlobDownload(blob: Blob, filename: string) {
@@ -32,7 +35,7 @@ function triggerBlobDownload(blob: Blob, filename: string) {
   URL.revokeObjectURL(blobUrl);
 }
 
-async function fetchImageBlob(url: string, filename: string): Promise<Blob> {
+async function fetchStudioMediaBlob(url: string, filename: string): Promise<Blob> {
   if (url.startsWith("blob:") || url.startsWith("data:")) {
     const res = await fetch(url);
     if (!res.ok) throw new Error("blob_fetch_failed");
@@ -63,10 +66,19 @@ async function fetchImageBlob(url: string, filename: string): Promise<Blob> {
 
 export async function downloadImageFile(url: string, filename: string) {
   try {
-    const blob = await fetchImageBlob(url, filename);
-    triggerBlobDownload(blob, filename);
+    const blob = await fetchStudioMediaBlob(url, filename);
+    triggerBlobDownload(blob, sanitizeDownloadFilename(filename, "png"));
   } catch (error) {
     console.error("[downloadImageFile]", error);
+  }
+}
+
+export async function downloadVideoFile(url: string, filename: string) {
+  try {
+    const blob = await fetchStudioMediaBlob(url, filename);
+    triggerBlobDownload(blob, sanitizeDownloadFilename(filename, "mp4"));
+  } catch (error) {
+    console.error("[downloadVideoFile]", error);
   }
 }
 
