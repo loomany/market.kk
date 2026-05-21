@@ -140,7 +140,7 @@ Token worktree **не заменял** dirty tree; follow-up ветки (icons �
 | Feature commit | `46af3bf` — `feat(billing): add Lemon token balance and AI usage gate` |
 | Remote branch | `origin/feat/vitrina-tokens` — **pushed** |
 | PR | https://github.com/loomany/market.kk/pull/new/feat/vitrina-tokens |
-| Этот report commit | _(см. ниже после push)_ |
+| Report commit | `89326d8` — `docs(release): token worktree packaging report` |
 
 ---
 
