@@ -43,9 +43,11 @@ create index if not exists token_transactions_user_created_idx
 alter table public.user_token_balances enable row level security;
 alter table public.token_transactions enable row level security;
 
+drop policy if exists "token balances own read" on public.user_token_balances;
 create policy "token balances own read" on public.user_token_balances
   for select using (auth.uid() = user_id);
 
+drop policy if exists "token transactions own read" on public.token_transactions;
 create policy "token transactions own read" on public.token_transactions
   for select using (auth.uid() = user_id);
 
