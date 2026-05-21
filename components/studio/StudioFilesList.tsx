@@ -15,6 +15,7 @@ import {
 } from "@/lib/studio/assetDisplayLabels";
 import type { StudioLocale } from "@/lib/studio/i18n/studioCopyTypes";
 import { useStudioCopy } from "./StudioLocaleContext";
+import { useStudioMobileLayout } from "./useStudioMobileLayout";
 
 const PAGE_SIZE = 4;
 
@@ -48,7 +49,9 @@ export function StudioFilesList({
   const { locale, copy } = useStudioCopy();
   const sf = copy.studioFiles;
   const pa = copy.processedAssets;
-  const showMobileActions = Boolean(onMobileCreateImage && onMobileCreateVideo);
+  const isMobileLayout = useStudioMobileLayout();
+  const showMobileActions =
+    isMobileLayout && Boolean(onMobileCreateImage && onMobileCreateVideo);
   const [page, setPage] = useState(1);
   const lastSyncedSelectionRef = useRef<string | null>(null);
 
@@ -154,21 +157,20 @@ export function StudioFilesList({
                   <Trash2 className="h-3.5 w-3.5" />
                   {sf.delete}
                 </button>
-                <Badge
-                  variant="outline"
-                  className="ml-auto hidden text-slate-500 lg:inline-flex"
-                >
-                  {new Date(asset.createdAt).toLocaleString(DATE_LOCALE[locale], {
-                    day: "numeric",
-                    month: "short",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </Badge>
+                {!isMobileLayout ? (
+                  <span className="ml-auto text-xs font-semibold text-slate-500">
+                    {new Date(asset.createdAt).toLocaleString(DATE_LOCALE[locale], {
+                      day: "numeric",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                ) : null}
               </div>
               {showMobileActions ? (
                 <div
-                  className="mt-3 grid grid-cols-2 gap-2 lg:hidden"
+                  className="mt-3 grid grid-cols-2 gap-2"
                   onClick={(event) => event.stopPropagation()}
                 >
                   <button

@@ -37,7 +37,7 @@ export function PostProcessingMobileSheet({
   if (!mounted || !open) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[70] lg:hidden" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[70]" role="dialog" aria-modal="true">
       <button
         type="button"
         className="absolute inset-0 bg-slate-900/45 backdrop-blur-[2px]"

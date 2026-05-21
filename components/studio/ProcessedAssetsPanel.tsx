@@ -37,6 +37,7 @@ import {
 } from "@/lib/studio/imageEnhancementPrompts";
 import { normalizePostProcessPrompt } from "@/lib/studio/postProcessPromptNormalizer";
 import { PostProcessingMobileSheet } from "./PostProcessingMobileSheet";
+import { useStudioMobileLayout } from "./useStudioMobileLayout";
 import { StudioFilesList } from "./StudioFilesList";
 import { PostProcessingActions } from "./PostProcessingActions";
 import { AiEditorPicker } from "./AiEditorPicker";
@@ -105,6 +106,7 @@ export function ProcessedAssetsPanel({
   onUpdateAsset,
 }: ProcessedAssetsPanelProps) {
   const { locale, copy } = useStudioCopy();
+  const isMobileLayout = useStudioMobileLayout();
   const pa = copy.processedAssets;
   const ppe = copy.postProcessingEditors;
 
@@ -533,15 +535,8 @@ export function ProcessedAssetsPanel({
   const closeMobileSheet = () => setMobileSheetOpen(false);
 
   useEffect(() => {
-    if (!mobileSheetOpen) return;
-    const mq = window.matchMedia("(min-width: 1024px)");
-    const sync = () => {
-      if (mq.matches) setMobileSheetOpen(false);
-    };
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, [mobileSheetOpen]);
+    if (!isMobileLayout) setMobileSheetOpen(false);
+  }, [isMobileLayout]);
 
   const handleDownloadAsset = (asset: StudioSessionAsset) => {
     if (!asset.url) return;
@@ -607,13 +602,13 @@ export function ProcessedAssetsPanel({
             </section>
           ) : null}
 
-          <div className="hidden lg:block">
+          {!isMobileLayout ? (
             <PostProcessingActions
               value={processingMode}
               onChange={setProcessingMode}
               disabled={!canProcessSource || generationLoading}
             />
-          </div>
+          ) : null}
 
           {processingMode ? (
             <AiEditorPicker
@@ -1118,23 +1113,27 @@ export function ProcessedAssetsPanel({
         }
       />
 
-      <Card className="hidden lg:block">
-        <CardHeader className="text-center">
-          <CardTitle>{pa.panelTitle}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">{settingsBody}</CardContent>
-      </Card>
+      {!isMobileLayout ? (
+        <Card>
+          <CardHeader className="text-center">
+            <CardTitle>{pa.panelTitle}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">{settingsBody}</CardContent>
+        </Card>
+      ) : null}
 
-      <PostProcessingMobileSheet
-        open={mobileSheetOpen}
-        title={mobileSheetTitle}
-        closeLabel={copy.studioFiles.mobileSheetHide}
-        onClose={closeMobileSheet}
-      >
-        <div className="space-y-6 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          {settingsBody}
-        </div>
-      </PostProcessingMobileSheet>
+      {isMobileLayout ? (
+        <PostProcessingMobileSheet
+          open={mobileSheetOpen}
+          title={mobileSheetTitle}
+          closeLabel={copy.studioFiles.mobileSheetHide}
+          onClose={closeMobileSheet}
+        >
+          <div className="space-y-6 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            {settingsBody}
+          </div>
+        </PostProcessingMobileSheet>
+      ) : null}
     </div>
   );
 }

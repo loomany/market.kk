@@ -34,7 +34,8 @@ export function WhatsAppLoginModal() {
   const [phoneCountryId, setPhoneCountryId] = useState(defaultCountryId);
   const [code, setCode] = useState("");
   const [user, setUser] = useState<User>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [statusHint, setStatusHint] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -62,12 +63,14 @@ export function WhatsAppLoginModal() {
   const sendCode = async () => {
     const validation = validatePhoneCountryInput(phone, phoneCountryId);
     if (!validation.ok) {
-      setMessage(validation.message);
+      setErrorMessage(validation.message);
+      setStatusHint(null);
       return;
     }
 
     setLoading(true);
-    setMessage(null);
+    setErrorMessage(null);
+    setStatusHint(null);
     try {
       const res = await fetch("/api/auth/whatsapp/send-code", {
         method: "POST",
@@ -79,7 +82,7 @@ export function WhatsAppLoginModal() {
         message?: string;
       } | null;
       if (!res.ok || !data?.ok) {
-        setMessage(
+        setErrorMessage(
           data?.message ??
             (res.status === 404
               ? "Сервис отправки кода недоступен. Перезапустите dev-сервер."
@@ -87,10 +90,10 @@ export function WhatsAppLoginModal() {
         );
         return;
       }
-      setMessage(data.message ?? "Код отправлен.");
+      setStatusHint(data.message ?? "Код отправлен в WhatsApp.");
       setStep("code");
     } catch {
-      setMessage("Не удалось отправить код. Проверьте соединение.");
+      setErrorMessage("Не удалось отправить код. Проверьте соединение.");
     } finally {
       setLoading(false);
     }
@@ -98,7 +101,7 @@ export function WhatsAppLoginModal() {
 
   const verifyCode = async () => {
     setLoading(true);
-    setMessage(null);
+    setErrorMessage(null);
     try {
       const res = await fetch("/api/auth/whatsapp/verify-code", {
         method: "POST",
@@ -112,7 +115,7 @@ export function WhatsAppLoginModal() {
         message?: string;
       };
       if (!data.ok || !data.user) {
-        setMessage(data.message ?? "Неверный код.");
+        setErrorMessage(data.message ?? "Неверный код.");
         return;
       }
       trackTelegramEvent(data.isNewUser ? "signup_success" : "login_success", {
@@ -123,9 +126,10 @@ export function WhatsAppLoginModal() {
       window.dispatchEvent(new Event("vitrina-auth-changed"));
       setOpen(false);
       setCode("");
-      setMessage(null);
+      setStatusHint(null);
+      setErrorMessage(null);
     } catch {
-      setMessage("Не удалось проверить код.");
+      setErrorMessage("Не удалось проверить код.");
     } finally {
       setLoading(false);
     }
@@ -147,7 +151,13 @@ export function WhatsAppLoginModal() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="whatsapp-login-title"
-        onClick={() => setOpen(false)}
+        onClick={() => {
+          setOpen(false);
+          setStep("phone");
+          setCode("");
+          setStatusHint(null);
+          setErrorMessage(null);
+        }}
       >
         <div
           className="w-full max-w-md rounded-[24px] bg-white p-5 shadow-2xl"
@@ -168,7 +178,13 @@ export function WhatsAppLoginModal() {
             <button
               type="button"
               aria-label="Закрыть"
-              onClick={() => setOpen(false)}
+              onClick={() => {
+                setOpen(false);
+                setStep("phone");
+                setCode("");
+                setStatusHint(null);
+                setErrorMessage(null);
+              }}
               className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
             >
               <X className="h-5 w-5" />
@@ -186,23 +202,28 @@ export function WhatsAppLoginModal() {
                 disabled={loading}
               />
             ) : (
-              <label className="space-y-1.5 text-sm font-semibold text-slate-950">
-                <span>Код из WhatsApp</span>
+              <div className="space-y-1.5">
                 <input
                   value={code}
-                  onChange={(event) => setCode(event.target.value)}
+                  onChange={(event) =>
+                    setCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                  }
                   inputMode="numeric"
-                  placeholder="111111"
-                  className="w-full rounded-[16px] border border-border px-3 py-3 text-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
+                  autoComplete="one-time-code"
+                  autoFocus
+                  placeholder="Введите код из WhatsApp"
+                  aria-label="Код подтверждения из WhatsApp"
+                  className="w-full rounded-[16px] border border-border px-3 py-3 text-base text-slate-950 outline-none placeholder:font-normal placeholder:text-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
                 />
-              </label>
+                {statusHint ? (
+                  <p className="text-sm leading-6 text-slate-500">{statusHint}</p>
+                ) : null}
+              </div>
             )}
 
-            {message && (
-              <p className="rounded-[16px] border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-900">
-                {message}
-              </p>
-            )}
+            {errorMessage ? (
+              <p className="text-sm leading-6 text-red-600">{errorMessage}</p>
+            ) : null}
 
             {step === "phone" ? (
               <Button className="w-full" loading={loading} onClick={sendCode}>
