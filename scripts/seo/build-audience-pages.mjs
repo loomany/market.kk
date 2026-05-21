@@ -329,6 +329,71 @@ const AUDIENCES = [
   },
 ];
 
+/** Mirrors data/seo/useCases.ts — slug → human label for related-link chips */
+const USE_CASE_SEEDS = [
+  { ruSlug: "odezhda-na-ai-modeli", enSlug: "clothing-on-ai-model", ru: "одежда на AI-модели", en: "clothing on AI model", kk: "Киім AI модельде" },
+  { ruSlug: "bele-na-ai-modeli", enSlug: "lingerie-on-ai-model", ru: "бельё на AI-модели", en: "lingerie on AI model", kk: "Ішкі киім AI модельде" },
+  { ruSlug: "plus-size-model-foto", enSlug: "plus-size-model-photos", ru: "фото plus-size модели для одежды", en: "plus-size model photos", kk: "Plus-size модель фотосы" },
+  { ruSlug: "foto-bizhuterii", enSlug: "jewelry-product-photos", ru: "фото бижутерии для маркетплейса", en: "jewelry product photos", kk: "Әшекей тауар фотосы" },
+  { ruSlug: "foto-sumok", enSlug: "bags-product-photos", ru: "фото сумок для маркетплейса", en: "bags product photos", kk: "Сөмке тауар фотосы" },
+  { ruSlug: "belyy-fon-dlya-marketpleysa", enSlug: "marketplace-white-background", ru: "белый фон для маркетплейса", en: "marketplace white background", kk: "Маркетплейске ақ фон" },
+  { ruSlug: "foto-tovara-dlya-instagram", enSlug: "instagram-product-photos", ru: "фото товара для Instagram", en: "Instagram product photos", kk: "Instagram тауар фотосы" },
+  { ruSlug: "reels-iz-foto-tovara", enSlug: "reels-from-product-image", ru: "Reels из фото товара", en: "Reels from product image", kk: "Тауар фотосынан Reels" },
+  { ruSlug: "ai-zamena-fona", enSlug: "ai-background-replacement", ru: "AI-замена фона у товара", en: "AI background replacement", kk: "AI фон ауыстыру" },
+  { ruSlug: "ochistka-tovarnogo-foto", enSlug: "product-photo-cleanup", ru: "очистка товарного фото", en: "product photo cleanup", kk: "Тауар фотосын тазалау" },
+  { ruSlug: "tochnaya-tovarnaya-kartochka", enSlug: "exact-product-card", ru: "точная товарная карточка", en: "exact product card", kk: "Нақты тауар картасы" },
+  { ruSlug: "kreativnaya-scena-tovara", enSlug: "creative-product-scene", ru: "креативная сцена товара", en: "creative product scene", kk: "Тауардың креативті сценасы" },
+  { ruSlug: "foto-dlya-ecommerce-kataloga", enSlug: "ecommerce-catalog-photos", ru: "фото для ecommerce каталога", en: "ecommerce catalog photos", kk: "Ecommerce каталог фотосы" },
+  { ruSlug: "foto-kataloga-postavshchika", enSlug: "supplier-catalog-photos", ru: "каталог поставщика", en: "supplier catalog photos", kk: "Жеткізуші каталогы" },
+  { ruSlug: "foto-tovarov-shouruma", enSlug: "showroom-product-photos", ru: "фото товаров шоурума", en: "showroom product photos", kk: "Шоурум тауар фотосы" },
+  { ruSlug: "tovarnye-foto-dlya-malogo-biznesa", enSlug: "small-business-product-photos", ru: "товарные фото для малого бизнеса", en: "small business product photos", kk: "Шағын бизнес тауар фотосы" },
+  { ruSlug: "workflow-kontent-menedzhera", enSlug: "marketplace-content-manager-workflow", ru: "workflow контент-менеджера маркетплейса", en: "marketplace content manager workflow", kk: "Маркетплейс контент-менеджері workflow" },
+];
+
+/** Mirrors data/seo/platforms.ts */
+const PLATFORM_SEEDS = [
+  { slug: "kaspi", name: "Kaspi" },
+  { slug: "wildberries", name: "Wildberries" },
+  { slug: "ozon", name: "Ozon" },
+  { slug: "ebay", name: "eBay" },
+  { slug: "amazon", name: "Amazon" },
+  { slug: "etsy", name: "Etsy" },
+  { slug: "shopify", name: "Shopify" },
+  { slug: "instagram-shop", name: "Instagram Shop" },
+  { slug: "tiktok-shop", name: "TikTok Shop" },
+  { slug: "facebook-marketplace", name: "Facebook Marketplace" },
+  { slug: "olx", name: "OLX" },
+  { slug: "aliexpress", name: "AliExpress" },
+  { slug: "temu", name: "Temu" },
+];
+
+function capitalizePhrase(text) {
+  if (!text) return text;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+const useCaseLabelBySlug = { ru: {}, en: {}, kk: {} };
+for (const seed of USE_CASE_SEEDS) {
+  useCaseLabelBySlug.ru[seed.ruSlug] = capitalizePhrase(seed.ru);
+  useCaseLabelBySlug.en[seed.enSlug] = capitalizePhrase(seed.en);
+  useCaseLabelBySlug.kk[seed.enSlug] = seed.kk;
+}
+
+const platformLabelBySlug = { ru: {}, en: {}, kk: {} };
+for (const seed of PLATFORM_SEEDS) {
+  platformLabelBySlug.ru[`${seed.slug}-foto-tovarov`] = seed.name;
+  platformLabelBySlug.en[`${seed.slug}-product-photos`] = seed.name;
+  platformLabelBySlug.kk[`${seed.slug}-product-photos`] = seed.name;
+}
+
+function useCaseLinkLabel(locale, slug) {
+  return useCaseLabelBySlug[locale][slug] ?? null;
+}
+
+function platformLinkLabel(locale, slug) {
+  return platformLabelBySlug[locale][slug] ?? null;
+}
+
 function wordCount(loc) {
   const text = [
     loc.intro,
@@ -353,8 +418,6 @@ function relatedLinks(ctx, locale) {
       mp: "Фото для маркетплейсов",
       fashion: "Одежда на AI-модели",
       jewelry: "Фото бижутерии",
-      uc: "Сценарии",
-      pl: "Площадки",
     },
     en: {
       home: "Home",
@@ -365,8 +428,6 @@ function relatedLinks(ctx, locale) {
       mp: "Marketplace product photos",
       fashion: "Fashion model photos",
       jewelry: "Jewelry product photos",
-      uc: "Use cases",
-      pl: "Platforms",
     },
     kk: {
       home: "Басты бет",
@@ -377,8 +438,6 @@ function relatedLinks(ctx, locale) {
       mp: "Маркетплейске фото",
       fashion: "Киім AI модельде",
       jewelry: "Әшекей фотосы",
-      uc: "Сценарийлер",
-      pl: "Алаңдар",
     },
   };
   const L = labels[locale];
@@ -397,10 +456,12 @@ function relatedLinks(ctx, locale) {
     links.push({ label: L.jewelry, href: s.jewelryPhotos });
   }
   for (const slug of uc) {
-    links.push({ label: `${L.uc}: ${slug}`, href: `${s.useCases}/${slug}` });
+    const label = useCaseLinkLabel(locale, slug);
+    if (label) links.push({ label, href: `${s.useCases}/${slug}` });
   }
   for (const slug of pl.slice(0, 2)) {
-    links.push({ label: `${L.pl}: ${slug.split("-")[0]}`, href: `${s.platforms}/${slug}` });
+    const label = platformLinkLabel(locale, slug);
+    if (label) links.push({ label, href: `${s.platforms}/${slug}` });
   }
   return links;
 }
