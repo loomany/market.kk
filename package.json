@@ -38,7 +38,9 @@
     "check:seo:llms": "npx tsx scripts/seo/check-seo-llms.ts",
     "audience:build": "node scripts/seo/build-audience-pages.mjs",
     "check:studio:i18n": "npx tsx scripts/studio/check-studio-i18n.ts",
-    "icons:generate": "node scripts/seo/generate-site-icons.mjs"
+    "icons:generate": "node scripts/seo/generate-site-icons.mjs",
+    "telegram:test": "npx tsx scripts/telegram-test.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@fal-ai/client": "^1.10.1",

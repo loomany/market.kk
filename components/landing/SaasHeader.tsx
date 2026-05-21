@@ -27,7 +27,13 @@ export function SaasHeader({ locale, copy }: { locale: Locale; copy: LandingCopy
           <Link href={`/${locale}/blog`} className="hover:text-slate-950">
             {copy.nav.blog}
           </Link>
-          <Link href="/studio" prefetch={false} className="hover:text-slate-950">
+          <Link
+            href="/studio"
+            prefetch={false}
+            data-telegram-event="cta_click"
+            data-telegram-label="nav_studio"
+            className="hover:text-slate-950"
+          >
             {copy.nav.studio}
           </Link>
         </nav>

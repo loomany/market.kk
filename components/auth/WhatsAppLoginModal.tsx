@@ -11,6 +11,7 @@ import {
 } from "@/components/auth/PhoneCountryInput";
 import { assertLocale } from "@/lib/i18n/localeConfig";
 import { resolveDefaultCountryId } from "@/lib/auth/phoneCountries";
+import { trackTelegramEvent } from "@/lib/telegram/clientEvents";
 
 type User = { id: string; phone: string } | null;
 
@@ -45,6 +46,11 @@ export function WhatsAppLoginModal() {
     window.addEventListener("vitrina-open-login", openLogin);
     return () => window.removeEventListener("vitrina-open-login", openLogin);
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    trackTelegramEvent("signup_start", { path: pathname });
+  }, [open, pathname]);
 
   useEffect(() => {
     void fetch("/api/auth/me")
@@ -102,12 +108,17 @@ export function WhatsAppLoginModal() {
       const data = (await res.json()) as {
         ok: boolean;
         user?: User;
+        isNewUser?: boolean;
         message?: string;
       };
       if (!data.ok || !data.user) {
         setMessage(data.message ?? "Неверный код.");
         return;
       }
+      trackTelegramEvent(data.isNewUser ? "signup_success" : "login_success", {
+        path: pathname,
+        userId: data.user.id,
+      });
       setUser(data.user);
       window.dispatchEvent(new Event("vitrina-auth-changed"));
       setOpen(false);
@@ -273,7 +284,13 @@ export function WhatsAppLoginModal() {
           Аккаунт
         </Button>
       ) : (
-        <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+        <Button
+          variant="outline"
+          size="sm"
+          data-telegram-event="cta_click"
+          data-telegram-label="header_login"
+          onClick={() => setOpen(true)}
+        >
           <MessageCircle className="h-4 w-4" />
           Войти
         </Button>

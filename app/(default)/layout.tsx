@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "../globals.css";
 import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
+import { SiteTelegramTracker } from "@/components/analytics/SiteTelegramTracker";
 import { JsonLdScript } from "@/components/seo/JsonLd";
 import {
   organizationJsonLd,
@@ -64,6 +65,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col text-slate-900">
         <AnalyticsProvider />
+        <SiteTelegramTracker />
         <JsonLdScript
           data={[organizationJsonLd(), websiteJsonLd(), softwareApplicationJsonLd()]}
         />

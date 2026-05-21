@@ -71,6 +71,8 @@ export function SaasLanding({ locale }: { locale: Locale }) {
                 <Link
                   href="/studio"
                   prefetch={false}
+                  data-telegram-event="cta_click"
+                  data-telegram-label="hero_start"
                   className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-primary px-6 text-base font-semibold text-white shadow-lg shadow-teal-900/15 transition-colors hover:bg-teal-800"
                 >
                   {copy.hero.primaryCta}

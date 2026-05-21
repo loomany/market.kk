@@ -54,7 +54,11 @@ export function Hero() {
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Link href="/studio">
+            <Link
+              href="/studio"
+              data-telegram-event="cta_click"
+              data-telegram-label="hero_studio"
+            >
               <Button size="lg" className="min-w-[200px]">
                 Открыть студию
                 <ArrowRight className="h-5 w-5" />

@@ -27,6 +27,7 @@ export async function POST(request: Request) {
   const phone = normalizePhone(parsed.data.phone);
   const admin = createSupabaseAdminClient();
   let userId = createMockUserId(phone);
+  let isNewUser = true;
 
   if (admin) {
     const { data: codeRows, error } = await admin
@@ -73,7 +74,9 @@ export async function POST(request: Request) {
 
     if (existingProfile?.id) {
       userId = existingProfile.id;
+      isNewUser = false;
     } else {
+      isNewUser = true;
       const created = await admin.auth.admin.createUser({
         phone,
         phone_confirm: true,
@@ -106,6 +109,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     ok: true,
+    isNewUser,
     user: { id: userId, phone },
   });
 }

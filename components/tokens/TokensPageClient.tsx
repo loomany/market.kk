@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { IndexableLocale } from "@/lib/i18n/localeConfig";
 import { formatTokenBalanceDisplay } from "@/lib/tokens/formatTokens";
 import { Button } from "@/components/ui/Button";
+import { trackTelegramEvent } from "@/lib/telegram/clientEvents";
 
 const COPY = {
   ru: {
@@ -67,6 +68,7 @@ export function TokensPageClient({ locale }: { locale: IndexableLocale }) {
   const [balanceDisplay, setBalanceDisplay] = useState("—");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const paymentReported = useRef(false);
 
   const refresh = useCallback(async () => {
     const me = await fetch("/api/auth/me").then((r) => r.json() as Promise<{ user: unknown }>);
@@ -92,11 +94,16 @@ export function TokensPageClient({ locale }: { locale: IndexableLocale }) {
   useEffect(() => {
     void refresh();
     if (checkout !== "success") return;
+    if (!paymentReported.current) {
+      paymentReported.current = true;
+      trackTelegramEvent("payment_success", { locale });
+    }
     const id = window.setInterval(() => void refresh(), 4000);
     return () => window.clearInterval(id);
-  }, [refresh, checkout]);
+  }, [refresh, checkout, locale]);
 
   const startCheckout = async () => {
+    trackTelegramEvent("checkout_click", { locale, label: "tokens_buy_10" });
     setLoading(true);
     setMessage(null);
     try {
@@ -150,6 +157,8 @@ export function TokensPageClient({ locale }: { locale: IndexableLocale }) {
           className="mt-6 w-full"
           loading={loading}
           disabled={signedIn === false}
+          data-telegram-event="checkout_click"
+          data-telegram-label="tokens_buy_button"
           onClick={() => void startCheckout()}
         >
           {copy.buy}
