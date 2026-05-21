@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, Trash2 } from "lucide-react";
+import { Clapperboard, Download, ImageIcon, Trash2 } from "lucide-react";
+import type { PostProcessingMode } from "@/lib/studio/postProcessingEditors";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import type { StudioSessionAsset } from "./types";
@@ -29,6 +30,9 @@ type StudioFilesListProps = {
   onSelectAsset: (id: string) => void;
   onDownloadAsset: (asset: StudioSessionAsset) => void;
   onDeleteAsset: (assetId: string) => void;
+  onMobileCreateImage?: (assetId: string) => void;
+  onMobileCreateVideo?: (assetId: string) => void;
+  mobileActiveMode?: PostProcessingMode | null;
 };
 
 export function StudioFilesList({
@@ -37,9 +41,14 @@ export function StudioFilesList({
   onSelectAsset,
   onDownloadAsset,
   onDeleteAsset,
+  onMobileCreateImage,
+  onMobileCreateVideo,
+  mobileActiveMode = null,
 }: StudioFilesListProps) {
   const { locale, copy } = useStudioCopy();
   const sf = copy.studioFiles;
+  const pa = copy.processedAssets;
+  const showMobileActions = Boolean(onMobileCreateImage && onMobileCreateVideo);
   const [page, setPage] = useState(1);
   const lastSyncedSelectionRef = useRef<string | null>(null);
 
@@ -145,7 +154,10 @@ export function StudioFilesList({
                   <Trash2 className="h-3.5 w-3.5" />
                   {sf.delete}
                 </button>
-                <Badge variant="outline" className="ml-auto text-slate-500">
+                <Badge
+                  variant="outline"
+                  className="ml-auto hidden text-slate-500 lg:inline-flex"
+                >
                   {new Date(asset.createdAt).toLocaleString(DATE_LOCALE[locale], {
                     day: "numeric",
                     month: "short",
@@ -154,6 +166,41 @@ export function StudioFilesList({
                   })}
                 </Badge>
               </div>
+              {showMobileActions ? (
+                <div
+                  className="mt-3 grid grid-cols-2 gap-2 lg:hidden"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    disabled={asset.status === "processing"}
+                    onClick={() => onMobileCreateImage?.(asset.id)}
+                    className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[14px] border px-2 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+                      selected &&
+                      mobileActiveMode === "image"
+                        ? "border-teal-500 bg-teal-50 text-teal-950"
+                        : "border-border bg-white text-slate-800 hover:border-teal-200"
+                    }`}
+                  >
+                    <ImageIcon className="h-4 w-4 shrink-0" aria-hidden />
+                    <span className="text-center leading-tight">{pa.createImage}</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={asset.status === "processing"}
+                    onClick={() => onMobileCreateVideo?.(asset.id)}
+                    className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[14px] border px-2 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+                      selected &&
+                      mobileActiveMode === "video"
+                        ? "border-teal-500 bg-teal-50 text-teal-950"
+                        : "border-border bg-white text-slate-800 hover:border-teal-200"
+                    }`}
+                  >
+                    <Clapperboard className="h-4 w-4 shrink-0" aria-hidden />
+                    <span className="text-center leading-tight">{pa.createVideo}</span>
+                  </button>
+                </div>
+              ) : null}
             </div>
           );
         })}

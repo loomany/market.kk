@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Clapperboard, Layers, Sparkles } from "lucide-react";
+import { Clapperboard, ImageIcon, Layers, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { VIDEO_MODELS, type VideoModelKey } from "@/lib/ai/videoModels";
@@ -36,6 +36,7 @@ import {
   buildFallbackGenerationPrompt,
 } from "@/lib/studio/imageEnhancementPrompts";
 import { normalizePostProcessPrompt } from "@/lib/studio/postProcessPromptNormalizer";
+import { PostProcessingMobileSheet } from "./PostProcessingMobileSheet";
 import { StudioFilesList } from "./StudioFilesList";
 import { PostProcessingActions } from "./PostProcessingActions";
 import { AiEditorPicker } from "./AiEditorPicker";
@@ -143,6 +144,7 @@ export function ProcessedAssetsPanel({
     useState<VideoMotionPresetId>("subtle-motion");
   const [preserveProduct, setPreserveProduct] = useState(true);
   const [outputFormat, setOutputFormat] = useState<ImageOutputFormat>("png");
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
 
   /**
    * In-memory cache for product preservation analyses, keyed by asset id.
@@ -516,8 +518,30 @@ export function ProcessedAssetsPanel({
       setError(pa.fileFailed);
     } finally {
       setGenerationLoading(false);
+      setMobileSheetOpen(false);
     }
   };
+
+  const openMobileWorkflow = (assetId: string, mode: PostProcessingMode) => {
+    setSelectedAssetId(assetId);
+    setProcessingMode(mode);
+    setError(null);
+    setEditorSwitchHint(null);
+    setMobileSheetOpen(true);
+  };
+
+  const closeMobileSheet = () => setMobileSheetOpen(false);
+
+  useEffect(() => {
+    if (!mobileSheetOpen) return;
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const sync = () => {
+      if (mq.matches) setMobileSheetOpen(false);
+    };
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, [mobileSheetOpen]);
 
   const handleDownloadAsset = (asset: StudioSessionAsset) => {
     if (!asset.url) return;
@@ -554,21 +578,11 @@ export function ProcessedAssetsPanel({
     );
   }
 
-  return (
-    <div className="grid gap-6 lg:grid-cols-[0.92fr_1.08fr]">
-      <StudioFilesList
-        assets={assets}
-        selectedAssetId={selectedAsset?.id ?? ""}
-        onSelectAsset={setSelectedAssetId}
-        onDownloadAsset={handleDownloadAsset}
-        onDeleteAsset={onDeleteAsset}
-      />
+  const mobileSheetTitle =
+    processingMode === "video" ? pa.createVideo : pa.createImage;
 
-      <Card>
-        <CardHeader className="text-center">
-          <CardTitle>{pa.panelTitle}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
+  const settingsBody = (
+    <>
           {!canProcessSource && selectedAsset ? (
             <p className="rounded-[16px] border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
               {pa.selectFileFirst}
@@ -593,11 +607,13 @@ export function ProcessedAssetsPanel({
             </section>
           ) : null}
 
-          <PostProcessingActions
-            value={processingMode}
-            onChange={setProcessingMode}
-            disabled={!canProcessSource || generationLoading}
-          />
+          <div className="hidden lg:block">
+            <PostProcessingActions
+              value={processingMode}
+              onChange={setProcessingMode}
+              disabled={!canProcessSource || generationLoading}
+            />
+          </div>
 
           {processingMode ? (
             <AiEditorPicker
@@ -1078,9 +1094,47 @@ export function ProcessedAssetsPanel({
               ) : null}
             </Button>
           ) : null}
+    </>
+  );
 
-        </CardContent>
+  return (
+    <div className="grid gap-6 lg:grid-cols-[0.92fr_1.08fr]">
+      <StudioFilesList
+        assets={assets}
+        selectedAssetId={selectedAsset?.id ?? ""}
+        onSelectAsset={setSelectedAssetId}
+        onDownloadAsset={handleDownloadAsset}
+        onDeleteAsset={onDeleteAsset}
+        onMobileCreateImage={(id) => openMobileWorkflow(id, "image")}
+        onMobileCreateVideo={(id) => openMobileWorkflow(id, "video")}
+        mobileActiveMode={
+          mobileSheetOpen
+            ? processingMode === "video"
+              ? "video"
+              : processingMode === "image"
+                ? "image"
+                : null
+            : null
+        }
+      />
+
+      <Card className="hidden lg:block">
+        <CardHeader className="text-center">
+          <CardTitle>{pa.panelTitle}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">{settingsBody}</CardContent>
       </Card>
+
+      <PostProcessingMobileSheet
+        open={mobileSheetOpen}
+        title={mobileSheetTitle}
+        closeLabel={copy.studioFiles.mobileSheetHide}
+        onClose={closeMobileSheet}
+      >
+        <div className="space-y-6 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          {settingsBody}
+        </div>
+      </PostProcessingMobileSheet>
     </div>
   );
 }

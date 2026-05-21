@@ -187,6 +187,7 @@ export const pass2RemainderRu = {
     download: "Скачать",
     downloadVideo: "Скачать видео",
     delete: "Удалить",
+    mobileSheetHide: "Скрыть",
   },
   studioFilesPagination: {
     navAria: "Пагинация файлов",
@@ -410,6 +411,7 @@ export const pass2RemainderEn = {
     download: "Download",
     downloadVideo: "Download video",
     delete: "Delete",
+    mobileSheetHide: "Hide",
   },
   studioFilesPagination: {
     navAria: "File pagination",
@@ -633,6 +635,7 @@ export const pass2RemainderKk = {
     download: "Жүктеп алу",
     downloadVideo: "Видеоны жүктеп алу",
     delete: "Өшіру",
+    mobileSheetHide: "Жасыру",
   },
   studioFilesPagination: {
     navAria: "Файл беттеуі",
