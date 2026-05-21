@@ -16,7 +16,10 @@ import { withLingerieModelDefaults } from "@/lib/studio/lingerieTryOnDefaults";
 import {
   getLingerieCropDescription,
   getLingerieCropSelectLabel,
-} from "@/lib/studio/lingerieCropUiCopy";
+} from "@/lib/studio/i18n/lingerieCropCopy";
+import { formatStudioString } from "@/lib/studio/i18n";
+import { getModelBodyTypes } from "@/lib/studio/i18n/studioOptionLists";
+import { useStudioCopy } from "./StudioLocaleContext";
 import {
   FAL_MODEL_ASPECT_RATIO_OPTIONS,
   FAL_MODEL_RESOLUTION_OPTIONS,
@@ -42,7 +45,6 @@ import { ModelPromptComposer } from "@/components/studio/ModelPromptComposer";
 import { ModelReadyCard } from "@/components/studio/ModelReadyCard";
 import type { Locale } from "@/lib/i18n/locales";
 import {
-  MODEL_BODY_TYPES,
   type ModelCrop,
   type ModelGender,
   type ModelGenerationSettings,
@@ -135,7 +137,7 @@ function SelectField<T extends string>({
   value,
   options,
   onChange,
-  placeholder = "Выберите…",
+  placeholder,
   disabled = false,
 }: {
   label: string;
@@ -213,7 +215,7 @@ function SelectWithCustomField<T extends string>({
   onCustomTextChange,
   customPlaceholder,
   disabled,
-  placeholder = "Выберите…",
+  placeholder,
 }: {
   label: string;
   description?: string;
@@ -258,64 +260,6 @@ function SelectWithCustomField<T extends string>({
   );
 }
 
-const GENDER_OPTIONS: {
-  id: ModelGender;
-  label: string;
-  hint: string;
-}[] = [
-  {
-    id: "female",
-    label: "Женская",
-    hint: "",
-  },
-  {
-    id: "male",
-    label: "Мужская",
-    hint: "Футболки, рубашки, костюмы и мужская верхняя одежда",
-  },
-];
-
-const CROP_OPTIONS: { id: ModelCrop; label: string; hint: string }[] = [
-  {
-    id: MODEL_PARAM_CUSTOM,
-    label: MODEL_CUSTOM_SELECT_OPTION.label,
-    hint: MODEL_CUSTOM_SELECT_OPTION.hint,
-  },
-  {
-    id: "full-body",
-    label: "В полный рост",
-    hint: "Платья, брюки, костюмы и комплекты",
-  },
-  {
-    id: "upper-body",
-    label: "По пояс",
-    hint: "Топы, свитшоты, куртки — когда низ не в кадре",
-  },
-];
-
-const LINGERIE_CROP_OPTIONS: { id: ModelCrop; label: string; hint: string }[] = [
-  {
-    id: "upper-thigh",
-    label: "До верхней части бедра",
-    hint: "Каталожный кадр белья: голова, весь комплект, верх бёдер — рекомендуемый формат",
-  },
-  {
-    id: "upper-body",
-    label: "По пояс",
-    hint: "Только верх тела — если низ комплекта не нужен в кадре",
-  },
-  {
-    id: "full-body",
-    label: "В полный рост",
-    hint: "Весь силуэт с ногами — только если нужен полный рост",
-  },
-  {
-    id: MODEL_PARAM_CUSTOM,
-    label: MODEL_CUSTOM_SELECT_OPTION.label,
-    hint: MODEL_CUSTOM_SELECT_OPTION.hint,
-  },
-];
-
 function hintForOption<T extends string>(
   options: { id: T; hint: string }[],
   value: T
@@ -335,12 +279,75 @@ export function ModelPresetSelector({
   sourceProductZoneFramingActive = false,
   uiMode = "full",
 }: ModelPresetSelectorProps) {
+  const { locale, copy } = useStudioCopy();
+  const mp = copy.modelPreset;
+  const ph = copy.placeholders;
+  const m = copy.model;
+  const bodyTypes = useMemo(() => getModelBodyTypes(locale), [locale]);
+  const customBody = bodyTypes.find((item) => item.id === MODEL_PARAM_CUSTOM);
+
+  const genderOptions = useMemo(
+    () => [
+      { id: "female" as const, label: m.genderFemale, hint: "" },
+      {
+        id: "male" as const,
+        label: m.genderMale,
+        hint: mp.genderMaleHint,
+      },
+    ],
+    [m, mp]
+  );
+
+  const cropOptions = useMemo(
+    () => [
+      {
+        id: MODEL_PARAM_CUSTOM as ModelCrop,
+        label: customBody?.label ?? MODEL_CUSTOM_SELECT_OPTION.label,
+        hint: customBody?.hint ?? MODEL_CUSTOM_SELECT_OPTION.hint,
+      },
+      {
+        id: "full-body" as const,
+        label: mp.cropFullBody,
+        hint: mp.cropFullBodyHint,
+      },
+      {
+        id: "upper-body" as const,
+        label: mp.cropUpperBody,
+        hint: mp.cropUpperBodyHint,
+      },
+    ],
+    [mp, customBody]
+  );
+
+  const lingerieCropOptions = useMemo(
+    () => [
+      {
+        id: "upper-thigh" as const,
+        label: mp.cropUpperThigh,
+        hint: copy.lingerieCrop.catalogHint,
+      },
+      {
+        id: "upper-body" as const,
+        label: mp.cropUpperBody,
+        hint: copy.lingerieCrop.upperBody,
+      },
+      {
+        id: "full-body" as const,
+        label: mp.cropFullBody,
+        hint: copy.lingerieCrop.fullBody,
+      },
+      {
+        id: MODEL_PARAM_CUSTOM as ModelCrop,
+        label: customBody?.label ?? MODEL_CUSTOM_SELECT_OPTION.label,
+        hint: customBody?.hint ?? MODEL_CUSTOM_SELECT_OPTION.hint,
+      },
+    ],
+    [mp, copy.lingerieCrop, customBody]
+  );
+
   if (uiMode === "saas") {
     return (
-      <p className="text-xs leading-5 text-slate-600">
-        AI подберёт пол, фигуру, кадр и формат по фото товара. Ниже можно
-        указать свою модель.
-      </p>
+      <p className="text-xs leading-5 text-slate-600">{mp.saasHint}</p>
     );
   }
 
@@ -355,27 +362,31 @@ export function ModelPresetSelector({
 
   const bodyTypeDescription =
     settings.bodyType === MODEL_PARAM_CUSTOM
-      ? settings.bodyTypeCustom.trim() || MODEL_CUSTOM_SELECT_OPTION.hint
-      : (MODEL_BODY_TYPES.find((item) => item.id === settings.bodyType)?.hint ??
-        "Влияет на силуэт в генерации");
+      ? settings.bodyTypeCustom.trim() ||
+        customBody?.hint ||
+        MODEL_CUSTOM_SELECT_OPTION.hint
+      : (bodyTypes.find((item) => item.id === settings.bodyType)?.hint ??
+        mp.bodyTypeFallback);
 
   const cropDescription =
     settings.crop === MODEL_PARAM_CUSTOM
-      ? settings.cropCustom.trim() || MODEL_CUSTOM_SELECT_OPTION.hint
+      ? settings.cropCustom.trim() ||
+        customBody?.hint ||
+        MODEL_CUSTOM_SELECT_OPTION.hint
       : isLingerieScenario
-        ? getLingerieCropDescription({
+        ? getLingerieCropDescription(locale, {
             crop: settings.crop,
             cropCustom: settings.cropCustom,
             sourceProductZoneFramingActive,
-            customEmptyHint: MODEL_CUSTOM_SELECT_OPTION.hint,
+            customEmptyHint: customBody?.hint ?? MODEL_CUSTOM_SELECT_OPTION.hint,
           })
-        : hintForOption(CROP_OPTIONS, settings.crop);
+        : hintForOption(cropOptions, settings.crop);
 
   const lingerieCropSelectOptions = useMemo(() => {
     if (!isLingerieScenario) return null;
-    return LINGERIE_CROP_OPTIONS.map((item) => ({
+    return lingerieCropOptions.map((item) => ({
       id: item.id,
-      label: getLingerieCropSelectLabel({
+      label: getLingerieCropSelectLabel(locale, {
         crop: item.id,
         defaultLabel: item.label,
         sourceProductZoneFramingActive,
@@ -385,7 +396,12 @@ export function ModelPresetSelector({
           ? MODEL_CUSTOM_SELECT_OPTION.shortHint
           : undefined,
     }));
-  }, [isLingerieScenario, sourceProductZoneFramingActive]);
+  }, [
+    isLingerieScenario,
+    sourceProductZoneFramingActive,
+    lingerieCropOptions,
+    locale,
+  ]);
 
   const isPromptLocked = settingsLocked;
 
@@ -394,7 +410,7 @@ export function ModelPresetSelector({
         FAL_MODEL_ASPECT_RATIO_OPTIONS,
         outputSize.aspectRatio
       )
-    : "Формат кадра для карточки.";
+    : mp.aspectFallback;
 
   return (
     <section className="relative space-y-6">
@@ -413,11 +429,9 @@ export function ModelPresetSelector({
       <header
         className={isPromptLocked ? "pointer-events-none opacity-50" : undefined}
       >
-        <h3 className="text-sm font-semibold text-slate-950">
-          AI-модель для одежды
-        </h3>
+        <h3 className="text-sm font-semibold text-slate-950">{m.title}</h3>
         <p className="mt-1 text-xs leading-5 text-slate-500">
-          AI создаст модель автоматически.
+          {mp.headerSubtitle}
         </p>
       </header>
 
@@ -429,7 +443,7 @@ export function ModelPresetSelector({
       >
         <div className="flex flex-col gap-4">
           {onModelDescriptionChange ? (
-            <SettingField label="Сцена и стиль фото">
+            <SettingField label={m.sceneLabel}>
               <textarea
                 value={modelDescription ?? ""}
                 onChange={(event) =>
@@ -441,7 +455,7 @@ export function ModelPresetSelector({
                 autoComplete="off"
                 autoCorrect="off"
                 spellCheck={false}
-                placeholder="Например: у большого окна, мягкий дневной свет, чистый студийный фон. Или: модель 30 лет, дорогой интерьер"
+                placeholder={mp.scenePlaceholder}
                 className={cn(
                   "min-h-[96px] w-full resize-y rounded-[12px] border border-border bg-white px-3 py-2.5 text-sm leading-6 text-slate-900 outline-none transition",
                   "hover:border-slate-300 focus:border-teal-400 focus:ring-2 focus:ring-teal-100",
@@ -452,32 +466,33 @@ export function ModelPresetSelector({
           ) : null}
           {!isLingerieScenario ? (
             <SelectField
-              label="Пол модели"
-              description={hintForOption(GENDER_OPTIONS, settings.gender)}
+              label={`${m.genderFemale} / ${m.genderMale}`}
+              description={hintForOption(genderOptions, settings.gender)}
+              placeholder={ph.select}
               value={settings.gender}
-              options={GENDER_OPTIONS}
+              options={genderOptions}
               disabled={isPromptLocked}
               onChange={(gender) => patch({ gender })}
             />
           ) : null}
           <SettingField
-            label="Национальность модели"
-            description="Например: казахская, славянская, азиатская. Если не указано — AI подберёт нейтральную коммерческую внешность."
+            label={mp.nationalityLabel}
+            description={mp.nationalityDesc}
           >
             <CustomParamInput
               value={settings.modelNationality}
               disabled={isPromptLocked}
-              placeholder="Например: казахская, славянская, азиатская"
+              placeholder={mp.nationalityPlaceholder}
               onChange={(modelNationality) => patch({ modelNationality })}
             />
           </SettingField>
           <SelectWithCustomField
-            label="Тип фигуры"
+            label={bodyTypes.find((item) => item.id === "standard")?.label ?? ph.selectType}
             description={bodyTypeDescription}
-            placeholder="Выберите тип"
+            placeholder={ph.selectType}
             value={settings.bodyType}
             customText={settings.bodyTypeCustom}
-            options={MODEL_BODY_TYPES.map((item) => ({
+            options={bodyTypes.map((item) => ({
               id: item.id,
               label: item.label,
               shortHint:
@@ -486,20 +501,20 @@ export function ModelPresetSelector({
                   : undefined,
               disabled: isMinor && item.id === "swimwear",
             }))}
-            customPlaceholder="Например: plus-size, широкие плечи"
+            customPlaceholder={mp.bodyTypeCustomPh}
             disabled={isPromptLocked}
             onChange={(bodyType) => patch({ bodyType })}
             onCustomTextChange={(bodyTypeCustom) => patch({ bodyTypeCustom })}
           />
           <SelectWithCustomField
-            label="Кадр для примерки"
+            label={copy.workflow.createPhoto}
             description={cropDescription}
-            placeholder="Выберите кадр"
+            placeholder={ph.selectFrame}
             value={settings.crop}
             customText={settings.cropCustom}
             options={
               lingerieCropSelectOptions ??
-              CROP_OPTIONS.map((item) => ({
+              cropOptions.map((item) => ({
                 id: item.id,
                 label: item.label,
                 shortHint:
@@ -508,7 +523,7 @@ export function ModelPresetSelector({
                     : undefined,
               }))
             }
-            customPlaceholder="Например: по колено, модель на стуле"
+            customPlaceholder={mp.cropCustomPh}
             disabled={isPromptLocked}
             onChange={(crop) => patch({ crop, cropCustom: "" })}
             onCustomTextChange={(cropCustom) => patch({ cropCustom })}
@@ -565,6 +580,11 @@ export function ModelAdvancedControls({
   tryOnSeed,
   uiMode = "full",
 }: ModelAdvancedControlsProps) {
+  const { locale, copy } = useStudioCopy();
+  const mp = copy.modelPreset;
+  const ph = copy.placeholders;
+  const m = copy.model;
+
   const patch = (partial: Partial<ModelGenerationSettings>) =>
     onSettingsChange(
       sanitizeModelSettingsForAge({ ...settings, ...partial })
@@ -572,14 +592,12 @@ export function ModelAdvancedControls({
   const isMinor = !isAdultModelAge(settings.modelAge);
   const isPromptLocked = Boolean(generating);
 
-  const ageDescription = isMinor
-    ? "До 18 лет недоступны сценарий «Бельё / купальники» и тип «Бикини / купальники»."
-    : undefined;
+  const ageDescription = isMinor ? mp.minorLingerie : undefined;
 
   if (uiMode === "saas") {
     return (
       <div className="space-y-4">
-        <SettingField label="Возраст модели" description={ageDescription}>
+        <SettingField label={mp.modelAgeLabel} description={ageDescription}>
           <input
             id="model-age-saas"
             type="number"
@@ -615,11 +633,11 @@ export function ModelAdvancedControls({
 
   const resolutionDescription = outputSize.resolution
     ? hintForOption(FAL_MODEL_RESOLUTION_OPTIONS, outputSize.resolution)
-    : "Качество изображения.";
+    : mp.qualityLabel;
 
   return (
     <div className="space-y-4">
-      <SettingField label="Возраст модели" description={ageDescription}>
+      <SettingField label={mp.modelAgeLabel} description={ageDescription}>
         <input
           id="model-age-advanced"
           type="number"
@@ -638,11 +656,11 @@ export function ModelAdvancedControls({
       </SettingField>
 
       <SettingField
-        label="Поза модели"
+        label={mp.poseLabel}
         description={
           useProductSampleAngles && productSampleAngles
-            ? "Поза подобрана по фото товара — учтём в итоговом промте."
-            : "Подберите позу с фото товара или опишите вручную — необязательно."
+            ? mp.poseFromProduct
+            : mp.poseManual
         }
       >
         <ModelAnglesField
@@ -668,13 +686,9 @@ export function ModelAdvancedControls({
 
       {showDevControls && onOutputSizeChange ? (
         <SelectField
-          label="Разрешение (dev)"
-          description={
-            outputSize.resolution === "1K"
-              ? "1K быстрее, 2K лучше для кружева и мелких деталей"
-              : resolutionDescription
-          }
-          placeholder="Выберите качество"
+          label={mp.resolutionDev}
+          description={resolutionDescription}
+          placeholder={ph.selectQuality}
           value={outputSize.resolution}
           options={FAL_MODEL_RESOLUTION_OPTIONS}
           onChange={(resolution) =>
@@ -692,14 +706,12 @@ export function ModelAdvancedControls({
         onClick={onGenerate}
       >
         <UserRound className="h-4 w-4" />
-        {generating
-          ? "Генерируем модель для примерки…"
-          : "Сгенерировать AI-модель"}
+        {generating ? mp.generatingForTryOn : m.generateCta}
       </Button>
 
       {generating ? (
         <p className="rounded-[12px] border border-teal-100 bg-teal-50 px-3 py-2 text-sm text-teal-900">
-          {generateProgress ?? "Генерируем AI-модель…"}
+          {generateProgress ?? copy.status.generatingModel}
         </p>
       ) : null}
 

@@ -26,6 +26,8 @@ import { Button } from "@/components/ui/Button";
 import { downloadImageFile } from "@/lib/studio/downloadImages";
 import { TryOnResultActions } from "@/components/studio/TryOnResultActions";
 import { cn } from "@/lib/utils";
+import { formatStudioString } from "@/lib/studio/i18n";
+import { useStudioCopy } from "./StudioLocaleContext";
 type GenerationResultGridProps = {
   results: StudioResultImage[];
   loading?: boolean;
@@ -63,6 +65,8 @@ function ProductCompareColumn({
   saasPreviewChrome?: boolean;
   previewAspectState?: PreviewAspectState | null;
 }) {
+  const { copy } = useStudioCopy();
+  const gr = copy.generationResults;
   const items =
     productPreviewItems.length > 0
       ? productPreviewItems
@@ -71,7 +75,7 @@ function ProductCompareColumn({
             {
               id: "product-single",
               url: productPreviewUrl,
-              label: "Товар",
+              label: copy.common.product,
             },
           ]
         : [];
@@ -83,9 +87,9 @@ function ProductCompareColumn({
 
   return (
     <PreviewCard
-      title="Товар"
+      title={copy.common.product}
       url={items.length === 1 ? (items[0]?.url ?? null) : null}
-      empty={saasPreviewChrome ? "Загрузите фото" : "Загрузите фото товара"}
+      empty={saasPreviewChrome ? gr.uploadPhoto : gr.uploadProductPhoto}
       {...(saasProps ?? {})}
       content={
         items.length > 1 ? (
@@ -193,16 +197,14 @@ function ResultImage({
   failed: boolean;
   onFail: (imageKey: string) => void;
 }) {
+  const { copy } = useStudioCopy();
   if (failed) {
     return (
       <div className="flex aspect-[3/4] w-full flex-col items-center justify-center gap-3 rounded-[18px] border border-dashed border-slate-300 bg-slate-50 p-5 text-center">
         <ImageOff className="h-8 w-8 text-slate-400" />
         <div>
           <p className="text-sm font-semibold text-slate-900">
-            Изображение не загрузилось
-          </p>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
-            Ссылка есть, но браузер не смог показать файл.
+            {copy.errors.imageFailed}
           </p>
         </div>
         <a
@@ -212,7 +214,7 @@ function ResultImage({
           className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[14px] border border-border bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-teal-200 hover:bg-teal-50"
         >
           <ExternalLink className="h-4 w-4" />
-          Открыть в новой вкладке
+          {copy.editorActions.open}
         </a>
       </div>
     );
@@ -236,18 +238,19 @@ function ResultAlerts({
   result: StudioResultImage;
   isClothingTryOnMode?: boolean;
 }) {
+  const { copy } = useStudioCopy();
+  const gr = copy.generationResults;
   return (
     <>
       {result.provider === "mock" && !isClothingTryOnMode && (
         <div className="rounded-[18px] border border-violet-100 bg-violet-50 px-4 py-3 text-xs leading-5 text-violet-800">
-          Демо: показан тестовый пример без списаний.
+          {gr.demoBanner}
         </div>
       )}
       {result.exactCardWithoutMask &&
         result.productShotFidelity === "exact-card" && (
           <div className="rounded-[18px] border border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900">
-            Карточка создана без ручного выделения. Проверьте, не попали ли
-            лишние предметы.
+            {gr.noMaskWarning}
           </div>
         )}
     </>
@@ -270,6 +273,8 @@ export function GenerationResultGrid({
   previewAspect,
   onStartOver,
 }: GenerationResultGridProps) {
+  const { copy } = useStudioCopy();
+  const gr = copy.generationResults;
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
 
   const markImageFailed = (imageKey: string) => {
@@ -294,8 +299,7 @@ export function GenerationResultGrid({
         <p className="font-medium text-teal-950">{loadingDetail}</p>
       ) : null}
       <p className={loadingDetail ? "mt-1" : undefined}>
-        Создаём изображение. Обычно это занимает от нескольких секунд до минуты —
-        не закрывайте страницу, пока идёт обработка.
+        {gr.creatingImage} {copy.status.tryOnSlow}
       </p>
     </div>
   );
@@ -303,7 +307,7 @@ export function GenerationResultGrid({
   if (loading) {
     if (embedded) {
       const resultLoadingLabel =
-        resultCountdownLabel ?? loadingDetail ?? "Создаём карточку";
+        resultCountdownLabel ?? loadingDetail ?? copy.status.creatingCard;
       const productCol = (
         <ProductCompareColumn
           productPreviewUrl={productPreviewUrl}
@@ -314,7 +318,7 @@ export function GenerationResultGrid({
       );
       const resultCol = (
         <PreviewCard
-          title="Результат"
+          title={copy.common.result}
           url={null}
           empty=""
           loading
@@ -329,7 +333,7 @@ export function GenerationResultGrid({
           loadingDetail={
             isProductShotMode
               ? resultLoadingLabel
-              : (loadingDetail ?? "Создаём изображение…")
+              : (loadingDetail ?? gr.creatingImage)
           }
           {...productCardResultPreviewProps(
             previewAspectState,
@@ -381,14 +385,14 @@ export function GenerationResultGrid({
           previewAspectState={previewAspectState}
         />,
         <PreviewCard
-          title="Результат"
+          title={copy.common.result}
           url={null}
           empty={
             saasPreviewChrome
               ? hasProductPreview
-                ? "Карточка убрана. Фото и рамка на месте — нажмите «Создать карточку»."
-                : "Создайте карточку"
-              : "Здесь появится результат после генерации"
+                ? gr.cardRemoved
+                : gr.createCard
+              : gr.resultAfterGen
           }
           {...productCardResultPreviewProps(
             previewAspectState,
@@ -402,10 +406,10 @@ export function GenerationResultGrid({
       <div className="flex min-h-[320px] items-center justify-center rounded-[24px] border border-border bg-slate-50 p-6 text-center">
         <div className="max-w-sm">
           <p className="text-base font-semibold text-slate-950">
-            Здесь появятся готовые варианты
+            {gr.resultAfterGen}
           </p>
           <p className="mt-2 text-sm leading-6 text-slate-500">
-            Загрузите товар, выберите режим и нажмите кнопку генерации.
+            {copy.status.uploadProductFirst}
           </p>
         </div>
       </div>
@@ -413,7 +417,9 @@ export function GenerationResultGrid({
   }
 
   const resultItems = results.map((result, index) => {
-        const label = result.label ?? `Вариант ${index + 1}`;
+        const label =
+          result.label ??
+          formatStudioString(copy.progress.photoN, { n: index + 1 });
         const removedUrl =
           result.cutoutPreviewUrl ?? result.backgroundRemovedUrl;
         const showExactCardRow =
@@ -425,19 +431,19 @@ export function GenerationResultGrid({
             ? getExportPreviewSize(result.width, result.height)
             : null;
         const resultTitle =
-          label ?? (isProductShotMode ? "Готовая карточка" : "Результат");
+          label ?? (isProductShotMode ? gr.readyCard : copy.common.result);
         const resultActions = (
           <>
             <TryOnResultActions
               onDownload={() => void downloadImageFile(result.url, `${result.id}.png`)}
               onStartOver={onStartOver}
               startOverLabel={
-                isProductShotMode ? "Создать ещё раз" : "Начать сначала"
+                isProductShotMode
+                  ? copy.actions.createAgain
+                  : copy.actions.startOver
               }
               startOverTitle={
-                isProductShotMode
-                  ? "Убрать готовую карточку. Фото, рамка и настройки останутся."
-                  : undefined
+                isProductShotMode ? gr.removeCardHint : undefined
               }
             />
           </>
@@ -447,7 +453,7 @@ export function GenerationResultGrid({
             <ResultImage
               imageKey={`${result.id}:main`}
               url={result.url}
-              alt={`${label}: готовый вариант`}
+              alt={`${label}: ${gr.readyVariant}`}
               className={cn(
                 "max-h-[460px] w-full object-contain",
                 isProductShotMode && "rounded-[18px]"
@@ -542,8 +548,7 @@ export function GenerationResultGrid({
                   key={`${result.id}-mock`}
                   className="col-span-full rounded-[18px] border border-violet-100 bg-violet-50 px-4 py-3 text-xs leading-5 text-violet-800 lg:col-span-2"
                 >
-                  Показан тестовый пример. Для финального результата запустите
-                  генерацию в студии.
+                  {gr.demoBanner}
                 </div>
               )}
               {result.exactCardWithoutMask && (
@@ -551,8 +556,7 @@ export function GenerationResultGrid({
                   key={`${result.id}-warn`}
                   className="col-span-full rounded-[18px] border border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900 lg:col-span-2"
                 >
-                  Карточка создана без ручного выделения. Проверьте, не попали
-                  ли лишние предметы.
+                  {gr.noMaskWarning}
                 </div>
               )}
               <div key={`${result.id}-exports`} className="col-span-full lg:max-w-md">
@@ -579,22 +583,21 @@ export function GenerationResultGrid({
           >
             {result.provider === "mock" && !isClothingTryOnMode && (
               <div className="border-b border-violet-100 bg-violet-50 px-4 py-3 text-xs leading-5 text-violet-800">
-                Демо: показан тестовый пример без списаний.
+                {gr.demoBanner}
               </div>
             )}
 
             {result.exactCardWithoutMask &&
               result.productShotFidelity === "exact-card" && (
                 <div className="border-b border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900">
-                  Карточка создана без ручного выделения. Проверьте, не попали
-                  ли лишние предметы.
+                  {gr.noMaskWarning}
                 </div>
               )}
 
             <div className="space-y-3 p-3">
               <div>
                 <p className="px-1 pb-2 text-xs font-semibold text-slate-500">
-                  {isProductShotMode ? "Готовая карточка" : "Готовый вариант"}
+                  {isProductShotMode ? gr.readyCard : gr.readyVariant}
                 </p>
                 <div
                   className={cn(
@@ -607,7 +610,7 @@ export function GenerationResultGrid({
                   <ResultImage
                     imageKey={`${result.id}:main`}
                     url={result.url}
-                    alt={`${label}: готовый вариант`}
+                    alt={`${label}: ${gr.readyVariant}`}
                     className="max-h-[560px] min-h-[260px] w-full rounded-[18px] object-contain"
                     failed={Boolean(failedImages[`${result.id}:main`])}
                     onFail={markImageFailed}
@@ -625,7 +628,7 @@ export function GenerationResultGrid({
                   onClick={() => void downloadImageFile(result.url, `${result.id}.png`)}
                 >
                   <Download className="h-4 w-4" />
-                  Скачать
+                  {copy.common.download}
                 </Button>
 
                 <Button
@@ -634,13 +637,13 @@ export function GenerationResultGrid({
                   className="w-full"
                   onClick={onStartOver}
                   title={
-                    isProductShotMode
-                      ? "Убрать готовую карточку. Фото, рамка и настройки останутся."
-                      : undefined
+                    isProductShotMode ? gr.removeCardHint : undefined
                   }
                 >
                   <RotateCcw className="h-4 w-4" />
-                  {isProductShotMode ? "Создать ещё раз" : "Начать сначала"}
+                  {isProductShotMode
+                    ? copy.actions.createAgain
+                    : copy.actions.startOver}
                 </Button>
               </div>
             )}

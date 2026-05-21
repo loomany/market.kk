@@ -10,8 +10,11 @@ import { getLandingCopy } from "../../lib/i18n/translations";
 import {
   isKkBlogTopicApproved,
   isKkStaticPageApproved,
+  isKkTrustPageApproved,
   KK_APPROVED_BLOG_TOPIC_NUMBERS,
+  KK_APPROVED_TRUST_PAGE_KEYS,
 } from "../../lib/seo/kkIndexPolicy";
+import { buildLocalizedPathMap } from "../../lib/i18n/routeSlugs";
 import { getBlogPathByLocale } from "../../lib/blog/blogResolve";
 import { shouldIndexPage } from "../../lib/seo/qualityGate";
 import { buildLanguageAlternates } from "../../lib/seo/site";
@@ -158,7 +161,9 @@ for (const page of staticSeoPages) {
   const content = page.content.kk;
   if (!content) continue;
 
-  const approved = isKkStaticPageApproved(page.key);
+  const approved =
+    isKkStaticPageApproved(page.key) ||
+    (page.kind === "trust" && isKkTrustPageApproved(page.key));
   const label = page.key;
   const text = [
     content.title,
@@ -231,10 +236,41 @@ for (const topic of kkPublished) {
   }
 }
 
-const draftKkInSitemap = kkPublished.length === KK_APPROVED_BLOG_TOPIC_NUMBERS.size;
-if (!draftKkInSitemap) {
+const expectedKkPublished = KK_APPROVED_BLOG_TOPIC_NUMBERS.size;
+if (kkPublished.length !== expectedKkPublished) {
   failures++;
-  console.error("FAIL expected 10 published kk blog topics");
+  console.error(
+    `FAIL expected ${expectedKkPublished} published kk blog topics, got ${kkPublished.length}`
+  );
+}
+
+console.log("\n=== KK trust pages (Stage 13.1) ===");
+for (const key of [...KK_APPROVED_TRUST_PAGE_KEYS]) {
+  const page = staticSeoPages.find((p) => p.key === key);
+  const content = page?.content.kk;
+  const label = String(key);
+  if (!page || page.kind !== "trust" || !content) {
+    failures++;
+    console.error(`FAIL trust ${label}: missing kk content`);
+    continue;
+  }
+  if (content.status !== "published") {
+    failures++;
+    console.error(`FAIL trust ${label}: expected published, got ${content.status}`);
+    continue;
+  }
+  const paths = {
+    ru: buildLocalizedPathMap(key).ru,
+    en: buildLocalizedPathMap(key).en,
+    kk: buildLocalizedPathMap(key).kk,
+  };
+  const alternates = buildLanguageAlternates(paths);
+  if (!alternates.kk) {
+    failures++;
+    console.error(`FAIL trust ${label}: missing kk hreflang`);
+  } else {
+    console.log(`OK trust ${label} published + hreflang triad`);
+  }
 }
 
 for (const topic of blogTopics.filter((t) => t.status.kk === "ready_for_review")) {

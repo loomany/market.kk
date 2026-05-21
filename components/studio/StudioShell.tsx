@@ -1,11 +1,10 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { Locale } from "@/lib/i18n/localeConfig";
 import {
   AlertTriangle,
-  ArrowLeft,
   Camera,
   Info,
   Sparkles,
@@ -94,7 +93,15 @@ import {
   parseSavedModelSnapshot,
 } from "@/lib/studio/savedModelSettings";
 import { Button } from "@/components/ui/Button";
+import { TokenBalancePill } from "@/components/auth/TokenBalancePill";
 import { WhatsAppLoginModal } from "@/components/auth/WhatsAppLoginModal";
+import { TokenBillingModal } from "@/components/studio/TokenBillingModal";
+import type { TokenBillingErrorPayload } from "@/lib/tokens/billingErrorPayload";
+import {
+  TokenBillingBlockedError,
+  tryApplyTokenBillingError,
+} from "@/lib/tokens/billingErrorPayload";
+import type { IndexableLocale } from "@/lib/i18n/localeConfig";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { ProductPhotosUploader } from "./ProductPhotosUploader";
@@ -165,7 +172,17 @@ import { ProductSelectionPanel } from "./ProductSelectionPanel";
 import { StudioWorkflowRail } from "./StudioWorkflowRail";
 import { StudioWorkflowStep } from "./StudioWorkflowStep";
 import { ProcessedAssetsPanel } from "./ProcessedAssetsPanel";
-import { useStudioLocale } from "./useStudioLocale";
+import {
+  StudioLocaleProvider,
+  useStudioCopy,
+} from "./StudioLocaleContext";
+import { StudioLanguageSwitcher } from "./StudioLanguageSwitcher";
+import {
+  friendlyAiError,
+  readJsonResponseError,
+} from "@/lib/studio/i18n/friendlyAiErrors";
+import { formatStudioString, getStudioCopy } from "@/lib/studio/i18n";
+import type { StudioCopy } from "@/lib/studio/i18n/studioCopyTypes";
 import {
   DEFAULT_MODEL_GENERATION_SETTINGS,
   DEFAULT_PRODUCT_SHOT_SETTINGS,
@@ -176,17 +193,15 @@ import {
   type StudioSessionAsset,
 } from "./types";
 
-async function readJsonResponse<T>(res: Response): Promise<
-  | { ok: true; data: T }
-  | { ok: false; error: string }
-> {
+async function readJsonResponse<T>(
+  res: Response,
+  copy: StudioCopy
+): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
   const text = await res.text();
   if (!text.trim()) {
     return {
       ok: false,
-      error: res.ok
-        ? "Сервер вернул пустой ответ. Попробуйте ещё раз."
-        : `Сервер недоступен (${res.status}). Проверьте, что dev-сервер запущен, и попробуйте снова.`,
+      error: readJsonResponseError(copy, res, res.ok),
     };
   }
   try {
@@ -194,57 +209,9 @@ async function readJsonResponse<T>(res: Response): Promise<
   } catch {
     return {
       ok: false,
-      error: `Сервер вернул некорректный ответ (${res.status}). Обновите страницу и попробуйте снова.`,
+      error: copy.errors.serverInvalid.replace("{status}", String(res.status)),
     };
   }
-}
-
-function friendlyAiError(errorCode?: string, message?: string): string {
-  if (errorCode === "FAL_KEY_MISSING") {
-    return "AI-сервис не настроен на сервере. Обратитесь к администратору.";
-  }
-
-  if (errorCode === "FAL_UPLOAD_FAILED") {
-    return "Не удалось временно отправить изображение в Fal. Попробуйте файл меньше 10MB в JPEG, PNG или WEBP.";
-  }
-
-  if (errorCode === "FAL_TRYON_FAILED") {
-    return "Не удалось создать фото на модели. Попробуйте повторить примерку или выбрать другое фото.";
-  }
-
-  if (errorCode === "FAL_MODEL_GENERATION_FAILED") {
-    return "Если модель получилась неудачной, сгенерируйте модель заново.";
-  }
-
-  if (message?.includes("did not generate the expected output")) {
-    return "Если товар исказился, используйте более чёткое фото товара и режим максимального качества.";
-  }
-
-  if (errorCode === "FAL_MODEL_GENERATION_TIMEOUT") {
-    return "Генерация заняла слишком долго. Попробуйте ещё раз.";
-  }
-
-  if (errorCode === "FAL_MODEL_CONTENT_BLOCKED") {
-    return "Fal отклонил запрос. Попробуйте другой вариант фото или сценарий «Одежда» вместо белья. Для белья лучше фото товара на человеке и полный кадр модели.";
-  }
-
-  if (message?.includes("Product image file or URL is required")) {
-    return "Загрузите фото товара.";
-  }
-
-  if (message?.includes("Product and model image sources are required")) {
-    return "Загрузите фото товара и модель или сгенерируйте AI-модель.";
-  }
-
-  if (errorCode === "VALIDATION_ERROR") {
-    return "Проверьте настройки модели (возраст, ракурсы, размер кадра) и попробуйте ещё раз.";
-  }
-
-  if (message?.includes("Invalid")) {
-    return "Проверьте данные и попробуйте ещё раз.";
-  }
-
-  return message ?? "Не удалось создать изображение. Проверьте фото и попробуйте ещё раз.";
 }
 
 function useObjectUrlPreview() {
@@ -283,7 +250,7 @@ function useObjectUrlPreview() {
   );
 }
 
-export function StudioShell({
+function StudioShellInner({
   mockMode,
   paidAiRunsAllowed,
   locale: localeProp,
@@ -292,7 +259,12 @@ export function StudioShell({
   paidAiRunsAllowed: boolean;
   locale?: Locale;
 }) {
-  const promptLocale = useStudioLocale(localeProp);
+  const { locale: promptLocale, copy } = useStudioCopy();
+  const resolveAiError = useCallback(
+    (errorCode?: string, message?: string): string =>
+      friendlyAiError(copy, errorCode, message),
+    [copy]
+  );
   const modelPreview = useObjectUrlPreview();
 
   const [studioMode, setStudioMode] = useState<StudioMode>("clothing-tryon");
@@ -386,6 +358,8 @@ export function StudioShell({
   const [results, setResults] = useState<StudioResultImage[]>([]);
   const [sessionAssets, setSessionAssets] = useState<StudioSessionAsset[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [tokenBilling, setTokenBilling] =
+    useState<TokenBillingErrorPayload | null>(null);
   const [generationSeed, setGenerationSeed] = useState(42);
   const [modelGenerationSeed, setModelGenerationSeed] = useState(42);
   const [maskEditorOpen, setMaskEditorOpen] = useState(false);
@@ -631,7 +605,7 @@ export function StudioShell({
 
   const handleApplyAnglesFromProducts = useCallback(async () => {
     if (productPhotos.length === 0) {
-      setModelGenerateError("Сначала загрузите фото товара.");
+      setModelGenerateError(copy.errors.uploadProductFirst);
       return;
     }
     setAnalyzingProductAngles(true);
@@ -652,13 +626,14 @@ export function StudioShell({
       };
       if (!res.ok) {
         setModelGenerateError(
-          data.message ?? `Ошибка сервера (${res.status}). Попробуйте ещё раз.`
+          data.message ??
+            formatStudioString(copy.progress.serverError, { status: res.status })
         );
         return;
       }
       if (!data.ok || !data.angles?.length) {
         setModelGenerateError(
-          data.message ?? "Не удалось разобрать позу с фото товара."
+          data.message ?? copy.progress.parsePoseFromPhoto
         );
         return;
       }
@@ -668,11 +643,11 @@ export function StudioShell({
         setModelGenerateNotice(data.message);
       }
     } catch {
-      setModelGenerateError("Не удалось разобрать позу. Попробуйте ещё раз.");
+      setModelGenerateError(copy.errors.parsePoseFailed);
     } finally {
       setAnalyzingProductAngles(false);
     }
-  }, [productPhotos]);
+  }, [productPhotos, copy]);
 
   const handleClearProductSampleAngles = useCallback(() => {
     setUseProductSampleAngles(false);
@@ -695,9 +670,9 @@ export function StudioShell({
       productPhotos.map((photo, index) => ({
         id: photo.id,
         url: photo.previewUrl,
-        label: `Фото ${index + 1}`,
+        label: formatStudioString(copy.progress.photoN, { n: index + 1 }),
       })),
-    [productPhotos]
+    [productPhotos, copy.progress.photoN]
   );
 
   const resetProductAnalysisState = useCallback(() => {
@@ -744,7 +719,10 @@ export function StudioShell({
 
         if (!res.ok || !data.ok || !data.analysis) {
           setProductAnalysisError(
-            data.message ?? `Ошибка анализа (${res.status}). Заполните поля вручную.`
+            data.message ??
+              formatStudioString(copy.progress.analysisError, {
+                status: res.status,
+              })
           );
           return null;
         }
@@ -793,7 +771,7 @@ export function StudioShell({
       } catch {
         if (requestId !== productAnalysisRequestId.current) return null;
         setProductAnalysisError(
-          "Не удалось проанализировать фото. Заполните параметры вручную."
+          copy.errors.analyzePhotoFailed
         );
         return null;
       } finally {
@@ -994,7 +972,7 @@ export function StudioShell({
       {
         id: "saved-model",
         url: savedStudioModel.url,
-        label: "Сохранённая модель",
+        label: copy.model.saved,
       },
     ]);
     restoreSavedModelParameters(savedStudioModel.settings);
@@ -1014,7 +992,7 @@ export function StudioShell({
           {
             id: "saved-model",
             url: model.url,
-            label: "Сохранённая модель",
+            label: copy.model.saved,
           },
         ]);
       }
@@ -1047,7 +1025,7 @@ export function StudioShell({
     if (!generatedModelUrl) return;
     if (!isRemoteImageUrl(generatedModelUrl)) {
       setModelGenerateError(
-        "Сначала дождитесь окончания генерации модели или сгенерируйте её заново."
+        copy.model.waitGeneration
       );
       return;
     }
@@ -1125,8 +1103,8 @@ export function StudioShell({
 
   const savedModelPersistenceHint = savedModelUrl
     ? isAuthenticated
-      ? "Хранится в вашем аккаунте, пока не удалите."
-      : "Хранится на этом устройстве. Войдите, чтобы сохранить в аккаунте."
+      ? copy.model.savedPersistenceAccount
+      : copy.model.savedPersistenceDevice
     : undefined;
 
   const persistAsset = useCallback(async (asset: StudioSessionAsset) => {
@@ -1300,10 +1278,10 @@ export function StudioShell({
         url: effectiveModelPreview,
         label:
           modelSource === "saved"
-            ? "Сохранённая модель"
+            ? copy.model.saved
             : modelSource === "upload"
-              ? "Загруженная модель"
-              : "AI-модель",
+              ? copy.model.uploaded
+              : "AI model",
       },
     ];
   }, [generatedModelPreviews, effectiveModelPreview, modelSource]);
@@ -1397,7 +1375,7 @@ export function StudioShell({
 
     if (!isModelOutputSizeComplete(modelOutputSize)) {
       setModelGenerateError(
-        "Выберите соотношение сторон изображения."
+        copy.errors.selectAspectRatio
       );
       endModelGeneration();
       return;
@@ -1429,9 +1407,16 @@ export function StudioShell({
         setModelGenerateProgress(
           angles.length > 1
             ? index === 0
-              ? `Ракурс 1 из ${angles.length}: ${angle.label} (базовая модель)`
-              : `Ракурс ${index + 1} из ${angles.length}: ${angle.label} (то же лицо и образ)`
-            : "Генерируем AI-модель…"
+              ? formatStudioString(copy.angleProgress.base, {
+                  total: angles.length,
+                  label: angle.label,
+                })
+              : formatStudioString(copy.angleProgress.nth, {
+                  n: index + 1,
+                  total: angles.length,
+                  label: angle.label,
+                })
+            : copy.status.generatingModel
         );
 
         const controller = new AbortController();
@@ -1498,9 +1483,14 @@ export function StudioShell({
               setGeneratedModelUrl(collected[0]!.url);
             }
             setModelGenerateError(
-              `Ракурс «${angle.label}»: генерация заняла слишком долго (больше 2,5 мин).` +
+              formatStudioString(copy.angleProgress.timeout, {
+                label: angle.label,
+              }) +
                 (collected.length > 0
-                  ? ` Готово ${collected.length} из ${angles.length}.`
+                  ? formatStudioString(copy.angleProgress.partialDone, {
+                      done: collected.length,
+                      total: angles.length,
+                    })
                   : "")
             );
             return;
@@ -1516,24 +1506,31 @@ export function StudioShell({
         };
 
         if (!data.ok) {
+          if (tryApplyTokenBillingError(data, setTokenBilling)) {
+            endModelGeneration();
+            return;
+          }
           if (collected.length > 0) {
             setGeneratedModelPreviews([...collected]);
             setGeneratedModelUrl(collected[0]!.url);
           }
           const partialHint =
             collected.length > 0
-              ? ` Готово ${collected.length} из ${angles.length}.`
+              ? formatStudioString(copy.angleProgress.partialDone, {
+                  done: collected.length,
+                  total: angles.length,
+                })
               : "";
           const detailHint = data.detail
             ? ` (${data.detail.slice(0, 120)}…)`
             : "";
           setModelGenerateError(
             (angles.length > 1
-              ? `Ракурс «${angle.label}»: ${friendlyAiError(
-                  data.errorCode,
-                  data.message
-                )}`
-              : friendlyAiError(data.errorCode, data.message)) +
+              ? formatStudioString(copy.angleProgress.failed, {
+                  label: angle.label,
+                  error: resolveAiError(data.errorCode, data.message),
+                })
+              : resolveAiError(data.errorCode, data.message)) +
               partialHint +
               detailHint
           );
@@ -1542,7 +1539,11 @@ export function StudioShell({
 
         if (data.usedAngleEditFallback && index > 0) {
           setModelGenerateProgress(
-            `Ракурс ${index + 1} из ${angles.length}: ${angle.label} (отдельная генерация, то же лицо по промпту)`
+            formatStudioString(copy.angleProgress.separate, {
+              n: index + 1,
+              total: angles.length,
+              label: angle.label,
+            })
           );
         }
 
@@ -1554,8 +1555,10 @@ export function StudioShell({
         if (!url) {
           setModelGenerateError(
             angles.length > 1
-              ? `Ракурс «${angle.label}»: модель не вернула изображение.`
-              : "Модель не вернула изображение. Попробуйте ещё раз."
+              ? formatStudioString(copy.angleProgress.noImage, {
+                  label: angle.label,
+                })
+              : copy.angleProgress.noImageGeneric
           );
           return;
         }
@@ -1569,7 +1572,7 @@ export function StudioShell({
 
       const primaryUrl = collected[0]?.url;
       if (!primaryUrl) {
-        setModelGenerateError("Модель не вернула изображение. Попробуйте ещё раз.");
+        setModelGenerateError(copy.errors.modelNoImage);
         return;
       }
 
@@ -1580,7 +1583,7 @@ export function StudioShell({
       setModelGenerationSeed(nextGenerationSeed());
     } catch {
       setModelGenerateError(
-        "Не удалось сгенерировать модель. Попробуйте ещё раз."
+        copy.errors.modelGenFailed
       );
     } finally {
       endModelGeneration();
@@ -1643,7 +1646,7 @@ export function StudioShell({
     const useSeed = options?.seedOverride ?? generationSeed;
 
     if (!productFile) {
-      setError("Загрузите фото товара.");
+      setError(copy.errors.uploadProduct);
       return;
     }
 
@@ -1655,7 +1658,7 @@ export function StudioShell({
 
     const pipelineSize = resolvePipelineOutputSize();
     if (!isModelOutputSizeComplete(pipelineSize)) {
-      setError("Выберите соотношение сторон в настройках модели.");
+      setError(copy.status.selectAspectRatio);
       return;
     }
 
@@ -1667,11 +1670,11 @@ export function StudioShell({
     if (requireModel && !modelFile && !resolvedModelUrl) {
       if (generatedModelUrl && !isRemoteImageUrl(generatedModelUrl)) {
         setError(
-          "Ссылка на AI-модель устарела. Нажмите «Сгенерировать AI-модель» ещё раз или загрузите фото модели."
+          copy.errors.modelUrlStale
         );
       } else {
         setError(
-          "Сначала загрузите фото модели или сгенерируйте AI-модель — примерка использует уже готовую модель."
+          copy.errors.modelRequired
         );
       }
       return;
@@ -1680,14 +1683,14 @@ export function StudioShell({
     const angles = resolveGenerationAngles();
     const angle = angles[0];
     if (!angle) {
-      setError("Выберите вариант фото для карточки.");
+      setError(copy.errors.selectCardVariant);
       return;
     }
 
     if (!options?.skipLoadingState) {
       beginClothingPipelineLoading();
     }
-    setTryOnProgress("Переносим товар на модель…");
+    setTryOnProgress(copy.status.transferring);
     setError(null);
     if (!options?.appendResults) {
       setResults([]);
@@ -1725,7 +1728,7 @@ export function StudioShell({
       // keep waiting; Fal/FASHN will finish in its own time.
       const slowNoticeTimer = window.setTimeout(() => {
         setTryOnProgress(
-          "Примерка занимает чуть больше времени, чем обычно — не закрывайте страницу, мы продолжаем работать…"
+          copy.status.tryOnSlow
         );
       }, slowNoticeAfterMs);
 
@@ -1739,7 +1742,7 @@ export function StudioShell({
         window.clearTimeout(slowNoticeTimer);
       }
 
-      const parsed = await readJsonResponse<TryOnResponse>(res);
+      const parsed = await readJsonResponse<TryOnResponse>(res, copy);
 
       if (!parsed.ok) {
         setError(parsed.error);
@@ -1749,7 +1752,8 @@ export function StudioShell({
       const data = parsed.data;
 
       if (!data.ok) {
-        setError(friendlyAiError(data.errorCode, data.message));
+        if (tryApplyTokenBillingError(data, setTokenBilling)) return;
+        setError(resolveAiError(data.errorCode, data.message));
         return;
       }
 
@@ -1783,11 +1787,11 @@ export function StudioShell({
       const detail =
         error instanceof Error && error.message
           ? error.message
-          : "сеть или dev-сервер";
+          : copy.progress.networkDetail;
       setError(
         detail === "Failed to fetch"
-          ? "Не удалось связаться с сервером. Проверьте, что dev-сервер запущен (npm run dev), откройте ту же страницу без перезагрузки во время генерации и попробуйте снова."
-          : `Не удалось связаться с сервером (${detail}). Убедитесь, что приложение запущено, и попробуйте ещё раз.`
+          ? copy.errors.networkDevServer
+          : formatStudioString(copy.progress.networkContact, { detail })
       );
     } finally {
       if (!options?.skipLoadingState) {
@@ -1812,11 +1816,11 @@ export function StudioShell({
 
   const handleExactProductCard = async () => {
     if (!productFile) {
-      setError("Загрузите фото товара.");
+      setError(copy.errors.uploadProduct);
       return;
     }
     if (!selectedProductFile) {
-      setError("Сначала нарисуйте рамку вокруг товара на шаге 2.");
+      setError(copy.errors.maskDrawFirst);
       return;
     }
 
@@ -1834,11 +1838,12 @@ export function StudioShell({
           onProgress: setTryOnProgress,
         });
 
-      setTryOnProgress("Убираем фон…");
+      setTryOnProgress(copy.status.removingBg);
       const bgData = await removeBackgroundForProduct(extractionFile);
 
       if (!bgData.ok) {
-        setError(friendlyAiError(bgData.errorCode, bgData.message));
+        if (tryApplyTokenBillingError(bgData, setTokenBilling)) return;
+        setError(resolveAiError(bgData.errorCode, bgData.message));
         return;
       }
 
@@ -1853,7 +1858,7 @@ export function StudioShell({
           }
           el.onload = () => resolve(el);
           el.onerror = () =>
-            reject(new Error("Не удалось загрузить вырезку"));
+            reject(new Error(copy.errors.cutoutLoadFailed));
           el.src = cutoutUrl;
         });
         cutoutUrl = prepareCutoutCanvas(img).toDataURL("image/png");
@@ -1862,9 +1867,13 @@ export function StudioShell({
       }
 
       if (usedVision && garmentLabelRu) {
-        setTryOnProgress(`Собираем карточку: ${garmentLabelRu}…`);
+        setTryOnProgress(
+          formatStudioString(copy.progress.assemblingCardWith, {
+            label: garmentLabelRu,
+          })
+        );
       } else {
-        setTryOnProgress("Собираем карточку…");
+        setTryOnProgress(copy.status.assemblingCard);
       }
       const [exportWidth, exportHeight] = shotSizePresetToDimensions(
         productShotSettings.shotSizePreset,
@@ -1917,7 +1926,7 @@ export function StudioShell({
       const message =
         error instanceof Error
           ? error.message
-          : "Не удалось собрать точную карточку.";
+          : copy.errors.exactCardFailed;
       setError(message);
     } finally {
       setLoading(false);
@@ -1941,7 +1950,7 @@ export function StudioShell({
       setProductCardCountdownStartedAt(null);
       clearProductCardPipelineSession();
       setProductCardResetNotice(
-        "Готовая карточка убрана. Фото, рамка и настройки сохранены — можно снова нажать «Создать карточку»."
+        copy.preview.cardCleared
       );
       return;
     }
@@ -1953,12 +1962,12 @@ export function StudioShell({
 
   const handleCreatePhotoOnModel = async () => {
     if (!productFile) {
-      setError("Сначала загрузите фото товара.");
+      setError(copy.errors.uploadProductFirst);
       return;
     }
 
     if (modelInputMode === "upload" && !modelFile) {
-      setError("Загрузите фото модели.");
+      setError(copy.status.uploadModel);
       return;
     }
 
@@ -1970,7 +1979,7 @@ export function StudioShell({
 
     const pipelineSize = resolvePipelineOutputSize();
     if (!isModelOutputSizeComplete(pipelineSize)) {
-      setError("Выберите соотношение сторон в настройках модели.");
+      setError(copy.status.selectAspectRatio);
       return;
     }
 
@@ -1993,7 +2002,7 @@ export function StudioShell({
     setError(null);
     setResults([]);
     setClothingPreviewTab("model");
-    setTryOnProgress("Проверяем товар…");
+    setTryOnProgress(copy.status.checkingProduct);
 
     try {
       let analysis = productAnalysis;
@@ -2002,7 +2011,7 @@ export function StudioShell({
         if (!analysis) {
           setError(
             productAnalysisError ??
-              "Не удалось проанализировать товар. Проверьте описание и попробуйте снова."
+              copy.errors.analyzeProductFailed
           );
           return;
         }
@@ -2016,14 +2025,14 @@ export function StudioShell({
         const needsFreshModel =
           !generatedModelUrl || !isRemoteImageUrl(generatedModelUrl);
         if (needsFreshModel) {
-          setTryOnProgress("Создаём модель…");
+          setTryOnProgress(copy.status.creatingModel);
           beginModelGeneration();
           setModelGenerateError(null);
 
           const angles = resolveGenerationAngles();
           const angle = angles[0];
           if (!angle) {
-            setError("Не удалось определить позу для генерации.");
+            setError(copy.errors.poseResolveFailed);
             return;
           }
 
@@ -2070,10 +2079,14 @@ export function StudioShell({
             setModelSource(null);
             setModelGenerationSeed(nextGenerationSeed());
           } catch (genError) {
+            if (genError instanceof TokenBillingBlockedError) {
+              setTokenBilling(genError.payload);
+              return;
+            }
             setError(
               genError instanceof Error
                 ? genError.message
-                : "Не удалось сгенерировать модель."
+                : copy.errors.modelGenFailed
             );
             return;
           } finally {
@@ -2086,11 +2099,11 @@ export function StudioShell({
       }
 
       if (!modelFile && !modelUrlForTryOn) {
-        setError("Не удалось получить изображение модели для примерки.");
+        setError(copy.errors.modelImageMissing);
         return;
       }
 
-      setTryOnProgress("Переносим товар на модель…");
+      setTryOnProgress(copy.status.transferring);
       await handleGenerateTryOn({
         analysisOverride: analysis,
         skipLoadingState: true,
@@ -2113,21 +2126,21 @@ export function StudioShell({
   const isPostProcessingMode = studioMode === "post-processing";
   const hasProductInput = productPhotos.length > 0;
   const primaryBlocker = (() => {
-    if (!hasProductInput) return "Сначала загрузите фото.";
-    if (productAnalyzing) return "Идёт AI-анализ товара…";
+    if (!hasProductInput) return copy.status.uploadProductFirst;
+    if (productAnalyzing) return copy.status.analyzingProduct;
 
     if (isProductShotMode) {
       if (maskEditorOpen) {
-        return "Нарисуйте рамку вокруг товара и нажмите «Сохранить рамку» выше.";
+        return copy.errors.maskRequired;
       }
       if (!selectedProductFile) {
-        return "На шаге 2 нажмите «Нарисовать рамку на фото» и сохраните.";
+        return copy.errors.maskDrawFirst;
       }
       if (
         productShotSettings.scenePreset === "custom" &&
         !productShotSettings.sceneCustomDescription.trim()
       ) {
-        return "Опишите фон своими словами.";
+        return copy.status.describeBackground;
       }
     }
 
@@ -2136,11 +2149,11 @@ export function StudioShell({
       if (anglesError) return anglesError;
 
       if (!isModelOutputSizeComplete(modelOutputSize)) {
-        return "Выберите соотношение сторон в настройках модели.";
+        return copy.status.selectAspectRatio;
       }
 
       if (modelInputMode === "upload" && !modelFile) {
-        return "Загрузите фото модели.";
+        return copy.status.uploadModel;
       }
     }
 
@@ -2155,7 +2168,7 @@ export function StudioShell({
       return null;
     }
     if (loading || modelGenerating) {
-      return tryOnProgress ?? (isProductShotMode ? "Создаём карточку…" : "Идёт генерация…");
+      return tryOnProgress ?? (isProductShotMode ? copy.status.creatingCard : copy.status.generating);
     }
     if (productAnalyzing) return null;
     return primaryBlocker;
@@ -2163,12 +2176,12 @@ export function StudioShell({
 
   const primaryButtonLabel = (() => {
     if (isProductShotMode && productAnalyzing) {
-      return "Анализ AI…";
+      return copy.status.analyzingAi;
     }
     if (isProductShotMode && loading) {
-      return tryOnProgress ?? "Создаём карточку…";
+      return tryOnProgress ?? copy.status.creatingCard;
     }
-    return isClothingMode ? "Создать фото на модели" : "Создать карточку";
+    return isClothingMode ? copy.actions.createOnModel : copy.actions.createCard;
   })();
 
   const productCardPrimaryBusy = isProductShotMode && (loading || productAnalyzing);
@@ -2203,7 +2216,7 @@ export function StudioShell({
       loading &&
       !modelGenerating &&
       tryOnProgress &&
-      /переносим|пример/i.test(tryOnProgress)
+      /переносим|пример|placing|transfer|көшір/i.test(tryOnProgress)
     ) {
       setClothingPreviewTab("result");
     }
@@ -2218,9 +2231,9 @@ export function StudioShell({
   if (!studioSessionHydrated) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-50 px-4">
-        <p className="text-sm font-medium text-slate-700">Загружаем студию…</p>
+        <p className="text-sm font-medium text-slate-700">{copy.loading.title}</p>
         <p className="max-w-sm text-center text-xs leading-5 text-slate-500">
-          Восстанавливаем вкладку, фото и настройки с этой сессии браузера.
+          {copy.loading.subtitle}
         </p>
       </div>
     );
@@ -2229,34 +2242,34 @@ export function StudioShell({
   return (
     <div className="min-h-screen">
       <header className="border-b border-border/70 bg-white/85 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-950"
+            href={`/${promptLocale}`}
+            className="shrink-0 text-lg font-bold tracking-tight text-slate-950 hover:text-slate-800"
           >
-            <ArrowLeft className="h-4 w-4" />
-            На главную
-          </Link>
-          <span className="hidden text-sm font-bold tracking-tight text-slate-950 sm:inline">
             Vitrina <span className="text-teal-700">AI</span>
-          </span>
-          <WhatsAppLoginModal />
+          </Link>
+          <div className="flex items-center gap-3">
+            <StudioLanguageSwitcher />
+            <TokenBalancePill />
+            <WhatsAppLoginModal />
+          </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-8 lg:px-8">
         <section>
-            <Badge variant="violet" className="mb-4">
-              <Sparkles className="h-3.5 w-3.5" />
-              Vitrina AI Studio
-            </Badge>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
-              Студия товарных фото
-            </h1>
+            <div className="flex flex-wrap items-center gap-3">
+              <Badge variant="violet" className="shrink-0">
+                <Sparkles className="h-3.5 w-3.5" />
+                {copy.hero.badge}
+              </Badge>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
+                {copy.hero.title}
+              </h1>
+            </div>
             <p className="mt-3 max-w-3xl text-base leading-7 text-slate-600 sm:text-lg">
-              Создавайте фото для карточек товаров: одежда на модели, точная
-              товарная карточка и проработка готовых изображений для видео,
-              фона и Reels.
+              {copy.hero.subtitle}
             </p>
         </section>
 
@@ -2271,6 +2284,7 @@ export function StudioShell({
             mockMode={mockMode}
             paidAiRunsAllowed={paidAiRunsAllowed}
             promptLocale={promptLocale}
+            onTokenBillingError={setTokenBilling}
             onDeleteAsset={deleteSessionAsset}
             onAssetCreated={addSingleAssetToSession}
             onUpdateAsset={updateSessionAsset}
@@ -2290,14 +2304,14 @@ export function StudioShell({
               <StudioWorkflowRail>
                     <StudioWorkflowStep
                       step={1}
-                        label={isClothingMode ? "Товар" : "Фото товара"}
+                        label={isClothingMode ? copy.workflow.product : copy.workflow.productPhoto}
                     >
                       <ProductPhotosUploader
-                        label="Загрузите фото товара"
+                        label={copy.upload.productLabel}
                         hint={
                           isClothingMode
-                            ? "Подойдёт фото товара на модели или отдельно. AI сам определит параметры."
-                            : "Одно фото за раз. Для следующего SKU замените файл кнопкой «Заменить фото»."
+                            ? copy.upload.productHintClothing
+                            : copy.upload.productHintSingle
                         }
                         maxPhotos={
                           isClothingMode
@@ -2349,7 +2363,7 @@ export function StudioShell({
                     {isProductShotMode && (
                       <StudioWorkflowStep
                         step={2}
-                        label="Выделение товара"
+                        label={copy.workflow.mask}
                         optional
                       >
                         <ProductSelectionPanel
@@ -2375,7 +2389,7 @@ export function StudioShell({
                       <>
                         <StudioWorkflowStep
                           step={2}
-                          label="Модель"
+                          label={copy.workflow.model}
                           softCorner="bottom"
                         >
                           <div className="relative space-y-4">
@@ -2386,8 +2400,7 @@ export function StudioShell({
                                 aria-live="polite"
                               >
                                 <p className="text-center text-sm leading-5 text-slate-700">
-                                  Идёт AI-анализ товара. Настройки модели
-                                  откроются после завершения.
+                                  {copy.progress.analyzingProductSettings}
                                 </p>
                               </div>
                             ) : null}
@@ -2443,10 +2456,10 @@ export function StudioShell({
                               >
                                 <ModelSourcePanel
                                   uiMode="saas"
-                                  label="Загрузите фото модели"
+                                  label={copy.upload.modelLabel}
                                   hint={
                                     isLingerieScenario
-                                      ? "Для белья лучше полный рост или кадр до бёдер."
+                                      ? copy.upload.modelHintLingerie
                                       : undefined
                                   }
                                   savedModelUrl={null}
@@ -2462,7 +2475,12 @@ export function StudioShell({
                           </div>
                         </StudioWorkflowStep>
 
-                        <StudioWorkflowStep step={3} label="Создание фото" isLast>
+                        <StudioWorkflowStep
+                          step={3}
+                          label={copy.workflow.createPhoto}
+                          tokenOperation="try-on"
+                          isLast
+                        >
                           <div className="space-y-3">
                             {showTryOnMaxToggle ? (
                               <label className="flex cursor-pointer items-start gap-2 rounded-[12px] border border-slate-200 bg-slate-50 px-3 py-2.5 text-left">
@@ -2588,7 +2606,7 @@ export function StudioShell({
                     {isProductShotMode && (
                       <StudioWorkflowStep
                         step={3}
-                        label="Карточка маркетплейса"
+                        label={copy.workflow.marketplaceCard}
                       >
                         <ProductShotSettingsPanel
                           settings={productShotSettings}
@@ -2598,7 +2616,12 @@ export function StudioShell({
                     )}
 
                     {!isClothingMode ? (
-                      <StudioWorkflowStep step={4} label="Готово" isLast>
+                      <StudioWorkflowStep
+                        step={4}
+                        label={copy.workflow.done}
+                        tokenOperation="background"
+                        isLast
+                      >
                         <div className="space-y-3">
                           <Button
                             className="w-full"
@@ -2639,8 +2662,7 @@ export function StudioShell({
                           ) : null}
                           {maskEditorOpen && isProductShotMode ? (
                             <p className="text-center text-[11px] leading-5 text-slate-500">
-                              Нарисуйте рамку на шаге 2 — «Сохранить рамку»,
-                              затем «Создать карточку».
+                              {copy.progress.maskStepHint}
                             </p>
                           ) : null}
                         </div>
@@ -2733,7 +2755,7 @@ export function StudioShell({
                       }
                       resultCountdownStartedAt={productCardCountdownStartedAt}
                       resultCountdownLabel={
-                        tryOnProgress ?? "Создаём карточку"
+                        tryOnProgress ?? copy.status.creatingCard
                       }
                       saasPreviewChrome
                       previewAspect={productCardPreviewAspect}
@@ -2747,7 +2769,43 @@ export function StudioShell({
         </div>
         )}
       </main>
+
+      <TokenBillingModal
+        open={tokenBilling !== null}
+        payload={tokenBilling}
+        onClose={() => setTokenBilling(null)}
+      />
     </div>
   );
 }
 
+function StudioShellLoadingFallback() {
+  const copy = getStudioCopy("ru");
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-50 px-4">
+      <p className="text-sm font-medium text-slate-700">{copy.loading.title}</p>
+    </div>
+  );
+}
+
+export function StudioShell(
+  props: {
+    mockMode: boolean;
+    paidAiRunsAllowed: boolean;
+    locale?: Locale;
+  }
+) {
+  return (
+    <Suspense fallback={<StudioShellLoadingFallback />}>
+      <StudioLocaleProvider
+        routeLocale={
+          props.locale === "en" || props.locale === "kk" || props.locale === "ru"
+            ? props.locale
+            : undefined
+        }
+      >
+        <StudioShellInner {...props} />
+      </StudioLocaleProvider>
+    </Suspense>
+  );
+}

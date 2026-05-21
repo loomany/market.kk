@@ -6,6 +6,11 @@ import {
   IMAGE_EDITOR_CAPABILITIES,
   type ImageEditorId,
 } from "@/lib/ai/imageEnhanceSchemas";
+import {
+  getImageFrameFormatOptions,
+  getSaasQualityOptions,
+} from "@/lib/studio/i18n/studioFormOptions";
+import { useStudioCopy } from "./StudioLocaleContext";
 
 export type ImageOutputFormat = "png" | "jpeg" | "webp";
 export type ImageAspectRatio =
@@ -25,24 +30,6 @@ const IMAGE_FILE_FORMAT_OPTIONS_ALL: {
   { value: "jpeg", label: "JPG" },
   { value: "webp", label: "WEBP" },
 ];
-
-const IMAGE_FRAME_FORMAT_OPTIONS_ALL: {
-  value: ImageAspectRatio;
-  label: string;
-}[] = [
-  { value: "9:16", label: "9:16 — вертикальный кадр" },
-  { value: "4:5", label: "4:5 — маркетплейсы / соцсети" },
-  { value: "1:1", label: "1:1 — квадрат" },
-  { value: "3:4", label: "3:4 — карточка товара" },
-  { value: "4:3", label: "4:3 — горизонтальный кадр" },
-  { value: "16:9", label: "16:9 — баннер" },
-];
-
-export const SAAS_QUALITY_OPTIONS = [
-  { value: "fast", label: "Быстро" },
-  { value: "balanced", label: "Стандарт" },
-  { value: "high", label: "Максимум" },
-] as const;
 
 /** UI ImageOutputFormat (jpeg/png/webp) → schema enum (jpg/png/webp). */
 function toSchemaOutputFormat(
@@ -78,7 +65,16 @@ export function ImageSettingsForm({
   onPreserveProductChange,
   disabled,
 }: ImageSettingsFormProps) {
+  const { locale, copy } = useStudioCopy();
   const capability = IMAGE_EDITOR_CAPABILITIES[editorId];
+  const frameFormatOptionsAll = useMemo(
+    () => getImageFrameFormatOptions(locale),
+    [locale]
+  );
+  const qualityOptions = useMemo(
+    () => getSaasQualityOptions(locale),
+    [locale]
+  );
 
   const outputFormatOptions = useMemo(
     () =>
@@ -92,17 +88,20 @@ export function ImageSettingsForm({
 
   const aspectRatioOptions = useMemo(
     () =>
-      IMAGE_FRAME_FORMAT_OPTIONS_ALL.filter((opt) =>
+      frameFormatOptionsAll.filter((opt) =>
         (capability.aspectRatios as readonly string[]).includes(opt.value)
       ),
-    [capability.aspectRatios]
+    [capability.aspectRatios, frameFormatOptionsAll]
   );
+
+  const s = copy.imageSettings;
+  const f = copy.form;
 
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
         <Select
-          label="Формат файла"
+          label={f.fileFormat}
           value={outputFormat}
           disabled={disabled}
           onChange={(value) =>
@@ -111,7 +110,7 @@ export function ImageSettingsForm({
           options={outputFormatOptions}
         />
         <Select
-          label="Формат кадра"
+          label={f.frameFormat}
           value={aspectRatio}
           disabled={disabled}
           onChange={(value) =>
@@ -121,11 +120,11 @@ export function ImageSettingsForm({
         />
         {capability.supportsQuality ? (
           <Select
-            label="Качество"
+            label={f.quality}
             value={quality}
             disabled={disabled}
             onChange={(value) => onQualityChange(value as SaasQualityTier)}
-            options={[...SAAS_QUALITY_OPTIONS]}
+            options={qualityOptions}
           />
         ) : null}
       </div>
@@ -135,7 +134,7 @@ export function ImageSettingsForm({
           type="button"
           role="switch"
           aria-checked={preserveProduct}
-          aria-label="Сохранять товар точно"
+          aria-label={s.preserveProduct}
           disabled={disabled}
           onClick={() => onPreserveProductChange(!preserveProduct)}
           className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 ${
@@ -151,10 +150,10 @@ export function ImageSettingsForm({
         </button>
         <div className="min-w-0">
           <p className="text-sm font-semibold text-slate-950">
-            Сохранять товар точно
+            {s.preserveProduct}
           </p>
           <p className="mt-1 text-xs leading-5 text-slate-500">
-            AI изменит только сцену, свет и фон — сам товар останется как есть.
+            {s.preserveProductHint}
           </p>
         </div>
       </div>

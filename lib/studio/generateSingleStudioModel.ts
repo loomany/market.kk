@@ -7,6 +7,7 @@ import type { ProductDescriptionAnalysis } from "@/lib/ai/productDescriptionAnal
 import { productPoseDescriptionForGeneration } from "@/lib/ai/productPoseSummary";
 import type { ModelGenerationSettings } from "@/components/studio/types";
 import { buildGenerateModelRequestBody } from "@/lib/studio/buildGenerateModelRequest";
+import { throwIfTokenBillingError } from "@/lib/tokens/billingErrorPayload";
 
 export async function fetchGenerateSingleStudioModel(input: {
   settings: ModelGenerationSettings;
@@ -72,6 +73,7 @@ export async function fetchGenerateSingleStudioModel(input: {
   };
 
   if (!data.ok) {
+    throwIfTokenBillingError(data);
     throw new Error(data.message ?? `Model generation failed (${res.status})`);
   }
 

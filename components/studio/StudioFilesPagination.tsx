@@ -2,7 +2,9 @@
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { formatStudioString } from "@/lib/studio/i18n";
 import { cn } from "@/lib/utils";
+import { useStudioCopy } from "./StudioLocaleContext";
 
 type StudioFilesPaginationProps = {
   page: number;
@@ -12,17 +14,6 @@ type StudioFilesPaginationProps = {
 
 type PaginationItem = number | "ellipsis-left" | "ellipsis-right";
 
-/**
- * SaaS-style compact pagination.
- *
- * Always pinned: first 2 pages and last 2 pages, plus current ±1.
- * Gaps render as a single ellipsis.
- *
- * Examples (total=6):
- *   page 1 → 1 2 … 5 6
- *   page 3 → 1 2 3 4 … 5 6
- *   page 6 → 1 2 … 5 6
- */
 function buildPaginationItems(
   page: number,
   totalPages: number
@@ -60,6 +51,9 @@ export function StudioFilesPagination({
   totalPages,
   onPageChange,
 }: StudioFilesPaginationProps) {
+  const { copy } = useStudioCopy();
+  const p = copy.studioFilesPagination;
+
   if (totalPages <= 1) return null;
 
   const items = buildPaginationItems(page, totalPages);
@@ -67,18 +61,18 @@ export function StudioFilesPagination({
   return (
     <nav
       className="flex flex-wrap items-center justify-center gap-1 text-sm"
-      aria-label="Пагинация файлов"
+      aria-label={p.navAria}
     >
       <Button
         variant="outline"
         size="sm"
         disabled={page <= 1}
         onClick={() => onPageChange(page - 1)}
-        aria-label="Предыдущая страница"
+        aria-label={p.prevPageAria}
         className="min-h-9 px-2.5"
       >
         <ChevronLeft className="h-4 w-4" />
-        Назад
+        {p.prev}
       </Button>
 
       <div className="flex flex-wrap items-center gap-1">
@@ -101,7 +95,7 @@ export function StudioFilesPagination({
               key={item}
               type="button"
               onClick={() => onPageChange(item)}
-              aria-label={`Страница ${item}`}
+              aria-label={formatStudioString(p.pageAria, { page: item })}
               aria-current={active ? "page" : undefined}
               className={cn(
                 "inline-flex h-9 min-w-9 items-center justify-center rounded-[12px] border px-2.5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2",
@@ -121,10 +115,10 @@ export function StudioFilesPagination({
         size="sm"
         disabled={page >= totalPages}
         onClick={() => onPageChange(page + 1)}
-        aria-label="Следующая страница"
+        aria-label={p.nextPageAria}
         className="min-h-9 px-2.5"
       >
-        Вперёд
+        {p.next}
         <ChevronRight className="h-4 w-4" />
       </Button>
     </nav>

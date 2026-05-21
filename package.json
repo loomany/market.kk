@@ -21,17 +21,23 @@
     "test:premium-garment-prep": "node --experimental-strip-types --import=./scripts/lib/registerTsAlias.mjs scripts/test-premium-garment-prep.ts",
     "test:lingerie-set-type": "node --experimental-strip-types --import=./scripts/lib/registerTsAlias.mjs scripts/test-lingerie-set-type.ts",
     "test:lingerie-tryon-ab": "node --experimental-strip-types --import=./scripts/lib/registerTsAlias.mjs scripts/test-lingerie-tryon-ab.ts",
+    "test:tokens": "node --experimental-strip-types --import=./scripts/lib/registerTsAlias.mjs scripts/test-tokens-ledger.ts",
     "smoke:ai:mock": "node --experimental-strip-types scripts/smoke/mock-ai-routes.ts",
     "smoke:seo:public": "npx tsx scripts/seo/smoke-public-routes.ts",
     "check:seo:ru-content": "npx tsx scripts/seo/check-seo-content.ts ru",
     "check:seo:en-content": "npx tsx scripts/seo/check-seo-content.ts en",
     "check:seo:content": "npx tsx scripts/seo/check-seo-content.ts all",
     "check:seo:kk-content": "npx tsx scripts/seo/check-seo-kk-content.ts",
+    "check:seo:kk-wave2": "npx tsx scripts/seo/check-seo-kk-wave2.ts",
     "check:seo:trust": "npx tsx scripts/seo/check-seo-trust.ts",
     "check:seo:examples": "npx tsx scripts/seo/check-seo-examples.ts",
     "check:seo:wave2": "npx tsx scripts/seo/check-seo-wave2.ts",
     "smoke:seo:hreflang": "npx tsx scripts/seo/smoke-hreflang-pairs.ts",
-    "smoke:seo:prelaunch": "npx tsx scripts/seo/smoke-prelaunch-gate.ts"
+    "smoke:seo:prelaunch": "npx tsx scripts/seo/smoke-prelaunch-gate.ts",
+    "check:seo:audience-pages": "npx tsx scripts/seo/check-seo-audience-pages.ts",
+    "audience:build": "node scripts/seo/build-audience-pages.mjs",
+    "check:studio:i18n": "npx tsx scripts/studio/check-studio-i18n.ts",
+    "icons:generate": "node scripts/seo/generate-site-icons.mjs"
   },
   "dependencies": {
     "@fal-ai/client": "^1.10.1",
@@ -54,6 +60,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
+    "to-ico": "^1.1.5",
     "typescript": "^5"
   }
 }

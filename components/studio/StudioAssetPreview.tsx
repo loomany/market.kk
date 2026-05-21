@@ -9,6 +9,7 @@ import {
 } from "@/lib/studio/assetDisplayLabels";
 import { POST_PROCESSING_COUNTDOWN_SEC } from "@/lib/studio/postProcessingEstimates";
 import { cn } from "@/lib/utils";
+import { useStudioCopy } from "./StudioLocaleContext";
 
 function formatCountdown(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -58,6 +59,8 @@ export function StudioAssetPreview({
   compact = false,
   circle = false,
 }: StudioAssetPreviewProps) {
+  const { copy } = useStudioCopy();
+  const s = copy.studioAssetPreview;
   const previewUrl = assetPreviewUrl(asset);
   const processing = asset.status === "processing";
   const errored = asset.status === "error";
@@ -82,7 +85,7 @@ export function StudioAssetPreview({
             aria-hidden
           />
           <p className="relative z-10 text-xs font-medium text-slate-700">
-            AI обрабатывает файл
+            {s.processing}
           </p>
           {asset.startedAt ? (
             <div className="relative z-10">
@@ -96,7 +99,7 @@ export function StudioAssetPreview({
       ) : errored ? (
         <div className="flex h-full flex-col items-center justify-center gap-2 px-3 text-center text-red-700">
           <AlertCircle className="h-8 w-8" aria-hidden />
-          <p className="text-xs font-medium">Не удалось создать</p>
+          <p className="text-xs font-medium">{s.failed}</p>
         </div>
       ) : isVideo && asset.url ? (
         <video

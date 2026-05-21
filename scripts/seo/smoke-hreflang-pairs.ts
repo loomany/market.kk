@@ -5,7 +5,9 @@ import { blogTopics } from "../../data/seo/blogTopics";
 import { getArticleByTopicId } from "../../data/seo/blogArticles";
 import { getBlogPathByLocale } from "../../lib/blog/blogResolve";
 import { indexableLocales } from "../../lib/i18n/localeConfig";
-import { isKkBlogTopicApproved } from "../../lib/seo/kkIndexPolicy";
+import { staticSeoPages } from "../../data/seo/staticPages";
+import { buildLocalizedPathMap, type StaticRouteKey } from "../../lib/i18n/routeSlugs";
+import { isKkBlogTopicApproved, isKkTrustPageApproved } from "../../lib/seo/kkIndexPolicy";
 import { buildLanguageAlternates } from "../../lib/seo/site";
 import { shouldIndexPage } from "../../lib/seo/qualityGate";
 
@@ -119,7 +121,26 @@ assert(enOnly.length === 0, `expected 0 EN-only published, got ${enOnly.length}`
 const kkTriads = publishedPairs.filter(
   (t) => isKkBlogTopicApproved(t.id) && t.status.kk === "published"
 );
-assert(kkTriads.length === 10, `expected 10 kk blog triads, got ${kkTriads.length}`);
+assert(kkTriads.length === 18, `expected 18 kk blog triads, got ${kkTriads.length}`);
+
+const trustTriadKeys = ["howItWorks", "quality", "faq"] as const satisfies readonly StaticRouteKey[];
+let trustTriads = 0;
+for (const key of trustTriadKeys) {
+  assert(isKkTrustPageApproved(key), `${key}: must be in KK approved trust policy`);
+  const page = staticSeoPages.find((p) => p.key === key);
+  assert(page?.content.kk?.status === "published", `${key}: kk trust must be published`);
+  const paths = {
+    ru: buildLocalizedPathMap(key).ru,
+    en: buildLocalizedPathMap(key).en,
+    kk: buildLocalizedPathMap(key).kk,
+  };
+  const alternates = buildLanguageAlternates(paths);
+  assert(alternates.kk, `${key}: trust hreflang missing kk`);
+  assert(alternates.ru && alternates.en, `${key}: trust hreflang missing ru/en`);
+  assert(alternates["x-default"] === alternates.ru, `${key}: x-default must be ru`);
+  trustTriads++;
+}
+assert(trustTriads === 3, `expected 3 kk trust triads, got ${trustTriads}`);
 
 if (failures) {
   console.error(`\n${failures} hreflang pair check(s) failed.`);
@@ -129,6 +150,7 @@ if (failures) {
 console.log(
   `OK ${publishedPairs.length} ru/en pairs with hreflang ru+en+x-default→ru`
 );
-console.log(`OK ${kkTriads.length} ru/en/kk triads with hreflang ru+en+kk+x-default→ru`);
+console.log(`OK ${kkTriads.length} ru/en/kk blog triads with hreflang ru+en+kk+x-default→ru`);
+console.log(`OK ${trustTriads} ru/en/kk trust triads (how-it-works, quality, faq)`);
 console.log("OK no RU-only or EN-only published blog topics");
 process.exit(0);

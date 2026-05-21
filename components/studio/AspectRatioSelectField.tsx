@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { Select } from "@/components/ui/Select";
+import { useStudioCopy } from "./StudioLocaleContext";
 
 export type AspectRatioSelectOption<T extends string = string> = {
   id: T;
@@ -41,14 +42,13 @@ export function hintForAspectRatioOption<T extends string>(
   return options.find((item) => item.id === value)?.hint ?? "";
 }
 
-/** Единый селектор «3:4 — WB и Ozon» для студии (Fal nano-banana и точная карточка). */
 export function AspectRatioSelectField<T extends string>({
-  label = "Соотношение сторон",
+  label,
   description,
   value,
   options,
   onChange,
-  placeholder = "Выберите формат",
+  placeholder,
   disabled = false,
 }: {
   label?: string;
@@ -59,11 +59,15 @@ export function AspectRatioSelectField<T extends string>({
   placeholder?: string;
   disabled?: boolean;
 }) {
+  const { copy } = useStudioCopy();
+  const resolvedLabel = label ?? copy.form.aspectRatio;
+  const resolvedPlaceholder = placeholder ?? copy.form.selectFormat;
+
   return (
-    <SettingField label={label} description={description}>
+    <SettingField label={resolvedLabel} description={description}>
       <Select
         triggerClassName="rounded-[12px] font-medium"
-        placeholder={placeholder}
+        placeholder={resolvedPlaceholder}
         menuMatchTriggerWidth
         disabled={disabled}
         value={value}

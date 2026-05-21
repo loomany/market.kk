@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { useStudioCopy } from "./StudioLocaleContext";
 
 export type ModelInputMode = "create" | "upload";
 
@@ -10,26 +11,28 @@ type ModelInputModeSelectorProps = {
   disabled?: boolean;
 };
 
-const MODES: { id: ModelInputMode; label: string }[] = [
-  { id: "create", label: "Создать модель" },
-  { id: "upload", label: "Своя модель" },
-];
-
 export function ModelInputModeSelector({
   value,
   onChange,
   disabled = false,
 }: ModelInputModeSelectorProps) {
+  const { copy } = useStudioCopy();
+  const m = copy.modelInputMode;
+  const modes: { id: ModelInputMode; label: string }[] = [
+    { id: "create", label: m.create },
+    { id: "upload", label: m.upload },
+  ];
+
   return (
     <div
       role="tablist"
-      aria-label="Способ выбора модели"
+      aria-label={m.ariaLabel}
       className={cn(
         "grid grid-cols-2 gap-1 rounded-xl bg-slate-100/90 p-1 ring-1 ring-slate-200/50",
         disabled && "pointer-events-none opacity-60"
       )}
     >
-      {MODES.map((mode) => (
+      {modes.map((mode) => (
         <button
           key={mode.id}
           type="button"

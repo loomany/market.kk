@@ -100,7 +100,6 @@ function checkTrustPages() {
     const page = staticSeoPages.find((p) => p.key === key);
     assert(page, `trust page ${key} exists`);
     for (const locale of indexableLocales) {
-      if (locale === "kk") continue;
       const content = page!.content[locale];
       assert(
         shouldIndexPage({

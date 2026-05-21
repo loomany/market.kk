@@ -12,6 +12,7 @@ import {
   isPaidAiGuardError,
   paidAiGuardResponse,
 } from "@/lib/ai/paidAiGuard";
+import { wrapAiPost } from "@/lib/tokens/wrapAiPost";
 
 export const runtime = "nodejs";
 
@@ -90,6 +91,10 @@ async function processFormPayload(payload: ProductShotFormPayload) {
 }
 
 export async function POST(request: Request) {
+  return wrapAiPost(request, "product-shot", ROUTE_ID, handleProductShotPost);
+}
+
+async function handleProductShotPost(request: Request) {
   const contentType = request.headers.get("content-type") ?? "";
 
   if (contentType.includes("multipart/form-data")) {

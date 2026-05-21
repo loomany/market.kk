@@ -5,6 +5,7 @@ import {
   ESTIMATED_SAAS_PIPELINE_DURATION_SEC,
   SAAS_MODEL_GENERATION_COUNTDOWN_SEC,
 } from "@/lib/studio/clothingTryOnEstimates";
+import { useStudioCopy } from "./StudioLocaleContext";
 
 export const SAAS_PIPELINE_COUNTDOWN_SEC =
   ESTIMATED_SAAS_PIPELINE_DURATION_SEC.max;
@@ -34,9 +35,12 @@ function remainingFromStartedAt(
 
 export function SaasPipelineCountdown({
   totalSeconds = SAAS_PIPELINE_COUNTDOWN_SEC,
-  label = "Создаём фото на модели",
+  label,
   startedAt,
 }: SaasPipelineCountdownProps) {
+  const { copy } = useStudioCopy();
+  const s = copy.saasCountdown;
+  const resolvedLabel = label ?? s.label;
   const [remaining, setRemaining] = useState(() =>
     startedAt != null
       ? remainingFromStartedAt(startedAt, totalSeconds)
@@ -55,7 +59,7 @@ export function SaasPipelineCountdown({
 
   return (
     <div className="flex h-full min-h-0 flex-col items-center justify-center gap-3 px-4 py-6 text-center">
-      <p className="text-sm font-medium text-slate-800">{label}</p>
+      <p className="text-sm font-medium text-slate-800">{resolvedLabel}</p>
       <p
         className="font-mono text-4xl font-semibold tabular-nums tracking-tight text-teal-800"
         aria-live="polite"
@@ -63,9 +67,7 @@ export function SaasPipelineCountdown({
       >
         {formatCountdown(remaining)}
       </p>
-      <p className="max-w-xs text-xs leading-5 text-slate-500">
-        Обычно укладываемся раньше — результат появится сразу, как будет готов.
-      </p>
+      <p className="max-w-xs text-xs leading-5 text-slate-500">{s.hint}</p>
     </div>
   );
 }

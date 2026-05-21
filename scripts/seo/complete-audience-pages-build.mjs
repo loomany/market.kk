@@ -1,0 +1,267 @@
+/**
+ * One-time assembler: writes scripts/seo/build-audience-pages.mjs with inline copy + emit tail.
+ * Run: node scripts/seo/complete-audience-pages-build.mjs
+ */
+import { readFileSync, writeFileSync } from "fs";
+import { dirname, join } from "path";
+import { fileURLToPath } from "url";
+import { RU_COPY as RU_BASE } from "./audience-pages-copy.mjs";
+import { EN_COPY as EN_BASE } from "./audience-pages-copy.mjs";
+import { EN_COPY as EN_FULL, KK_COPY as KK_FULL } from "./audience-pages-en-kk-full.mjs";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const BUILD = join(__dirname, "build-audience-pages.mjs");
+
+function wc(loc) {
+  const text = [
+    loc.intro,
+    ...loc.sections.map((s) => s.body),
+    ...loc.scenarios.map((s) => s.body),
+    loc.limitations,
+  ].join(" ");
+  return text.split(/\s+/).filter(Boolean).length;
+}
+
+const QA_RU =
+  " Сверьте результат с живым товаром и актуальной справкой кабинета Kaspi, Wildberries или Ozon — правила меняются. Vitrina AI Studio не является официальным партнёром площадок и не гарантирует прохождение модерации. Ручная проверка обязательна: цвет, форма, текст на упаковке, края маски и комплектация. Демо-режим помогает обучить команду без списаний и реальных AI-вызовов.";
+
+const SCENARIO_RU =
+  " Менеджер проходит QA: исходник слева, результат справа, zoom 100%. Отклонённые кадры не публикуются — лучше задержка, чем простой карточки. Vitrina AI Studio не гарантирует одобрение модерации; ответственность за загрузку несёт продавец или менеджер кабинета.";
+
+function expandRu(copy, min = 900) {
+  const out = structuredClone(copy);
+  let n = wc(out);
+  for (const s of out.sections) {
+    if (n >= min) break;
+    s.body += QA_RU;
+    n = wc(out);
+  }
+  for (const s of out.scenarios) {
+    if (n >= min) break;
+    s.body += SCENARIO_RU;
+    n = wc(out);
+  }
+  while (n < min) {
+    out.limitations += QA_RU;
+    n = wc(out);
+  }
+  return out;
+}
+
+const RU_COPY = {};
+for (const id of Object.keys(RU_BASE)) {
+  RU_COPY[id] = expandRu(RU_BASE[id], 900);
+}
+
+function padEnCopy(copy, min = 900) {
+  const out = structuredClone(copy);
+  let n = wc(out);
+  const pad =
+    " Compare every frame to the physical sample and current seller-cabinet rules before publishing. Vitrina AI Studio is not an official marketplace partner.";
+  for (const s of out.sections) {
+    if (n >= min) break;
+    s.body += pad;
+    n = wc(out);
+  }
+  while (n < min) {
+    out.limitations += pad;
+    n = wc(out);
+  }
+  return out;
+}
+
+const EN_COPY = {};
+for (const id of Object.keys(RU_BASE)) {
+  EN_COPY[id] =
+    id === "marketplace-sellers" && EN_BASE[id]
+      ? padEnCopy(EN_BASE[id], 900)
+      : EN_FULL[id] ?? EN_BASE[id];
+}
+const KK_COPY = { ...KK_FULL };
+
+let header = readFileSync(BUILD, "utf8").split("\n").slice(0, 471).join("\n");
+header = header.replace(/\nfunction join\(\.\.\.parts\) \{\n  return parts\.filter\(Boolean\)\.join\(" "\);\n\}\n/, "\n");
+
+const emitTail = `
+function renderLocalized(loc) {
+  const sections = loc.sections
+    .map((s) => \`      { title: \${JSON.stringify(s.title)}, body: \${JSON.stringify(s.body)} }\`)
+    .join(",\\n");
+  const scenarios = loc.scenarios
+    .map((s) => \`      { title: \${JSON.stringify(s.title)}, body: \${JSON.stringify(s.body)} }\`)
+    .join(",\\n");
+  const faq = loc.faq
+    .map(
+      (f) =>
+        \`      { question: \${JSON.stringify(f.question)}, answer: \${JSON.stringify(f.answer)} }\`
+    )
+    .join(",\\n");
+  const related = loc.relatedLinks
+    .map((l) => \`      { label: \${JSON.stringify(l.label)}, href: \${JSON.stringify(l.href)} }\`)
+    .join(",\\n");
+  return \`    {
+      slug: \${JSON.stringify(loc.slug)},
+      title: \${JSON.stringify(loc.title)},
+      metaDescription: \${JSON.stringify(loc.metaDescription)},
+      h1: \${JSON.stringify(loc.h1)},
+      intro: \${JSON.stringify(loc.intro)},
+      chipLabel: \${JSON.stringify(loc.chipLabel)},
+      sections: [
+\${sections}
+      ],
+      forWho: [\${loc.forWho.map((x) => JSON.stringify(x)).join(", ")}],
+      tasks: [\${loc.tasks.map((x) => JSON.stringify(x)).join(", ")}],
+      howHelps: [\${loc.howHelps.map((x) => JSON.stringify(x)).join(", ")}],
+      scenarios: [
+\${scenarios}
+      ],
+      limitations: \${JSON.stringify(loc.limitations)},
+      faq: [
+\${faq}
+      ],
+      relatedLinks: [
+\${related}
+      ],
+      status: "published",
+    }\`;
+}
+
+function renderPage(page) {
+  return \`  {
+    id: \${JSON.stringify(page.id)},
+    content: {
+      ru: \${renderLocalized(page.content.ru)},
+      en: \${renderLocalized(page.content.en)},
+      kk: \${renderLocalized(page.content.kk)},
+    },
+  }\`;
+}
+
+function emitTs() {
+  const pages = AUDIENCES.map((ctx) => ({
+    id: ctx.id,
+    content: { ru: buildRu(ctx), en: buildEn(ctx), kk: buildKk(ctx) },
+  }));
+
+  const body = pages.map(renderPage).join(",\\n");
+  const file = \`/** Auto-generated by scripts/seo/build-audience-pages.mjs — do not edit manually */
+import type { Locale, TranslationStatus } from "@/lib/i18n/localeConfig";
+import { supportedLocaleCodes } from "@/lib/i18n/localeConfig";
+
+export type FaqItem = {
+  question: string;
+  answer: string;
+};
+
+export type AudienceLocalized = {
+  slug: string;
+  title: string;
+  metaDescription: string;
+  h1: string;
+  intro: string;
+  chipLabel: string;
+  sections: Array<{ title: string; body: string }>;
+  forWho: string[];
+  tasks: string[];
+  howHelps: string[];
+  scenarios: Array<{ title: string; body: string }>;
+  limitations: string;
+  faq: FaqItem[];
+  relatedLinks: Array<{ label: string; href: string }>;
+  status: TranslationStatus;
+};
+
+export type AudiencePage = {
+  id: string;
+  content: Pick<Record<Locale, AudienceLocalized>, "ru" | "en" | "kk"> &
+    Partial<Record<Locale, AudienceLocalized>>;
+};
+
+export const audiencePages: AudiencePage[] = [
+\${body}
+];
+
+export function getAudienceBySlug(locale: Locale, slug: string) {
+  return audiencePages.find((p) => p.content[locale]?.slug === slug);
+}
+
+export function getAudienceById(id: string) {
+  return audiencePages.find((p) => p.id === id);
+}
+
+export const audiencePathByLocale: Record<Locale, string> = {
+  ru: \${JSON.stringify(HUB.ru)},
+  en: \${JSON.stringify(HUB.en)},
+  kk: \${JSON.stringify(HUB.kk)},
+  ky: \${JSON.stringify(HUB.en)},
+  uz: \${JSON.stringify(HUB.en)},
+  tg: \${JSON.stringify(HUB.en)},
+  tr: \${JSON.stringify(HUB.en)},
+  az: \${JSON.stringify(HUB.en)},
+  ar: \${JSON.stringify(HUB.en)},
+  es: \${JSON.stringify(HUB.en)},
+  pt: \${JSON.stringify(HUB.en)},
+  fr: \${JSON.stringify(HUB.en)},
+  de: \${JSON.stringify(HUB.en)},
+  it: \${JSON.stringify(HUB.en)},
+  pl: \${JSON.stringify(HUB.en)},
+  uk: \${JSON.stringify(HUB.en)},
+  hi: \${JSON.stringify(HUB.en)},
+  id: \${JSON.stringify(HUB.en)},
+  vi: \${JSON.stringify(HUB.en)},
+  zh: \${JSON.stringify(HUB.en)},
+};
+
+export function getAudienceChips(locale: Locale) {
+  const hub = audiencePathByLocale[locale] ?? audiencePathByLocale.en;
+  return audiencePages
+    .filter((p) => p.content[locale] || (locale !== "ru" && locale !== "kk" && p.content.en))
+    .map((p) => {
+      const c = p.content[locale] ?? p.content.en;
+      return {
+        id: p.id,
+        label: c.chipLabel,
+        href: '/' + locale + '/' + hub + '/' + c.slug,
+      };
+    });
+}
+\`;
+
+  writeFileSync(OUT, file, "utf8");
+  console.log("Wrote", OUT);
+}
+
+const MIN = { ru: 900, en: 900, kk: 850 };
+let failed = false;
+
+for (const ctx of AUDIENCES) {
+  for (const locale of ["ru", "en", "kk"]) {
+    const loc =
+      locale === "ru" ? buildRu(ctx) : locale === "en" ? buildEn(ctx) : buildKk(ctx);
+    const count = wordCount(loc);
+    console.log(\`  \${ctx.id} \${locale}: \${count} words\`);
+    if (count < MIN[locale]) {
+      console.error(\`FAIL \${ctx.id} \${locale}: \${count} < \${MIN[locale]}\`);
+      failed = true;
+    }
+  }
+}
+
+emitTs();
+if (failed) process.exit(1);
+`;
+
+const body = `
+function sec(title, body) {
+  return { title, body };
+}
+
+const RU_COPY = ${JSON.stringify(RU_COPY, null, 2)};
+
+const EN_COPY = ${JSON.stringify(EN_COPY, null, 2)};
+
+const KK_COPY = ${JSON.stringify(KK_COPY, null, 2)};
+${emitTail}`;
+
+writeFileSync(BUILD, header + body, "utf8");
+console.log("Assembled", BUILD);

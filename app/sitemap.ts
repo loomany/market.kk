@@ -4,6 +4,8 @@ import { getArticleByTopicId } from "@/data/seo/blogArticles";
 import { getBlogPathByLocale } from "@/lib/blog/blogResolve";
 import { platformPages } from "@/data/seo/platforms";
 import { staticSeoPages } from "@/data/seo/staticPages";
+import { audiencePages } from "@/data/seo/audiencePages";
+import { audiencePathByLocale as audienceIndexPaths } from "@/lib/seo/audiencePagePaths";
 import { useCasePages } from "@/data/seo/useCases";
 import { indexableLocales, type Locale } from "@/lib/i18n/localeConfig";
 import { shouldIndexPage } from "@/lib/seo/qualityGate";
@@ -123,6 +125,31 @@ export default function sitemap(): MetadataRoute.Sitemap {
         })
       ) {
         items.push(entry(locale, pathByLocale, 0.68));
+      }
+    }
+  }
+
+  for (const page of audiencePages) {
+    const pathByLocale = audienceIndexPaths(page);
+
+    for (const locale of indexableLocales) {
+      if (!pathByLocale[locale]) continue;
+
+      const content = page.content[locale];
+      if (
+        shouldIndexPage({
+          locale,
+          title: content.title,
+          description: content.metaDescription,
+          h1: content.h1,
+          status: content.status,
+          sectionCount: content.sections.length,
+          internalLinkCount: content.relatedLinks.length,
+          hasCanonical: true,
+          hasHreflang: true,
+        })
+      ) {
+        items.push(entry(locale, pathByLocale, 0.66));
       }
     }
   }

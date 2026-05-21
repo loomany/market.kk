@@ -3,7 +3,6 @@ import {
   ArrowRight,
   BadgeCheck,
   CheckCircle2,
-  CircleDollarSign,
   ImageIcon,
   Play,
   ShieldCheck,
@@ -15,34 +14,34 @@ import {
 } from "lucide-react";
 import type { Locale } from "@/lib/i18n/localeConfig";
 import { getLandingCopy } from "@/lib/i18n/translations";
-import {
-  MOCK_MODEL_IMAGE,
-  MOCK_PRODUCT_IMAGE,
-  MOCK_PRODUCT_SHOT_IMAGES,
-} from "@/lib/ai/mockResults";
-import { platformPages } from "@/data/seo/platforms";
+import { getPlatformById, platformPages } from "@/data/seo/platforms";
 import { useCasePages } from "@/data/seo/useCases";
 import { getPublishedBlogArticles } from "@/lib/blog/blogResolve";
+import { getAudienceChips } from "@/data/seo/audiencePages";
 import { getLocalizedPath } from "@/lib/i18n/routeSlugs";
-import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
-import { SaasFooter } from "@/components/landing/SaasFooter";
 
-const platformNames = [
-  "Kaspi",
-  "Wildberries",
-  "Ozon",
-  "eBay",
-  "Amazon",
-  "Etsy",
-  "Shopify",
-  "Instagram Shop",
-  "TikTok Shop",
-  "Facebook Marketplace",
-  "OLX",
-  "AliExpress",
-  "Temu",
-  "локальные каталоги",
-];
+const landingPlatformChipIds = [
+  "kaspi",
+  "wildberries",
+  "ozon",
+  "instagram-shop",
+  "tiktok-shop",
+  "facebook-marketplace",
+  "ebay",
+  "amazon",
+  "etsy",
+  "shopify",
+  "olx",
+] as const;
+
+const platformChipLabels: Partial<Record<(typeof landingPlatformChipIds)[number], string>> = {
+  "instagram-shop": "Instagram",
+  "tiktok-shop": "TikTok",
+  "facebook-marketplace": "Facebook",
+};
+
+const platformChipClassName =
+  "rounded-full border border-border bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-teal-200 hover:bg-teal-50 hover:text-teal-800";
 
 const featureIcons = [Shirt, BadgeCheck, Sparkles, ImageIcon, Video, Play, Wand2, Store, ShieldCheck];
 
@@ -53,49 +52,12 @@ export function SaasLanding({ locale }: { locale: Locale }) {
   const featuredPlatforms = platformPages.slice(0, 8);
 
   return (
-    <>
-      <header className="sticky top-0 z-50 border-b border-border/70 bg-white/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <Link href={`/${locale}`} className="shrink-0 text-lg font-bold tracking-tight text-slate-950">
-            Vitrina <span className="text-teal-700">AI</span>
-          </Link>
-          <nav className="hidden items-center gap-6 text-sm font-medium text-slate-600 lg:flex">
-            <a href="#features" className="hover:text-slate-950">
-              {copy.nav.features}
-            </a>
-            <a href="#audiences" className="hover:text-slate-950">
-              {copy.nav.audiences}
-            </a>
-            <a href="#platforms" className="hover:text-slate-950">
-              {copy.nav.platforms}
-            </a>
-            <Link href={`/${locale}/blog`} className="hover:text-slate-950">
-              {copy.nav.blog}
-            </Link>
-            <Link href="/studio" prefetch={false} className="hover:text-slate-950">
-              {copy.nav.studio}
-            </Link>
-          </nav>
-          <div className="flex shrink-0 items-center gap-2">
-            <LanguageSwitcher locale={locale} />
-            <Link
-              href="/studio"
-              prefetch={false}
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-sm font-semibold text-white shadow-lg shadow-teal-900/15 transition-colors hover:bg-teal-800 sm:px-4"
-            >
-              <span className="hidden sm:inline">{copy.nav.openStudio}</span>
-              <span className="sm:hidden">{copy.nav.studio}</span>
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      <main>
+    <main>
         <section className="px-4 pb-14 pt-12 sm:px-6 lg:px-8 lg:pb-16">
-          <div className="mx-auto grid max-w-7xl min-w-0 items-center gap-10 lg:grid-cols-[1.04fr_0.96fr]">
-            <div className="min-w-0 max-w-[calc(100vw-2rem)] sm:max-w-none">
-              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-teal-100 bg-teal-50 px-3 py-1.5 text-sm font-semibold text-teal-800">
+          <div className="mx-auto max-w-7xl min-w-0">
+            <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)] lg:items-center lg:gap-12">
+            <div className="min-w-0">
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-teal-100 bg-teal-50 px-3 py-1.5 text-sm font-semibold text-teal-800">
                 <Sparkles className="h-4 w-4" />
                 {copy.hero.badge}
               </div>
@@ -121,34 +83,15 @@ export function SaasLanding({ locale }: { locale: Locale }) {
                   {copy.hero.secondaryCta}
                 </a>
               </div>
-              <div className="mt-8 grid gap-3 sm:grid-cols-3">
-                {copy.cards.map((card) => (
-                  <div key={card.title} className="min-w-0 rounded-lg border border-border bg-white p-4 shadow-sm">
-                    <p className="font-semibold text-slate-950">{card.title}</p>
-                    <p className="mt-2 break-words text-sm leading-6 text-slate-600">{card.text}</p>
-                  </div>
-                ))}
-              </div>
             </div>
-
-            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-              {[
-                { title: copy.cards[0].title, src: MOCK_PRODUCT_IMAGE, label: "Input" },
-                { title: copy.cards[0].title, src: MOCK_MODEL_IMAGE, label: "Model" },
-                { title: copy.cards[1].title, src: MOCK_PRODUCT_SHOT_IMAGES[0].url, label: "Output" },
-              ].map((item) => (
-                <figure key={item.label} className="rounded-lg border border-border bg-white p-2 shadow-md">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={item.src}
-                    alt={item.title}
-                    className="aspect-[4/5] w-full rounded-md object-cover"
-                  />
-                  <figcaption className="px-1 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {item.label}
-                  </figcaption>
-                </figure>
+            <div className="flex min-w-0 flex-col gap-3">
+              {copy.cards.map((card) => (
+                <div key={card.title} className="min-w-0 rounded-lg border border-border bg-white p-4 shadow-sm">
+                  <p className="font-semibold text-slate-950">{card.title}</p>
+                  <p className="mt-2 break-words text-sm leading-6 text-slate-600">{card.text}</p>
+                </div>
               ))}
+            </div>
             </div>
           </div>
         </section>
@@ -173,27 +116,25 @@ export function SaasLanding({ locale }: { locale: Locale }) {
 
         <section id="features" className="px-4 py-14 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-7xl">
-            <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
-              <div className="max-w-3xl">
+            <div>
+              <div className="flex items-center justify-between gap-4">
                 <h2 className="text-3xl font-bold tracking-tight text-slate-950">{copy.features.title}</h2>
-                <p className="mt-3 text-lg leading-7 text-slate-600">{copy.features.intro}</p>
+                <Link
+                  href={getLocalizedPath(locale, "features")}
+                  className="shrink-0 text-sm font-semibold text-teal-700 hover:text-teal-900"
+                >
+                  {copy.nav.features} →
+                </Link>
               </div>
-              <Link href={getLocalizedPath(locale, "features")} className="text-sm font-semibold text-teal-700 hover:text-teal-900">
-                {copy.nav.features} →
-              </Link>
+              <p className="mt-3 max-w-3xl text-lg leading-7 text-slate-600">{copy.features.intro}</p>
             </div>
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {copy.features.items.map((feature, index) => {
                 const Icon = featureIcons[index] ?? CheckCircle2;
                 return (
                   <div key={feature.title} className="rounded-lg border border-border bg-white p-5 shadow-sm">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-50 text-teal-700">
-                        <Icon className="h-5 w-5" />
-                      </div>
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                        {feature.status}
-                      </span>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-50 text-teal-700">
+                      <Icon className="h-5 w-5" />
                     </div>
                     <h3 className="mt-4 text-lg font-semibold text-slate-950">{feature.title}</h3>
                     <p className="mt-2 text-sm leading-6 text-slate-600">{feature.text}</p>
@@ -211,10 +152,14 @@ export function SaasLanding({ locale }: { locale: Locale }) {
               <p className="mt-3 text-lg leading-7 text-slate-300">{copy.audiences.intro}</p>
             </div>
             <div className="flex flex-wrap gap-2.5">
-              {copy.audiences.items.map((audience) => (
-                <span key={audience} className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-slate-100">
-                  {audience}
-                </span>
+              {getAudienceChips(locale).map((chip) => (
+                <Link
+                  key={chip.id}
+                  href={chip.href}
+                  className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-slate-100 transition-colors hover:border-teal-300/60 hover:bg-teal-500/20 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-400"
+                >
+                  {chip.label}
+                </Link>
               ))}
             </div>
           </div>
@@ -222,47 +167,40 @@ export function SaasLanding({ locale }: { locale: Locale }) {
 
         <section id="platforms" className="px-4 py-14 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-7xl">
-            <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
-              <div className="max-w-3xl">
+            <div>
+              <div className="flex items-center justify-between gap-4">
                 <h2 className="text-3xl font-bold tracking-tight text-slate-950">{copy.platforms.title}</h2>
-                <p className="mt-3 text-lg leading-7 text-slate-600">{copy.platforms.intro}</p>
+                <Link
+                  href={`/${locale}/platforms`}
+                  className="shrink-0 text-sm font-semibold text-teal-700 hover:text-teal-900"
+                >
+                  {copy.nav.platforms} →
+                </Link>
               </div>
-              <Link href={`/${locale}/platforms`} className="text-sm font-semibold text-teal-700 hover:text-teal-900">
-                {copy.nav.platforms} →
-              </Link>
+              <p className="mt-3 max-w-3xl text-lg leading-7 text-slate-600">{copy.platforms.intro}</p>
             </div>
             <div className="mt-8 flex flex-wrap gap-2.5">
-              {platformNames.map((name) => (
-                <span key={name} className="rounded-full border border-border bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">
-                  {name}
-                </span>
-              ))}
-            </div>
-            <p className="mt-5 max-w-4xl text-sm leading-6 text-slate-500">{copy.platforms.disclaimer}</p>
-          </div>
-        </section>
-
-        <section className="border-y border-border/70 bg-white px-4 py-14 sm:px-6 lg:px-8">
-          <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-2">
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-amber-950">
-              <ShieldCheck className="h-7 w-7 text-amber-700" />
-              <h2 className="mt-4 text-2xl font-bold tracking-tight">{copy.trust.title}</h2>
-              <ul className="mt-5 space-y-3">
-                {copy.trust.items.map((item) => (
-                  <li key={item} className="flex gap-3 text-sm leading-6">
-                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="rounded-lg border border-teal-100 bg-teal-50 p-6 text-teal-950">
-              <CircleDollarSign className="h-7 w-7 text-teal-700" />
-              <h2 className="mt-4 text-2xl font-bold tracking-tight">{copy.modes.title}</h2>
-              <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                <p className="rounded-lg bg-white p-4 text-sm leading-6 shadow-sm">{copy.modes.demo}</p>
-                <p className="rounded-lg bg-white p-4 text-sm leading-6 shadow-sm">{copy.modes.real}</p>
-              </div>
+              {landingPlatformChipIds.map((id) => {
+                const page = getPlatformById(id);
+                if (!page) return null;
+                const label = platformChipLabels[id] ?? page.name;
+                return (
+                  <Link
+                    key={id}
+                    href={`/${locale}/platforms/${page.content[locale].slug}`}
+                    className={platformChipClassName}
+                  >
+                    {label}
+                  </Link>
+                );
+              })}
+              <Link href={`/${locale}/platforms`} className={platformChipClassName}>
+                {locale === "ru"
+                  ? "локальные каталоги"
+                  : locale === "kk"
+                    ? "жергілікті каталогтар"
+                    : "local catalogs"}
+              </Link>
             </div>
           </div>
         </section>
@@ -292,63 +230,7 @@ export function SaasLanding({ locale }: { locale: Locale }) {
             />
           </div>
         </section>
-
-        <section className="bg-slate-950 px-4 py-14 text-white sm:px-6 lg:px-8">
-          <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-6 md:flex-row md:items-center">
-            <div className="max-w-3xl">
-              <h2 className="text-3xl font-bold tracking-tight">{copy.finalCta.title}</h2>
-              <p className="mt-3 text-lg leading-7 text-slate-300">{copy.finalCta.text}</p>
-            </div>
-            <Link
-              href="/studio"
-              prefetch={false}
-              className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-white px-6 text-base font-semibold text-slate-950 transition-colors hover:bg-teal-50"
-            >
-              {copy.finalCta.button}
-              <ArrowRight className="h-5 w-5" />
-            </Link>
-          </div>
-        </section>
-      </main>
-
-      <SaasFooter
-        locale={locale}
-        copy={copy}
-        productLinks={[
-          { label: copy.nav.openStudio, href: "/studio" },
-          { label: copy.nav.features, href: `/${locale}/features` },
-          {
-            label: locale === "ru" ? "Кратко для AI" : "AI summary",
-            href: `/${locale}/ai-summary`,
-          },
-        ]}
-        useCaseLinks={featuredUseCases.slice(0, 4).map((page) => ({
-          label: page.content[locale].h1,
-          href: `/${locale}/use-cases/${page.content[locale].slug}`,
-        }))}
-        platformLinks={featuredPlatforms.slice(0, 4).map((page) => ({
-          label: page.name,
-          href: `/${locale}/platforms/${page.content[locale].slug}`,
-        }))}
-        resourceLinks={[
-          {
-            label: locale === "ru" ? "Как работает" : locale === "kk" ? "Қалай жұмыс істейді" : "How it works",
-            href: `/${locale}/how-it-works`,
-          },
-          {
-            label: locale === "ru" ? "Качество AI" : locale === "kk" ? "AI сапасы" : "AI quality",
-            href: `/${locale}/quality`,
-          },
-          { label: "FAQ", href: `/${locale}/faq` },
-          { label: copy.nav.blog, href: `/${locale}/blog` },
-          {
-            label: locale === "ru" ? "Тарифы" : locale === "kk" ? "Тарифтер" : "Pricing",
-            href: `/${locale}/cost`,
-          },
-          { label: "llms.txt", href: "/llms.txt" },
-        ]}
-      />
-    </>
+    </main>
   );
 }
 

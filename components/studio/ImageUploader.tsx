@@ -4,6 +4,8 @@ import { useState } from "react";
 import { ImagePlus, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatFileSize } from "@/lib/ai/clientImageValidation";
+import { formatStudioString } from "@/lib/studio/i18n";
+import { useStudioCopy } from "./StudioLocaleContext";
 
 type ImageUploaderProps = {
   label: string;
@@ -24,6 +26,8 @@ export function ImageUploader({
   onClearFile,
   className,
 }: ImageUploaderProps) {
+  const { copy } = useStudioCopy();
+  const u = copy.imageUploader;
   const [dragActive, setDragActive] = useState(false);
   const canUploadFile = Boolean(onFileSelect);
 
@@ -40,8 +44,7 @@ export function ImageUploader({
       </div>
 
       <div className="rounded-[18px] border border-teal-100 bg-teal-50/60 px-3 py-2 text-xs leading-5 text-teal-950">
-        JPEG, PNG или WEBP до 10MB. Файл не сохраняется у нас и временно
-        передаётся в облачный AI-сервис только для обработки.
+        {u.formatsHint}
       </div>
 
       {canUploadFile && (
@@ -72,7 +75,7 @@ export function ImageUploader({
         >
           <Upload className="mb-3 h-7 w-7 text-teal-700" />
           <span className="text-sm font-semibold text-slate-800">
-            Выберите файл или перетащите его сюда
+            {u.dropzone}
           </span>
           <input
             type="file"
@@ -106,7 +109,7 @@ export function ImageUploader({
               type="button"
               onClick={onClearFile}
               className="shrink-0 rounded-[12px] p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
-              aria-label="Очистить выбранный файл"
+              aria-label={u.clearFileAria}
             >
               <X className="h-4 w-4" />
             </button>
@@ -119,7 +122,7 @@ export function ImageUploader({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={previewUrl}
-            alt={`Предпросмотр: ${label}`}
+            alt={formatStudioString(u.previewAlt, { label })}
             className="max-h-[320px] min-h-[180px] w-full object-contain"
           />
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowDown, ArrowRight } from "lucide-react";
+import { useStudioCopy } from "./StudioLocaleContext";
 
 type BeforeAfterPreviewProps = {
   beforeUrl?: string | null;
@@ -11,18 +12,22 @@ export function BeforeAfterPreview({
   beforeUrl,
   afterUrl,
 }: BeforeAfterPreviewProps) {
+  const { copy } = useStudioCopy();
+
   if (!beforeUrl && !afterUrl) {
     return null;
   }
 
+  const b = copy.beforeAfter;
+
   return (
     <div className="space-y-3">
-      <h3 className="text-sm font-semibold text-slate-950">До / После</h3>
+      <h3 className="text-sm font-semibold text-slate-950">{b.title}</h3>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <PreviewSlot label="До" url={beforeUrl} />
+        <PreviewSlot label={b.before} url={beforeUrl} />
         <ArrowDown className="mx-auto h-5 w-5 shrink-0 text-slate-400 sm:hidden" />
         <ArrowRight className="hidden h-5 w-5 shrink-0 text-slate-400 sm:block" />
-        <PreviewSlot label="После" url={afterUrl} />
+        <PreviewSlot label={b.after} url={afterUrl} />
       </div>
     </div>
   );

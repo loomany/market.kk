@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { Select } from "@/components/ui/Select";
 import { MODEL_PARAM_CUSTOM } from "@/lib/ai/modelCustomParams";
 import {
@@ -13,31 +13,7 @@ import {
   hintForAspectRatioOption,
 } from "@/components/studio/AspectRatioSelectField";
 import type { ProductShotScenePreset, ProductShotSettings } from "./types";
-
-const MARKETPLACE_SCENE_HELP =
-  "Стандартная карточка для Kaspi, Wildberries и Ozon: ровный нейтральный фон, товар остаётся как на вашем фото — меняется только подложка, без декора и без перекраски изделия.";
-
-const SCENE_PRESETS: {
-  id: Exclude<ProductShotScenePreset, typeof MODEL_PARAM_CUSTOM>;
-  label: string;
-  hint: string;
-}[] = [
-  {
-    id: "marketplace-clean",
-    label: "Маркетплейс",
-    hint: MARKETPLACE_SCENE_HELP,
-  },
-  {
-    id: "white-studio",
-    label: "Белый фон",
-    hint: "Чистый белый фон — универсальный вариант для карточки.",
-  },
-  {
-    id: "light-gray-studio",
-    label: "Светло-серый фон",
-    hint: "Мягкий серый фон — чуть мягче белого, всё ещё нейтрально.",
-  },
-];
+import { useStudioCopy } from "./StudioLocaleContext";
 
 type ProductShotSettingsPanelProps = {
   settings: ProductShotSettings;
@@ -79,6 +55,36 @@ export function ProductShotSettingsPanel({
   settings,
   onChange,
 }: ProductShotSettingsPanelProps) {
+  const { copy } = useStudioCopy();
+  const ps = copy.productShot;
+  const f = copy.form;
+
+  const scenePresets = useMemo(
+    () =>
+      [
+        {
+          id: "marketplace-clean" as const,
+          label: ps.sceneMarketplace,
+          hint: ps.marketplaceHelp,
+        },
+        {
+          id: "white-studio" as const,
+          label: ps.sceneWhite,
+          hint: ps.sceneWhiteHint,
+        },
+        {
+          id: "light-gray-studio" as const,
+          label: ps.sceneGray,
+          hint: ps.sceneGrayHint,
+        },
+      ] satisfies {
+        id: Exclude<ProductShotScenePreset, typeof MODEL_PARAM_CUSTOM>;
+        label: string;
+        hint: string;
+      }[],
+    [ps]
+  );
+
   const patch = (partial: Partial<ProductShotSettings>) =>
     onChange({ ...settings, ...partial });
 
@@ -99,37 +105,29 @@ export function ProductShotSettingsPanel({
 
   const sceneDescription =
     scenePreset === "marketplace-clean"
-      ? MARKETPLACE_SCENE_HELP
-      : hintForOption(SCENE_PRESETS, scenePreset);
+      ? ps.marketplaceHelp
+      : hintForOption(scenePresets, scenePreset);
 
   const aspectRatioDescription = aspectRatio
     ? hintForAspectRatioOption(PRODUCT_SHOT_ASPECT_RATIO_OPTIONS, aspectRatio)
-    : "Формат кадра для карточки.";
+    : ps.aspectFallback;
 
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-sm font-semibold text-slate-950">
-          Настройки товарной карточки
-        </h3>
-        <p className="mt-1 text-xs leading-5 text-slate-600">
-          Точная карточка для маркетплейсов: фон меняется, товар остаётся как на
-          фото.
-        </p>
+        <h3 className="text-sm font-semibold text-slate-950">{ps.title}</h3>
+        <p className="mt-1 text-xs leading-5 text-slate-600">{ps.subtitle}</p>
       </div>
 
       <div className="space-y-2">
-        <SettingField
-          label="Фон карточки"
-          description={sceneDescription}
-        >
+        <SettingField label={ps.backgroundLabel} description={sceneDescription}>
           <div className="space-y-2">
             <Select
               triggerClassName="rounded-[12px] font-medium"
-              placeholder="Выберите фон"
+              placeholder={f.selectBackground}
               menuMatchTriggerWidth
               value={scenePreset}
-              options={SCENE_PRESETS.map((opt) => ({
+              options={scenePresets.map((opt) => ({
                 value: opt.id,
                 label: opt.label,
                 triggerLabel: opt.label,

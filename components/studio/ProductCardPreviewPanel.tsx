@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { FalModelAspectRatio } from "@/lib/ai/modelOutputSizes";
 import {
   previewAspectFromFal,
@@ -11,17 +11,9 @@ import {
   StudioPreviewResultColumnHeader,
   StudioPreviewTabBar,
 } from "./StudioSaaSPreviewChrome";
+import { useStudioCopy } from "./StudioLocaleContext";
 
 export type ProductCardPreviewTabId = "product" | "result";
-
-const DESKTOP_PRODUCT_TABS: { id: "product"; label: string }[] = [
-  { id: "product", label: "Товар" },
-];
-
-const MOBILE_TABS: { id: ProductCardPreviewTabId; label: string }[] = [
-  { id: "product", label: "Товар" },
-  { id: "result", label: "Итог" },
-];
 
 type ProductCardSaaSPreviewLayoutProps = {
   previewAspect: PreviewAspectState;
@@ -38,7 +30,22 @@ export function ProductCardSaaSPreviewLayout({
   productPanel,
   resultPanel,
 }: ProductCardSaaSPreviewLayoutProps) {
+  const { copy } = useStudioCopy();
+  const pc = copy.productCard;
   const [activeTab, setActiveTab] = useState<ProductCardPreviewTabId>("product");
+
+  const desktopProductTabs = useMemo(
+    () => [{ id: "product" as const, label: pc.tabProduct }],
+    [pc.tabProduct]
+  );
+  const mobileTabs = useMemo(
+    () => [
+      { id: "product" as const, label: pc.tabProduct },
+      { id: "result" as const, label: pc.tabResult },
+    ],
+    [pc.tabProduct, pc.tabResult]
+  );
+
   const tabReady: Record<ProductCardPreviewTabId, boolean> = {
     product: productReady,
     result: resultReady,
@@ -49,17 +56,17 @@ export function ProductCardSaaSPreviewLayout({
       <div className="hidden w-full max-w-[656px] items-start gap-4 lg:flex">
         <div className="w-[320px] shrink-0">
           <StudioPreviewTabBar
-            tabs={DESKTOP_PRODUCT_TABS}
+            tabs={desktopProductTabs}
             activeTab="product"
             tabReady={{ product: productReady }}
             onTabChange={() => {}}
             aspectLabel={previewAspect.badge}
-            ariaLabel="Товарная карточка"
+            ariaLabel={pc.ariaProductCard}
           />
           <div role="tabpanel">{productPanel}</div>
         </div>
 
-        <div className="w-[320px] shrink-0" aria-label="Результат генерации">
+        <div className="w-[320px] shrink-0" aria-label={pc.ariaResult}>
           {!resultReady ? (
             <StudioPreviewResultColumnHeader aspectLabel={previewAspect.badge} />
           ) : null}
@@ -69,13 +76,13 @@ export function ProductCardSaaSPreviewLayout({
 
       <div className="flex w-full flex-col max-lg:-mx-4 max-lg:w-[calc(100%+2rem)] lg:hidden">
         <StudioPreviewTabBar
-          tabs={MOBILE_TABS}
+          tabs={mobileTabs}
           activeTab={activeTab}
           tabReady={tabReady}
           onTabChange={setActiveTab}
           aspectLabel={previewAspect.badge}
           fullWidth
-          ariaLabel="Товарная карточка"
+          ariaLabel={pc.ariaProductCard}
         />
         <div role="tabpanel" className="w-full min-w-0">
           {activeTab === "product" ? productPanel : resultPanel}

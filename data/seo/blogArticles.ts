@@ -4,6 +4,7 @@ import { enBlogStage4Legacy } from "./enBlogStage4LegacyContent";
 import { enBlogStage3P0 } from "./enBlogStage3Content";
 import { enBlogStage11Wave2 } from "./enBlogStage11Wave2";
 import { kkBlogStage5P0 } from "./kkBlogStage5Content";
+import { kkBlogStage13Wave2 } from "./kkBlogStage13Wave2";
 import { ruBlogExpanded, ruBlogNewP0 } from "./ruBlogStage2Content";
 import { ruBlogStage11Wave2 } from "./ruBlogStage11Wave2";
 
@@ -106,6 +107,18 @@ function applyStage3En(articles: BlogArticle[]): BlogArticle[] {
 function applyStage5Kk(articles: BlogArticle[]): BlogArticle[] {
   return articles.map((article) => {
     const kk = kkBlogStage5P0[article.topicId];
+    if (!kk) return article;
+    return {
+      ...article,
+      updatedAt: "2026-05-20",
+      content: { ...article.content, kk },
+    };
+  });
+}
+
+function applyStage13KkWave2(articles: BlogArticle[]): BlogArticle[] {
+  return articles.map((article) => {
+    const kk = kkBlogStage13Wave2[article.topicId];
     if (!kk) return article;
     return {
       ...article,
@@ -546,10 +559,12 @@ const baseBlogArticles: BlogArticle[] = [
   },
 ];
 
-export const blogArticles = applyStage11Wave2En(
-  applyStage11Wave2Ru(
-    applyStage5Kk(
-      applyStage4LegacyEn(applyStage3En(applyStage2Ru(baseBlogArticles)))
+export const blogArticles = applyStage13KkWave2(
+  applyStage11Wave2En(
+    applyStage11Wave2Ru(
+      applyStage5Kk(
+        applyStage4LegacyEn(applyStage3En(applyStage2Ru(baseBlogArticles)))
+      )
     )
   )
 );

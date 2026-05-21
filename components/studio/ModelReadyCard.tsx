@@ -7,6 +7,8 @@ import {
   type PreviewCarouselItem,
 } from "@/components/studio/PreviewImageCarousel";
 import { downloadImageFile, previewImageFilename } from "@/lib/studio/downloadImages";
+import { formatStudioString } from "@/lib/studio/i18n";
+import { useStudioCopy } from "./StudioLocaleContext";
 
 type ModelReadyCardProps = {
   previewItems: PreviewCarouselItem[];
@@ -29,6 +31,8 @@ export function ModelReadyCard({
   onLockForAllViews,
   onStartOver,
 }: ModelReadyCardProps) {
+  const { copy } = useStudioCopy();
+  const m = copy.modelReady;
   const hasMultiple = previewItems.length > 1;
   const singleItem = previewItems[0];
 
@@ -36,8 +40,8 @@ export function ModelReadyCard({
     <div className="overflow-hidden rounded-[16px] border border-slate-200/90 bg-white shadow-sm">
       <p className="px-3 pb-2 pt-3 text-xs font-semibold text-slate-500">
         {hasMultiple
-          ? `Готовые ракурсы (${previewItems.length})`
-          : "Готовый вариант"}
+          ? formatStudioString(m.anglesTitle, { count: previewItems.length })
+          : m.singleTitle}
       </p>
       <div className="flex min-h-[220px] flex-col border-t border-border bg-slate-50">
         {hasMultiple ? (
@@ -50,7 +54,7 @@ export function ModelReadyCard({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={singleItem.url}
-              alt="Сгенерированная AI-модель"
+              alt={m.alt}
               className="max-h-[460px] min-h-[200px] w-full rounded-[12px] object-contain"
             />
             <Button
@@ -66,7 +70,7 @@ export function ModelReadyCard({
               }
             >
               <Download className="h-4 w-4" />
-              Скачать
+              {copy.editorActions.download}
             </Button>
           </div>
         ) : null}
@@ -80,12 +84,12 @@ export function ModelReadyCard({
             className="w-full"
             onClick={onLockForAllViews}
           >
-            Закрепить для всех ракурсов
+            {m.lockForAll}
           </Button>
         ) : null}
         {identityLocked ? (
           <p className="rounded-[10px] border border-teal-200 bg-teal-50/80 px-3 py-2 text-xs leading-5 text-teal-950">
-            Модель закреплена — при смене фото товара лицо и образ не меняются.
+            {m.lockedHint}
           </p>
         ) : null}
         <Button
@@ -99,10 +103,10 @@ export function ModelReadyCard({
           {isSaved ? (
             <>
               <Check className="h-4 w-4" />
-              Модель сохранена
+              {m.saved}
             </>
           ) : (
-            "Сохранить модель"
+            m.save
           )}
         </Button>
         <Button
@@ -113,7 +117,7 @@ export function ModelReadyCard({
           onClick={onStartOver}
         >
           <RotateCcw className="h-4 w-4" />
-          Заменить модель
+          {m.replace}
         </Button>
       </div>
     </div>

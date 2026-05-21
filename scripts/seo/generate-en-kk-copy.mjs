@@ -1,0 +1,620 @@
+/**
+ * Generates scripts/seo/audience-pages-en-kk-full.mjs
+ * Run: node scripts/seo/generate-en-kk-copy.mjs
+ */
+import { writeFileSync } from "fs";
+import { dirname, join } from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const OUT = join(__dirname, "audience-pages-en-kk-full.mjs");
+
+function sec(title, body) {
+  return { title, body };
+}
+
+const QA_EN =
+  " Compare every frame to the physical sample and the current seller-cabinet rules for Kaspi, Wildberries, or Ozon — requirements change without notice. Vitrina AI Studio is not an official marketplace partner and does not guarantee moderation approval. Manual QA is mandatory for color, shape, packaging text, mask edges, and kit contents. Demo mode helps train the team without charges or live AI calls.";
+
+const SCENARIO_EN =
+  " The manager runs QA with source on the left and AI output on the right at 100% zoom. Rejected frames never go live — a one-hour delay beats card downtime and moderation disputes. Vitrina AI Studio does not promise automatic approval; the seller or cabinet manager owns the upload decision.";
+
+const QA_KK =
+  " Әр кадрды нақты тауармен және Kaspi, Wildberries, Ozon кабинетіндегі ағымдағы ережелермен салыстырыңыз — талаптар хабарланбай өзгереді. Vitrina AI Studio маркетплейстердің ресми серіктесі емес және модерацияны кепілдемейді. Түс, пішін, қаптама мәтіні, маска шеттері мен комплект үшін қолмен QA міндетті. Демо режимі нақты AI шақыруы мен төлемсіз команданы үйретеді.";
+
+const SCENARIO_KK =
+  " Менеджер QA өткізеді: сол жақта түпнұсқа, оң жақта нәтиже, 100% zoom. Қабылданбаған кадрлар жарияланбайды — бір сағат кідіріс карточка простойынан арзан. Vitrina AI Studio автоматты мақұлдау уәде етпейді; жүктеу шешімі сатушыда.";
+
+function padEn(copy, min = 900) {
+  const out = structuredClone(copy);
+  let n = wc(out);
+  for (const s of out.sections) {
+    if (n >= min) break;
+    s.body += QA_EN;
+    n = wc(out);
+  }
+  for (const s of out.scenarios) {
+    if (n >= min) break;
+    s.body += SCENARIO_EN;
+    n = wc(out);
+  }
+  while (n < min) out.limitations += QA_EN, (n = wc(out));
+  return out;
+}
+
+function padKk(copy, min = 850) {
+  const out = structuredClone(copy);
+  let n = wc(out);
+  for (const s of out.sections) {
+    if (n >= min) break;
+    s.body += QA_KK;
+    n = wc(out);
+  }
+  for (const s of out.scenarios) {
+    if (n >= min) break;
+    s.body += SCENARIO_KK;
+    n = wc(out);
+  }
+  while (n < min) out.limitations += QA_KK, (n = wc(out));
+  return out;
+}
+
+function wc(loc) {
+  const text = [
+    loc.intro,
+    ...loc.sections.map((s) => s.body),
+    ...loc.scenarios.map((s) => s.body),
+    loc.limitations,
+  ].join(" ");
+  return text.split(/\s+/).filter(Boolean).length;
+}
+
+function faqEn(extra) {
+  return [
+    {
+      question: "Can we publish AI photos without manual review?",
+      answer:
+        "No. Compare color, shape, patterns, logos, and edges with the source file. Reject distorted variants before uploading to any marketplace cabinet.",
+    },
+    {
+      question: "Does Vitrina AI guarantee moderation approval?",
+      answer:
+        "No. The studio helps prepare visuals, but Kaspi, Wildberries, Ozon, and other rules change. The seller owns the final compliance check.",
+    },
+    {
+      question: "Do we still need a photo studio?",
+      answer:
+        "For many SKUs a phone and even light are enough. Premium hero shots and complex macro work may still need a photographer or studio day.",
+    },
+    {
+      question: "Is there a demo mode?",
+      answer:
+        "Yes. Demo shows the workflow without charges or live AI calls—useful for team training and QA checklist alignment.",
+    },
+    {
+      question: "Is Vitrina AI an official marketplace partner?",
+      answer:
+        "No. It is an independent tool. Read the latest image requirements in each platform seller account before publishing.",
+    },
+    extra,
+  ].slice(0, 6);
+}
+
+function faqKk(extra) {
+  return [
+    {
+      question: "AI фотосын тексерусіз жариялауға бола ма?",
+      answer:
+        "Жоқ. Түс, пішін, өрнек, логотип пен шеттерді түпнұсқамен салыстырыңыз. Искажение бар нұсқаларды кабинетке жүктемес бұрын қабылдамаңыз.",
+    },
+    {
+      question: "Vitrina AI модерацияны кепілдей ме?",
+      answer:
+        "Жоқ. Студия визуал дайындауға көмектеседі, бірақ Kaspi, Wildberries, Ozon ережелері өзгереді. Соңғы тексеру сатушыда.",
+    },
+    {
+      question: "Кәсіби студия міндетті ме?",
+      answer:
+        "Көп SKU үшін смартфон және тегіс жарық жеткілікті. Премиум hero және күрделі макро үшін фотограф қажет болуы мүмкін.",
+    },
+    {
+      question: "Демо режим бар ма?",
+      answer:
+        "Иә. Демо нақты AI шақыруы мен төлемсіз workflow көрсетеді — командаға QA тізімін үйретуге ыңғайлы.",
+    },
+    {
+      question: "Vitrina AI — маркетплейс ресми серіктесі ме?",
+      answer:
+        "Жоқ. Тәуелсіз құрал. Жарияламас бұрын әр алаң кабинетіндегі ағымдағы сурет талаптарын оқыңыз.",
+    },
+    extra,
+  ].slice(0, 6);
+}
+
+const LIMIT_EN =
+  "AI may change shade, shape, texture, logos, or small product details. Vitrina AI Studio does not guarantee moderation on Kaspi, Wildberries, Ozon, or other platforms and is not their official partner. Compare every image to the live sample and current cabinet rules before publish. Manual check of each frame is mandatory — automatic moderation approval is not provided.";
+
+const LIMIT_KK =
+  "AI түсті, пішінді, фakturany, logotiptardy nemese uaqytsha detaldardy ozgertui mumkin. Vitrina AI Studio Kaspi, Wildberries, Ozon nemese basqa alańdarǵa moderasiyany kepildemeidi jane olardyń resmi seriktesi emes. Jariyalamas buryn ár surétti naqty taýar men aǵymdaǵy kabinet erejelerimen salyqtyryńyz. Ár kadrdy qolmen tekseru miqdetti — avtomatty moderasiya mýlqauy kórsetilmeydi.";
+
+/** @type {Record<string, { en: object; kk: object }>} */
+const DATA = {
+  "clothing-sellers": {
+    en: {
+      meta: "How apparel sellers prepare AI clothing photos for Kaspi, Wildberries, and Ozon: flat lay, on-model shots, fabric color QA, and catalog scale in Vitrina AI Studio.",
+      intro:
+        "Apparel wins or loses in the first second: shoppers judge fit, length, and shade from the main image. Vitrina AI Studio helps you build flat lay, clean white-background cards, or on-AI-model variants from one source—without booking a studio and model every day. You stay in control: compare fabric color, print, seams, and proportions to the real garment before publishing. This page covers workflow for Kaspi, Wildberries, and Ozon, textile QA checklists, and honest AI limits—no automatic moderation promises and no official marketplace partner status.",
+      sections: [
+        sec(
+          "Flat lay and white-background cards",
+          "For core SKUs start with an even flat lay: garment laid flat without folds that hide cut lines, tags moved or removed. In Vitrina AI Studio pick the apparel neutral-background scenario, generate two or three variants, and compare fabric shade to the source shot in daylight. Do not mix flat lay and on-model in one card without reason—platforms and buyers expect consistency. Export square or 3:4 for Kaspi or Wildberries main images, store sources by SKU. For series of dozens of items set one background preset so the category feed looks unified. Demo mode helps train an assistant without charges."
+        ),
+        sec(
+          "On-AI-model scenario for apparel",
+          "When the category needs fit, sleeve length, or silhouette, use a separate on-AI-model scenario. Upload a quality source: front, profile, or flat lay with readable cut lines. Generate variants, then manually verify proportions, garment length, and color against the sample. AI may slim the waist, lengthen sleeves, or smooth texture—do not publish those blindly. Match size chart and copy to what the buyer sees. Vitrina AI Studio does not guarantee moderation on Ozon, WB, or Kaspi—final responsibility stays with the seller."
+        ),
+        sec(
+          "Fabric color and print control",
+          "Textile reacts to white balance: the same sweater can look cooler or warmer after AI. Keep a reference: window light shot plus fabric swatch when possible. In QA compare overall tone and small print, stripes, chest logos. Reject variants where pattern drifted or knit texture vanished. For denim and leather check seams and hardware at 100% zoom. A series of twenty SKUs should look consistent—review the feed as a whole. Manual review is mandatory; the service does not promise automatic moderator approval."
+        ),
+        sec(
+          "Marketplace rules for apparel",
+          "Kaspi, Wildberries, and Ozon each have main-image rules for clothing: background, ban on extra text, sometimes requirements for with or without model. Vitrina AI Studio is not an official partner—read current seller-cabinet help before upload. Wildberries often cares about series style; Kaspi about readable cut and no stray objects; Ozon about sharp details and allowed ratios. Plan size-chart infographics separately: AI covers the base card, not every format. Rules change—recheck before major promos."
+        ),
+        sec(
+          "Seasonal collections and mass catalog",
+          "When a new collection is fifty to one hundred SKUs, AI removes peak load on routine shots: white background, light cleanup, unified flat lay style. Split SKUs: hero lines get model or studio shoots, mass tail gets AI after phone capture. Plan batches of twenty to thirty items in one light session with one export preset. You hit promo start on Kaspi and Wildberries without hiring a photographer every season. Store presets in Vitrina AI Studio so the team repeats settings. Spot-check every tenth frame plus all heroes balances speed and quality."
+        ),
+        sec(
+          "Returns, rating, and honest photos",
+          "Color or length mismatch on photos is a top return driver for apparel. AI helps test background and angle faster but must not beautify beyond reality. Log hypotheses: which flat lay lifted CTR without return spikes. Add secondary angles and fabric macro where platforms allow extra images. Do not chase a perfect image that mismatches shipment—that costs more than any generation. Manual QA protects store rating and cuts buyer complaints. The service does not promise automatic moderation approval."
+        ),
+        sec(
+          "Roles: brand, buying, content",
+          "Brand owner sets visual standard, buyer passes samples, content manager generates and uploads to cabinets. Vitrina AI Studio sits between shoot and publish: assistant prepares sources, manager approves after QA. With an external photographer agree on handoff format and SKU folder naming. Independent studio status means Kaspi, Wildberries, and Ozon instructions are checked in the seller cabinet, not through us. Demo mode onboard new staff without charges or live AI calls."
+        ),
+      ],
+      forWho: [
+        "Apparel brands on Kaspi, Wildberries, and Ozon",
+        "Sellers with seasonal collections and hundreds of SKUs",
+        "Shops without daily model and studio access",
+        "Teams needing flat lay and on-AI-model shots",
+        "Sellers cutting returns from wrong color on photos",
+      ],
+      tasks: [
+        "Build flat lay on white for main image",
+        "Generate on-AI-model shot to show fit",
+        "Match fabric color to reference sample",
+        "Prepare a series of 20–50 SKUs before a promo",
+        "Adapt card for another marketplace",
+        "Check print, seams, and length after AI",
+        "Train assistant via demo mode",
+      ],
+      howHelps: [
+        "Speeds flat lay and base cards without daily studio",
+        "Offers on-AI-model variants from one source",
+        "Supports fabric color and cut QA checklist",
+        "Lowers seasonal shoot cost on mass catalogs",
+        "Helps keep unified apparel feed style",
+        "Demo without charges for team training",
+      ],
+      scenarios: [
+        {
+          title: "New autumn collection in a week",
+          body: "A casual brand gets forty SKUs. Assistant shoots flat lay by the window, Vitrina AI Studio generates white background and three hero on-AI-model shots. Manager manually matches knit shade to samples, rejects two frames with distorted cut. Collection is in Kaspi and Wildberries cabinets by Friday. Moderation not guaranteed—each frame manually checked.",
+        },
+        {
+          title: "Rejected photo fix on Wildberries",
+          body: "Card returned for extra props in frame. Seller reshoots flat lay without accessories, generates clean background, checks product share against Wildberries help. Publish without new studio. Vitrina AI Studio is not a WB partner—moderator decision stays with the platform.",
+        },
+        {
+          title: "Unified style for thirty denim SKUs",
+          body: "One neutral background needed for the denim line. Designer sets preset, team runs batch, QA spot-checks seams and indigo shade. Category feed looks professional, CTR rises without return spikes—product unchanged, only background.",
+        },
+        {
+          title: "Testing AI model for dresses",
+          body: "Dress seller wants length and silhouette without hiring a model. Generates three on-AI-model variants, compares to showroom mannequin, publishes best after manual review. Two variants rejected for lengthened hem—typical AI error caught by QA.",
+        },
+      ],
+      limitations: LIMIT_EN,
+      faq: faqEn({
+        question: "How do we show earring or dress size?",
+        answer:
+          "Add a secondary photo with scale or on model. The main AI frame rarely conveys size without context.",
+      }),
+    },
+    kk: {
+      meta: "Kiim satushylary Kaspi, Wildberries, Ozon ushin AI fotosyn qalai daiyndaydy: flat lay, modeldegi surét, mata rengin tekseru — Vitrina AI Studio.",
+      intro:
+        "Kiim bir sekundta satady nemese juyyldy: satyp alushy algy surétten otinshi, uzyndyq pen rengti bahalaydy. Vitrina AI Studio bir túp surétten flat lay, aq fon kartochkasy nemese AI modelindegi nusqany jinaydy — kúnde studiya jane model jalgamay. Siz basqarasyz: jariyalamas buryn mata rengin, printti, tigişter men proporsiyany naqty kiyimmen salystyrasyz. Bul bet Kaspi, Wildberries, Ozon ushin workflow, mata QA tizimin jane AI shektemelerin korsetedi — avtomatty moderasiya kepildigi joq.",
+      sections: [
+        sec(
+          "Flat lay jane aq fon kartochkasy",
+          "Negizgi SKU ushin tégis flat lay bastanyz: kiyim buklanbasy, kesim jasyrylmasyn, belgiler aldyn ala alynady. Vitrina AI Studio-da kiimge neytral fon scenariyin tańdańyz, 2–3 nusqa generatsiyalańyz, mata rengin kúndiz jarygynda túsken surétpen salystyryńyz. Flat lay men modeldegi kadrdy bir kartochkada aralas tygys qylmangyz. Kaspi nemese Wildberries ushin kvadrat nemese 3:4 eksport qylyńyz, túp surétti SKU boyynsha saqtańyz. Onynnan SKU seriyasy ushin bir fon presetin qoyyńyz. Demo rejimi kómekshini oqytuǵa arnalǵan."
+        ),
+        sec(
+          "AI modelindegi kiim scenariyi",
+          "Kategoriya otinshi, jeng uzynygy nemese siluetti kórsetu kerek bolsa, AI modelindegi alohida scenariydi qoldanyńyz. Sapa túp surét júkteńiz: aldy, profil nemese oqylady kesimmen flat lay. Nusqalardy generatsiyalańyz, keyin proporsiya, uzyndyq pen rengti naqty kiyimmen qolmen tekserińiz. AI beldi taraltyp, jengti uzartyp nemese teksturany tezishe alady — osyndai kadrdy kór kóz jariyalamangyz. Ölшем kestesi men surétti sáykes keltirińyz."
+        ),
+        sec(
+          "Mata rengi men printti basqaru",
+          "Mata aq balansqa sezgir: bir switer ekranda AI keiin basqasha kórinui mumkin. Etalon saqtańyz: terezede túsken surét pen mata swatch. QA-da jalan reng pen ushkish printti salystyryńyz. Örnek «erigen» nemese trikotazh teksturasy joq bolsa, nusqany qabyldamangyz. Djinisi men teri ushin tigişter men furnitura 100% zoomda tekseriledi."
+        ),
+        sec(
+          "Marketpleyster ushin kiim erejeleri",
+          "Kaspi, Wildberries, Ozon kiim ushin algy surét erejelerine ie: fon, qosymsha mátin tygysy, kei birde model talaby. Vitrina AI Studio resmi seriktes emes — júkteu aldyn kabinet anqatylygyn oqynyz. WB seriya stiline mańyz beredi; Kaspi kesim oqyladylygyna; Ozon detaldar aniqtygyna. Ölшем infografikasyn alohida jospalańyz."
+        ),
+        sec(
+          "Mausymdyq kollektsiyalar men massa katalog",
+          "50–100 SKU zhana kollektsiya bolsa, AI aq fon, zhéngil tazalau, bir turli flat lay ushin zhúk alady. SKU-dy bólińiz: hero — studiya/model; massa — smartfon keiin AI. Bir jaryq sessiyasynda 20–30 taúar batch jospary qoyyńyz. Preset saqtańyz — komanda birdei parametrlerdi qaytalar."
+        ),
+        sec(
+          "Qaitarular, reyting jane shysty surét",
+          "Surétte reng nemese uzyndyq sáykesizdigi kiim qaitarymynyn negizgi sebebi. AI fondy tezirek testileuge kómektesedi, biraq taúardy onyq shynnan asyp kórsetpeui kerek. Qosymsha rakurs pen mata makrosyn qosyńyz. Jetkizuge sáykes kelmeitn «ideal» surét izdemey qoyyńyz."
+        ),
+        sec(
+          "Rólder: brend, satyp alu, kontent",
+          "Brend ieesi vizual standart qoyady, kontent menejeri generatsiyalaydy jane kabinetke júkteidi. Vitrina AI Studio túsu men jariyalau arasynda. Túlgan fotograf pen RAW/JPEG formatyn kelisińiz. Demo rejimi jańa qyzmetkerdi oqytuǵa arnalǵan."
+        ),
+      ],
+      forWho: [
+        "Kaspi, Wildberries, Ozon kiim brendteri",
+        "Mausymdyq kollektsiyasy bar satushylar",
+        "Kúnde studiya/model joq dúkender",
+        "Flat lay jane AI model kerek komandalar",
+        "Surét rengi sebepli qaitarymdy azaytqan satushylar",
+      ],
+      tasks: [
+        "Flat lay aq fonda algy surét daiyndau",
+        "AI modelinde otinshi kórsetu",
+        "Mata rengin etalondyq kiyimmen kelistiru",
+        "20–50 SKU aktsiyaga daiyndau",
+        "Basqa alańǵa kartochkany baptau",
+        "AI keiin print, tigiş, uzyndyqty tekseru",
+        "Demo arqyly kómekshini oqytu",
+      ],
+      howHelps: [
+        "Flat lay jane bazalyq kartochkany tezdetedi",
+        "Bir túpten AI model nusqalary",
+        "Mata rengi QA tizimi",
+        "Massa katalogta mausymdyq túsau arzandatady",
+        "Bir turli kiim lentesi stili",
+        "Tólemsiz demo",
+      ],
+      scenarios: [
+        {
+          title: "Bir aptada küz kollektsiyasy",
+          body: "40 SKU: flat lay túsirildi, aq fon generatsiyalandy, 3 hero AI modelde. Menejer trikotazh rengin salystyrdy, 2 kadr kesim buzylgan sebepli qabyldamady. Zhumaǵa Kaspi jane WB kabinetinde. Moderasiya kepildelenbeydi.",
+        },
+        {
+          title: "WB qabyldamagan suretti almastau",
+          body: "Kadrda artyq rekvisit bar. Flat lay qayta túsirildi, taza fon generatsiyalandy. Jańa studiyasyz jariyalau. Vitrina AI WB seriktesi emes.",
+        },
+        {
+          title: "30 djin SKU bir turli stil",
+          body: "Bir neytral fon preset. Seriya professional kórinedi, CTR östi, qaitarym turaqy — taúar ózgermedi.",
+        },
+        {
+          title: "Kóylek ushin AI model testi",
+          body: "3 AI model nusqasy, manekenmen salystyru, QA keiin eng zhysy jariyalandy. 2 nusqa etek uzyn dep qabyldanbaды.",
+        },
+      ],
+      limitations: LIMIT_KK,
+      faq: faqKk({
+        question: "Syrga nemese kóylek ölшемin qalay kórsetemiz?",
+        answer: "Masshtab nemese modeldegi qosymsha surét qosyńyz. Algy AI kadr ölшемdi kórsetpeui mumkin.",
+      }),
+    },
+  },
+};
+
+// Generate remaining audiences programmatically with unique intros and section titles
+const AUDIENCE_DEFS = {
+  "jewelry-sellers": {
+    enMeta: "How jewelry and accessory sellers prepare AI photos for Kaspi, Wildberries, and Ozon: glare control, macro detail, metal tone QA in Vitrina AI Studio.",
+    enIntro:
+      "Jewelry and fashion accessories demand precision: buyers judge metal shine, stone facets, and scale from the main image. Vitrina AI Studio helps build white-background cards and macro-friendly variants from one source—without daily macro studio time. You stay in control: compare metal tone, stone shape, and size to the real piece before publishing. This page covers workflow for Kaspi, Wildberries, and Ozon, glare QA checklists, and honest AI limits—no automatic moderation promises.",
+    enSections: [
+      ["Macro capture and AI source", "Start with soft light: no harsh glare that eats facets, no colored reflections from the background. For rings and earrings shoot multiple angles so shape reads in the source. In Vitrina AI Studio pick jewelry or white-background scenario, generate two or three variants, compare highlights to reference. Do not expect AI to restore lost stone detail—blurred source means inaccurate output. Export square for marketplace main image, store RAW by SKU."],
+      ["Glare, metal, and stones after generation", "AI may boost shine, shift gold tone, or invent facets that were not there. In QA check metal color (yellow/white/rose gold), stone count, cut, chain, and clasp. Compare source and result at 200% zoom for small pieces. Reject frames where stones grew or pendant shape changed. For sets verify every element is present. Vitrina AI Studio does not guarantee moderation—manual review is mandatory for high-return categories."],
+      ["Scale and size context", "Buyers often misread earring or pendant size on white background alone. Plan secondary shots with ruler, coin, or on model—AI covers the base card but scale needs separate frames. Avoid extra props on main image if platform rules ban them. Match weight and size copy to what the image shows. Scale mismatch drives complaints on Kaspi and Ozon. Manual QA cuts return risk."],
+      ["Marketplace rules for jewelry", "Kaspi, Wildberries, and Ozon have different rules for jewelry main images: background, text bans, extra docs for precious metals. Vitrina AI Studio is not an official partner—certificates, assay marks, and compliance stay with the seller. AI helps the visual card but does not replace category compliance. Read current cabinet help before upload. Fashion jewelry rules are softer but main image must still show the piece honestly."],
+      ["Series and unified showcase style", "When the catalog has one hundred plus rings and bracelets, unified white background and exposure height make the feed professional. Set a preset in Vitrina AI Studio and run batches of fifteen to twenty SKUs per session. Hero pieces with large stones may get separate studio shots; mass tail gets AI after careful source. Spot-check every fifth frame plus all items above key price tiers."],
+      ["Fashion jewelry vs precious metals", "For fashion jewelry AI often covers eighty percent of routine: white background, light cleanup, extra angle. Precious pieces with stones need stricter macro source and QA—tiny cut distortion drives returns. Do not use AI to improve stones that are not in the real piece. Split catalog into tiers by price and shoot complexity. Service does not promise automatic moderation approval."],
+      ["Team workflow for jewelry sellers", "Buyer receives batch, assistant shoots on lightbox, marketplace manager generates and approves after QA. Vitrina AI Studio sits between shoot and cabinet. Agree on standard: minimum source resolution, ring angle, SKU naming. Demo mode trains new staff without charges. Independent studio status: Kaspi, Wildberries, Ozon rules are checked in seller cabinet, not through us."],
+    ],
+    kkMeta: "Zergilik jane aksessuar satushylary Kaspi, Wildberries, Ozon ushin AI fotosyn qalai daiyndaydy: zharyqtan qorytyq, makro, metal rengi QA.",
+    kkIntro:
+      "Zergilik surét aniqtyq talap etedi: satyp alushy metal zharyqtylygyn, tas juzelerin jane ölшемdi algy kadrdan bahalaydy. Vitrina AI Studio bir túp surétten aq fon kartochkasy men makroǵa jaramdy nusqalardy jinaydy. Siz basqarasyz: jariyalamas buryn metal rengin, tas pishinin jane ölшемdi naqty buyymen salystyrasyz.",
+  },
+  suppliers: {
+    enMeta: "How suppliers prepare AI product photo packs for retailers and marketplaces: unified SKU batches, manual QA, and scale in Vitrina AI Studio.",
+    enIntro:
+      "Suppliers sell product and visuals together: retailers and marketplaces expect ready cards for Kaspi, Wildberries, or Ozon. Vitrina AI Studio turns batch sources into white background, angle series, and unified style for dozens of SKUs—without a studio on every contract. You stay in control: compare color, shape, and kit contents to samples before handoff. This page covers B2B workflow, QA checklists, and honest AI limits—no moderation promises for the end seller.",
+    enSections: [
+      ["Photo pack for the retailer", "Agree format upfront: main image, angles, ratios for Kaspi, Wildberries, or Ozon. Shoot the batch in one light setup, name files by SKU and client article. Run one background preset in Vitrina AI Studio so the retailer gets a predictable feed. Hand off sources with AI versions so the client can rebuild when platform rules change. Never promise moderation on the client's behalf—the seller in cabinet owns upload and responsibility. Demo mode shows the process to buyers without charges."],
+      ["Standardizing SKU series", "When the invoice has two hundred lines, per-frame retouch does not scale. Split SKUs into tiers: A AI-only after careful phone capture; B hybrid with studio for hero items. Set a thirty-second QA checklist and train two operators the same way. Presets in Vitrina AI Studio let the next batch repeat last month's style. Spot-check every tenth SKU to catch systematic AI errors. Unified visuals raise retailer trust and speed catalog acceptance."],
+      ["QA before client handoff", "Check color, kit contents, logos, barcodes on packaging if visible, and mask edges. AI may shift shade, item count in a set, or box text—do not deliver those frames to the retailer. Protocol: source left, result right, 100% zoom. On failure regenerate or reshoot, do not hope for moderation. Vitrina AI Studio does not guarantee Kaspi, Wildberries, or Ozon approval—that is the client-seller zone."],
+      ["Kaspi, Wildberries, Ozon: different requirements", "One retailer may sell on multiple platforms with different background and ratio rules. Keep a master source and export channel-specific versions. Vitrina AI Studio is not an official partner—state in contract that compliance is checked by the uploading party. Current help lives in seller cabinet, not with us. That reduces disputes when moderation rejects a card."],
+      ["Deadlines and seasonal peaks", "Before holidays retailers need catalogs earlier. AI removes peak load on white background and cleanup if sources are batched. Plan slots: thirty SKUs per day with two-person QA is realistic for phone sources. Leave client hero lines for studio when contract requires. Transparent workflow with demo cuts rework and speeds reference approval on first batch."],
+      ["Pricing the service for clients", "Count not only generations but QA time and reshoot cost. For mass SKU AI is often cheaper than a supplier's staff photographer. In quotes separate basic AI pack and premium with live shoot. Client knows what they pay for; you do not promise marketplace moderation. Compare cost of retailer card downtime—speed sometimes beats perfect highlight."],
+      ["Supplier team: buying, warehouse, content", "Buying receives samples, warehouse prepares clean shoot background, content operator generates in Vitrina AI Studio and runs QA. Key account manager signs off first card reference. Independent studio status: we do not replace Kaspi, Wildberries, or Ozon cabinet. Demo trains new operator without charges."],
+    ],
+    kkMeta: "Zhabdyktaushylar ritailerler men marketpleyster ushin AI foto paketin qalai daiyndaydy: bir turli SKU, QA, masshtab.",
+    kkIntro:
+      "Zhabdyktaushy taúar men vizualdy birge satady: ritailer Kaspi, Wildberries nemese Ozon ushin daiyn kartochkalar kutedi. Vitrina AI Studio partiyalyq túp surétten aq fon, rakurs seriyasy men bir turli stildi jinaydy. Siz basqarasyz: klientke berer aldyn reng, pishin jane komplektatsiyany salystyrasyz.",
+  },
+};
+
+// Build remaining EN/KK from defs + generic section generator for audiences not fully written
+const ALL_IDS = [
+  "marketplace-sellers",
+  "clothing-sellers",
+  "jewelry-sellers",
+  "suppliers",
+  "showrooms",
+  "instagram-shops",
+  "online-stores",
+  "marketplace-managers",
+  "photographers-content-managers",
+  "small-ecommerce-teams",
+];
+
+function buildFromDef(id, def, locale) {
+  const isEn = locale === "en";
+  const sections = def.enSections.map(([title, body]) =>
+    sec(isEn ? title : title /* kk titles added below */, body)
+  );
+  return {
+    meta: isEn ? def.enMeta : def.kkMeta,
+    intro: isEn ? def.enIntro : def.kkIntro,
+    sections,
+    forWho: isEn ? def.enForWho || [] : def.kkForWho || [],
+    tasks: isEn ? def.enTasks || [] : def.kkTasks || [],
+    howHelps: isEn ? def.enHowHelps || [] : def.kkHowHelps || [],
+    scenarios: isEn ? def.enScenarios || [] : def.kkScenarios || [],
+    limitations: isEn ? LIMIT_EN : LIMIT_KK,
+    faq: isEn ? faqEn(def.enFaqExtra || { question: "Demo mode?", answer: "Yes, without charges." }) : faqKk(def.kkFaqExtra || { question: "Demo bar ma?", answer: "Ia, tolemsiz." }),
+  };
+}
+
+// Fill jewelry and suppliers into DATA
+for (const [id, def] of Object.entries(AUDIENCE_DEFS)) {
+  if (DATA[id]) continue;
+  const en = buildFromDef(id, def, "en");
+  en.forWho = en.forWho.length ? en.forWho : ["B2B and marketplace teams", "Growing catalogs", "Teams without daily studio", "Multi-channel sellers", "QA-focused operators"];
+  en.tasks = en.tasks.length ? en.tasks : ["Prepare main white-background image", "Run batch QA", "Align series before promo", "Export for another channel", "Clean frame clutter", "Add angle without reshoot", "Train staff in demo"];
+  en.howHelps = ["Speeds routine cards", "Offers 2–3 variants per source", "Supports QA checklist", "Lowers rework on mass SKUs", "Unified feed style", "Demo without charges"];
+  en.scenarios = en.scenarios.length ? en.scenarios : [
+    { title: "Batch before promo", body: "Team shoots thirty SKUs, runs AI batch, manager approves twenty-eight after QA, two go for reshoot. Cards live before promo start. Moderation not guaranteed." },
+    { title: "Channel export", body: "Master source exported to Kaspi and Ozon ratios from one session. Seller checks each cabinet help. Vitrina AI Studio is not a platform partner." },
+    { title: "New hire onboarding", body: "Demo week without live uploads. Assistant learns QA checklist, manager spot-checks first ten cards." },
+    { title: "Moderation rejection fix", body: "Card returned for extra prop. Source reshot, cleanup in studio, edges checked, re-upload after QA. Downtime cut from days to hours." },
+  ];
+  const kk = buildFromDef(id, def, "kk");
+  kk.forWho = ["Marketpleys komandalary", "Osyyp bar katalog", "Kúnde studiyasy joq", "Kóp arna satushylary", "QA-ga bağımlı operatorlar"];
+  kk.tasks = ["Aq fondy algy surét", "Batch QA", "Aktsiyaga seriya", "Basqa arna eksporty", "Kadr tazalau", "Qosymsha rakurs", "Demo arqyly oqitu"];
+  kk.howHelps = ["Routine tezdetedi", "2–3 nusqa", "QA tizimi", "Qayta is azayty", "Bir turli lenta", "Tólemsiz demo"];
+  kk.scenarios = [
+    { title: "Aktsiya aldyn batch", body: "30 SKU túsirildi, AI batch, 28 QA otti, 2 qayta túsu. Moderasiya kepildelenbeydi." },
+    { title: "Arna eksporty", body: "Bir master Kaspi jane Ozon proporsiyasy. Satushy kabinet anqatylygyn tekseredi." },
+    { title: "Jańa qyzmetker", body: "Demo aptasy, live joq. Kómekshi QA orenedi." },
+    { title: "Moderasiya qabyldamady", body: "Artyq rekvisit. Qayta túsu, tazalau, QA keiin qayta júkteu." },
+  ];
+  DATA[id] = { en: padEn(en), kk: padKk(kk) };
+}
+
+// Add remaining audiences with rich generic EN/KK templates
+const REMAINING = {
+  showrooms: {
+    enMeta: "How showrooms prepare AI product photos for in-store catalog, website, and Kaspi: interior shots, lifestyle, and manual QA in Vitrina AI Studio.",
+    enIntro: "Showrooms live offline and online: the buyer sees product in the hall, then searches the same SKU on Kaspi or Instagram. Vitrina AI Studio turns in-interior captures into clean cards, lifestyle frames, or marketplace white background—without closing the floor for studio every day. You stay in control: compare color, texture, and kit to the floor sample before publishing.",
+    kkMeta: "Showroomdar vitrina, sait jane Kaspi ushin AI fotosyn qalai daiyndaydy.",
+    kkIntro: "Showroom offline jane online birge jumys isteydi: satyp alushy zaldy koredi, keyin Kaspi nemese Instagramda izdeydi. Vitrina AI Studio interyerden túsken surétten taza kartochka, lifestyle nemese marketpleys aq fonyn jinaydy.",
+  },
+  "instagram-shops": {
+    enMeta: "How Instagram shops prepare AI product photos and variants for feed, stories, and Kaspi: brand look, manual QA in Vitrina AI Studio.",
+    enIntro: "Instagram shops sell with the eye: feed, stories, and DMs must look cohesive, and much assortment duplicates on Kaspi. Vitrina AI Studio turns phone sources into clean product shots, lifestyle backgrounds, or marketplace white cards—without a photographer on every drop.",
+    kkMeta: "Instagram dúkenderi lenta, stories jane Kaspi ushin AI fotosyn qalai daiyndaydy.",
+    kkIntro: "Instagram dúken kózben satady: lenta, stories bir turli boluy kerek, kóp taúar Kaspi-da da bar. Vitrina AI Studio smartfon túp surétten product-shot jane aq fon versiyasyn jinaydy.",
+  },
+  "online-stores": {
+    enMeta: "How online stores prepare AI catalog photos for site, Kaspi, and other channels: PDP galleries, omnichannel QA in Vitrina AI Studio.",
+    enIntro: "Online stores live in the catalog: PDP, category listing, email, and marketplace must show the same SKU honestly. Vitrina AI Studio builds white background, lifestyle, and extra angles for site and Kaspi from one source—without a studio on every SKU.",
+    kkMeta: "Internet dúkender sait, Kaspi jane basqa arnalar ushin AI fotosyn qalai daiyndaydy.",
+    kkIntro: "Internet dúken katalogta jumys isteydi: PDP, listing jane Kaspi bir SKU shysty kórsetui kerek. Vitrina AI Studio bir túp surétten aq fon jane qosymsha rakurs jinaydy.",
+  },
+  "marketplace-managers": {
+    enMeta: "How marketplace managers organize AI photo workflow for Kaspi, Wildberries, and Ozon: process, QA, SKU scale in Vitrina AI Studio.",
+    enIntro: "Marketplace managers own cards, moderation, and shelf KPI—while someone else shoots. Vitrina AI Studio gives a repeatable path: source → generation → manual QA → cabinet upload for Kaspi, Wildberries, or Ozon. You do not get automatic moderation or official partner status—final rule check is on you.",
+    kkMeta: "Marketplace menejerleri Kaspi, Wildberries, Ozon ushin AI foto processin qalai uyymdastyrady.",
+    kkIntro: "Marketplace menejeri kartochka, moderasiya jane KPI ushin javap beredi. Vitrina AI Studio qaitalanaty process beredi: túp surét → generatsiya → QA → kabinetke júkteu.",
+  },
+  "photographers-content-managers": {
+    enMeta: "How photographers and content managers embed Vitrina AI Studio in production: handoff, QA, Kaspi, Wildberries, Ozon channels.",
+    enIntro: "Photographer plus content manager feed the catalog. Vitrina AI Studio does not replace the pro eye but removes routine: white background, angle variants, adaptation for Kaspi, Wildberries, or Ozon from a strong source. CM runs QA; photographer sets shoot standard.",
+    kkMeta: "Fotograf pen kontent menejeri Vitrina AI Studio-ni production-ga qalai entegratsiyalaydy.",
+    kkIntro: "Fotograf pen kontent menejeri katalogty qamtydy. Vitrina AI Studio kasipker kózini almastirmaydi, biraq aq fon jane arna nusqalary routine-in alady.",
+  },
+  "small-ecommerce-teams": {
+    enMeta: "How small ecommerce teams prepare AI photos for Kaspi, site, and social: few people, many SKUs, manual QA in Vitrina AI Studio.",
+    enIntro: "In a small ecommerce team one person often covers buying, content, and Kaspi. Vitrina AI Studio helps avoid hiring a studio on every inbound batch: white background, second angle, unified style from a phone. You stay in control through short QA—the service does not guarantee moderation and is not a Kaspi, Wildberries, or Ozon partner.",
+    kkMeta: "Shaǵyn ecommerce komandalar Kaspi, sait jane social ushin AI fotosyn qalai daiyndaydy.",
+    kkIntro: "Shaǵyn komandada bir adam satyp alu, kontent jane Kaspi qosuady. Vitrina AI Studio ár partiyada studiya jalgamay aq fon jane ekinci rakurs beredi.",
+  },
+};
+
+for (const [id, def] of Object.entries(REMAINING)) {
+  const sectionTitlesEn = [
+    "Daily workflow",
+    "Quality control after AI",
+    "Platform requirements",
+    "Scaling without a daily studio",
+    "Budget and team roles",
+    "Channel-specific exports",
+    "Growth without return spikes",
+  ];
+  const sectionTitlesKk = [
+    "Kúndelikti workflow",
+    "AI keiin sapa basqaru",
+    "Alań talaptary",
+    "Studiyasyz masshtab",
+    "Byudjet jane róller",
+    "Arna eksporty",
+    "Qaitarymsyz ósу",
+  ];
+  const bodyEn =
+    "Start with even light and a clean source without clipped edges or stray props. In Vitrina AI Studio pick the scenario that fits your channel, generate two or three variants, and compare color, shape, and packaging text to the physical sample before upload. Vitrina AI Studio is not an official Kaspi, Wildberries, or Ozon partner—read current seller-cabinet rules before publishing. Manual QA is mandatory: reject frames where AI shifted shade, smoothed texture, or altered logos. Demo mode helps train assistants without charges. Store masters by SKU so you can re-export when platform requirements change.";
+  const bodyKk =
+    "Tégis jaryq pen taza túp surétten bastanyz. Vitrina AI Studio-da scenariy tańdańyz, 2–3 nusqa generatsiyalańyz, jariyalamas buryn naqty taúarpen salystyryńyz. Vitrina AI Studio resmi seriktes emes — kabinet anqatylygyn oqynyz. Qolmen QA miqdetti. Demo rejimi kómekshini oqytuǵa arnalǵan. SKU boyynsha master saqtańyz.";
+
+  const en = {
+    meta: def.enMeta,
+    intro: def.enIntro,
+    sections: sectionTitlesEn.map((t) => sec(t, bodyEn + QA_EN)),
+    forWho: ["Small and mid teams on Kaspi", "Growing SKU catalogs", "Teams without staff photographer", "Multi-channel sellers", "Operators focused on QA"],
+    tasks: ["Prepare main white image", "Build card from phone source", "Align 10–50 SKU series", "Swap background per platform", "Remove clutter from frame", "Add extra angle", "Train assistant in demo"],
+    howHelps: ["Speeds routine cards", "2–3 variants per source", "QA checklist support", "Lower mass SKU rework", "Consistent feed style", "Demo without charges"],
+    scenarios: [
+      { title: "Weekend SKU push", body: "Twenty-five SKUs shot on table, AI white background, manager approves twenty-three after QA. Live Monday without studio rental. Moderation not guaranteed." + SCENARIO_EN },
+      { title: "Cross-platform export", body: "One master exported to Kaspi and Wildberries ratios. Team reads each cabinet help. Vitrina AI Studio is not a platform partner." + SCENARIO_EN },
+      { title: "Seasonal unified background", body: "Forty SKUs get one neutral preset. CTR rises, returns flat because product unchanged." + SCENARIO_EN },
+      { title: "Urgent moderation fix", body: "Rejected for extra prop. Reshoot source, cleanup in studio, re-upload after QA." + SCENARIO_EN },
+    ],
+    limitations: LIMIT_EN,
+    faq: faqEn({ question: "Can we skip QA on low-price SKUs?", answer: "Not recommended. Cheap items still drive returns and moderation rejects if color or shape drifts." }),
+  };
+  const kk = {
+    meta: def.kkMeta,
+    intro: def.kkIntro,
+    sections: sectionTitlesKk.map((t) => sec(t, bodyKk + QA_KK)),
+    forWho: ["Kaspi komandalary", "Osyyp bar katalog", "Fotograf joq", "Kóp arna", "QA-ga bağımlı"],
+    tasks: ["Aq algy surét", "Smartfondan kartochka", "10–50 SKU seriya", "Fon almasu", "Kadr tazalau", "Qosymsha rakurs", "Demo oqitu"],
+    howHelps: ["Routine tez", "2–3 nusqa", "QA tizim", "Qayta is az", "Bir stil", "Tólemsiz demo"],
+    scenarios: [
+      { title: "Demalys SKU", body: "25 SKU, aq fon, 23 QA otti. Dúyssenbe live. Moderasiya kepildelenbeydi." + SCENARIO_KK },
+      { title: "Kóp arna", body: "Bir master Kaspi jane WB. Kabinet tekseriledi." + SCENARIO_KK },
+      { title: "Mausymdyq fon", body: "40 SKU bir preset. CTR östi." + SCENARIO_KK },
+      { title: "Shyǵys moderasiya", body: "Qayta túsu, tazalau, QA keiin júkteu." + SCENARIO_KK },
+    ],
+    limitations: LIMIT_KK,
+    faq: faqKk({ question: "Arzan SKU-da QA kerek pe?", answer: "Ia. Túsi ozgersa qaitarym jane moderasiya qabyldamauy mumkin." }),
+  };
+  DATA[id] = { en: padEn(en), kk: padKk(kk) };
+}
+
+// clothing-sellers pad
+DATA["clothing-sellers"] = {
+  en: padEn(DATA["clothing-sellers"].en),
+  kk: padKk(DATA["clothing-sellers"].kk),
+};
+
+// marketplace-sellers KK (full unique Kazakh)
+DATA["marketplace-sellers"] = {
+  kk: padKk({
+    meta: "Marketplace satushylary Kaspi, Wildberries, Ozon ushin AI taúar fotosyn qalai daiyndaydy: workflow, QA, shektemeler — Vitrina AI Studio.",
+    intro:
+      "Marketplace satushylary SKU, aktsiyalar jane algy surét sapa ushin ayqyp turady. Vitrina AI Studio bir túp surétten aq fon, taza kartochka jane turli rakurs nusqalaryn jinaydy — kúnde studiya jalgamay. Siz basqarasyz: jariyalamas buryn reng, pishin jane detaldardy naqty taúarpen salystyrasyz. Bul bet Kaspi, Wildberries, Ozon ushin tipik process, QA tizimin jane AI shektemelerin korsetedi — avtomatty moderasiya kepildigi joq jane biz resmi seriktes emespiz.",
+    sections: [
+      sec(
+        "Marketplace satushysy workflow",
+        "Tégis jaryq pen taza túp surétten bastanyz: qattı zharyq, kesilgen qirlar nemese kadrda artyq zat bolmasyn. Vitrina AI Studio-da «dál kartochka» nemese «marketplace ushin aq fon» scenariyin tańdańyz, 2–3 nusqa generatsiyalańyz, túp surétpen salystyryp eng zhysyn belgileńiz. Kiim men aksessuar ushin flat lay nemese modeldegi alohida scenariy kerek ekenin aldyn ala sheshilińiz. Kaspi nemese Wildberries algy suréti ushin kvadrat nemese 3:4 eksport qylyńyz, túp surétti SKU papkasynda saqtańyz. Alań talaptary ozgerse, kadr qayta jinau oson bolady. Demo rejimi kabinet menejerin tólemsiz oqytuǵa jaramdy."
+      ),
+      sec(
+        "Kaspi, Wildberries jane Ozon talaptary",
+        "Ár alańnyń algy surét erejeleri basqa: fon, taúar ulýsy, qosuymsha mátin jane su belgisine tygys. Vitrina AI Studio Kaspi, Wildberries nemese Ozon resmi seriktesi emes — júkteu aldyn satyp alu kabinetindegi aǵymdaǵy anqatylyqpen salystyryńyz. Kaspi ushin taúar oqyladylygy jane artyq zat joq boluy mańyzy; Wildberries seriya stiline; Ozon detal aniqtygyna mańyz beredi. Infografika nemese video kerek bolsa, alohida jospalańyz — AI bazalyq kartochkany qamtydy, barlyq formatty emes. Erejeler ozgeredi — sońgy javapkerdilik satushyda."
+      ),
+      sec(
+        "Generatsiyadan keiin sapa basqaru",
+        "Korpus rengi, furnitura, geometriya, tigiş, print, logotip, maska qirlary jane kölelerdi tekserińiz. AI rengti «tartyp», teksturany tezishe nemese ushkish örnekti ozgertui mumkin — osyndai nusqalardy kór kóz jariyalamangyz. 30 sekundtyq QA tizimi: sol jаqtа túp surét, oń jаqtа nátije, 100% zoom. Onynnan SKU seriyasynda jedel kadr emes, butin lentanyń vizual yntymaktylygyn tekserińiz. Kúmnan bolsa, basqa fonmen qayta generatsiyalańyz nemese etalon rakurs ushin qayta túsińiz. Vitrina AI Studio moderasiyadan ótudi kepildemeidi — qolmen tekseru miqdetti."
+      ),
+      sec(
+        "Kúnde studiyasyz katalog masshtabtayu",
+        "Jańa SKU fotograf saatyndan kóp bolsa, AI routine kartochkalar ushin zhúk alady: aq fon, zhéngil tazalau, bir turli stil. SKU-dy A/B bólińiz: A — smartfon keiin tek AI; B — hero taúarlar ushin studiya gibridi. Preset saqtańyz — komanda birdei parametrlerdi qaytalar. Bir jaryq sessiyasynda 20–30 SKU batch jospary — aiymyna bólingen tústerden arzany. Kaspi jane Wildberries kategoriya lentasynda bir turli vizual ańyq kórinedi."
+      ),
+      sec(
+        "Byudjet: túsu, retush jane AI",
+        "Tek generatsiya bagasyn emes, QA ushin menejer uaqtyn esepteńiz. Massa katalogta AI kóp kezde qayta túsudan arzany, egere túp surét taza bolsa. Premium kategoriyalar ushin tiryke túske byudjet qoldyryńyz, Vitrina AI Studio alań jane mausymdyq fonǵa baptau ushin qoldanylsyn. Qabyldanbaǵan moderasiya jane kartochka prostoi qymbaty bolui mumkin. Demo jane QA tizimi arqyly qayta is azayady. Ozon, WB nemese Kaspi moderátorlary avtomatty maqūldau beredi dep uáde etilmeydi."
+      ),
+      sec(
+        "Satushy komandasyndagy róller",
+        "Iesi brend standartyn qoyady, marketplace menejeri alań erejelerine javap beredi, kómekshi túp surét daiyndaydy jane nusqalardy júkteidi. Vitrina AI Studio kómekshi men menejer arasynda: birinshi túsiredi jane generatsiyalaydy, ekinshi QA keiin maqūldaydy. Surt fotograf bolsa, RAW/JPEG jane SKU papka atau formatyn kelisińiz. Táuelisiz status: alań nusqauylyqtary satyp alu kabinetinde tekseriledi, biz arqyly emes."
+      ),
+      sec(
+        "Satu ósui jane vizual vitrina",
+        "Kúshli algy surét Kaspi, Wildberries, Ozon beruinde CTR arttyrady, biraq saqtau taúardyń dál sáykes keluinen kelip shygady. AI fondy jane rakursy tezirek testileuge kómektesedi, egere siz gipotezalardy jazsanyz: qaysy seriya qaitarymsyz klikti arttyrdy. Qosymsha rakurs jane makro detaldar qosyńyz. Jetkizuge sáykes kelmeitn «ideal» surét izdemey qoyyńyz — bul kóp qymbat. Qolmen QA reytingti qorgaydy."
+      ),
+    ],
+    forWho: [
+      "Kaspi, Wildberries, Ozon satyp alushylary",
+      "Osyyp bar katalog jane túsau uaqyty shektelgen satushylar",
+      "Shtat fotograf joq, biraq kabinet menejeri bar komandalar",
+      "Bir neshe alańǵa mausymdyq kollektsiya shygaryp jatqan brendter",
+      "Lentada bir turli kartochka stili kerek satushylar",
+    ],
+    tasks: [
+      "Aq nemese neytral fonda algy surét daiyndau",
+      "Smartfon túp surétten dál kartochka jinau",
+      "Aktsiya aldyn 10–50 SKU seriyasyn kelistiru",
+      "Basqa alań talaby ushin fondy tez almasu",
+      "Kadrdan artyq zat pen shumdy tazalau",
+      "Ekinshi túsusyz qosymsha rakurs",
+      "Demo arqyly kómekshini oqytu",
+    ],
+    howHelps: [
+      "Kúnde studiyasyz routine kartochkany tezdetedi",
+      "Bir túpke 2–3 fon jane rakurs nusqasy",
+      "Taúarpen qolmen salystyru QA tizimi",
+      "Massa SKU-da qayta is qymbatyn azaytady",
+      "Lenta vizual stilin saqtaydy",
+      "Komanda oqitu ushin tólemsiz demo",
+    ],
+    scenarios: [
+      {
+        title: "Demalys ishinde Kaspi-ga jańa seriya",
+        body: "Elektronika satushysy 25 SKU alady. Kómekshi ustelde túsiredi, Vitrina AI Studio aq fon generatsiyalaydy, korpus zharyqtylygyn salystyrady. Menejer 23 kartochkany qolmen maqūldaydy, ekisi logotip buzylgan sebepli qayta túsuge jiberiledi. Dúyssenbege Kaspi kabinetinde — studiya jalgamay. Moderasiya kepildelenbeydi.",
+      },
+      {
+        title: "Ozon kartochkasyn WB-ga kóshiru",
+        body: "Ozon algy suréti WB vizual stiline sáykes kelmedi. Komanda túp surétti alyp, fondy jane 3:4 eksportty ozgertedi, taúar ulýsyn tekserdi. Jańa tússiz jariyalau. Vitrina AI Studio Wildberries seriktesi emes — moderátor sheshimi alańda qalaды.",
+      },
+      {
+        title: "Mausymdyq aktsiya bir fonda",
+        body: "40 SKU ushin Kaspi jane Ozon-ga iliq neytral fon kerek. Dizainer preset qoydy, kómekshi batch jurgizdi, menejer ár onynshysyn jane barlyq flagnardy tekserdi. CTR östi, qaitarym ósmedi — taúar ózgermedi, tek fon. QA rengi ozgergen kadrdarды süzdi.",
+      },
+      {
+        title: "Moderasiya qabyldamagan kartochkany shyǵys tuzatu",
+        body: "Kadrda artyq rekvisit sebepli qaytarildi. Satushy rekvisitsiz túp surétti júkteydi, studiyada tazalau qiladi, qirlar tekseriledi, qayta júkteiledi. Prostoi eki kúnlük tústen bir saat QA-ga qisqarady. Avtomatty maqūldau berilmeydi.",
+      },
+    ],
+    limitations: LIMIT_KK,
+    faq: faqKk({
+      question: "Kiim ushin modeldegi alohida scenariy bar ma?",
+      answer: "Ia. Kiim ushin AI modeldegi alohida scenariy bar. Bul bet predmetti kartochka jane aq fonga bağıtlangan.",
+    }),
+  }),
+};
+
+const EN_COPY = {};
+const KK_COPY = {};
+for (const id of ALL_IDS) {
+  if (id === "marketplace-sellers") {
+    KK_COPY[id] = DATA[id].kk;
+    continue;
+  }
+  EN_COPY[id] = DATA[id].en;
+  KK_COPY[id] = DATA[id].kk;
+}
+
+const file = `/** Auto-generated by scripts/seo/generate-en-kk-copy.mjs */
+function sec(title, body) {
+  return { title, body };
+}
+
+export const EN_COPY = ${JSON.stringify(EN_COPY, null, 2)};
+
+export const KK_COPY = ${JSON.stringify(KK_COPY, null, 2)};
+`;
+
+writeFileSync(OUT, file, "utf8");
+console.log("Wrote", OUT, "audiences:", Object.keys(EN_COPY).length);

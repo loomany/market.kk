@@ -9,12 +9,17 @@ import {
   paidAiGuardResponse,
 } from "@/lib/ai/paidAiGuard";
 import { MAX_CLOTHING_PRODUCT_SET } from "@/lib/studio/productPhotos";
+import { wrapAiPost } from "@/lib/tokens/wrapAiPost";
 
 export const runtime = "nodejs";
 
 const ROUTE_ID = "/api/ai/analyze-product-angles";
 
 export async function POST(request: Request) {
+  return wrapAiPost(request, "angles-analyze", ROUTE_ID, handleAnalyzeProductAnglesPost);
+}
+
+async function handleAnalyzeProductAnglesPost(request: Request) {
   let formData: FormData;
   try {
     formData = await request.formData();

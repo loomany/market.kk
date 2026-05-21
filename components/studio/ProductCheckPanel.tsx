@@ -9,14 +9,10 @@ import type { ProductDescriptionAnalysis } from "@/lib/ai/productDescriptionAnal
 import { sourcePresentationSummaryRu } from "@/lib/studio/garmentPhotoTypeFromPresentation";
 import { isSourceModelPopulated } from "@/lib/ai/sourceModelPostProcess";
 import { sourceModelCheckLinesRu } from "@/lib/studio/sourceModelSummaryRu";
+import { formatStudioString } from "@/lib/studio/i18n";
+import { getModelScenarioLabel } from "@/lib/studio/i18n/studioOptionLists";
+import { useStudioCopy } from "./StudioLocaleContext";
 import type { ModelCategoryContext } from "./types";
-
-const SCENARIO_LABELS: Record<ModelCategoryContext, string> = {
-  clothing: "Одежда",
-  lingerie: "Бельё / купальники",
-  jewelry: "Украшения",
-  general: "Универсально",
-};
 
 type ProductCheckPanelProps = {
   hasPhoto: boolean;
@@ -72,6 +68,7 @@ export function ProductCheckPanel({
   scenario,
   onReanalyze,
 }: ProductCheckPanelProps) {
+  const { locale, copy } = useStudioCopy();
   if (!hasPhoto) return null;
 
   const sourcePhotoSummary = sourcePresentationSummaryRu(
@@ -86,16 +83,13 @@ export function ProductCheckPanel({
   return (
     <div className="space-y-3">
       <div>
-        <h3 className="text-sm font-semibold text-slate-950">Проверка товара</h3>
-        <p className="mt-1 text-xs leading-5 text-slate-600">
-          AI автоматически определил параметры. Описание товара ниже — только
-          для просмотра.
-        </p>
+        <h3 className="text-sm font-semibold text-slate-950">{copy.productCheck.title}</h3>
+        <p className="mt-1 text-xs leading-5 text-slate-600">{copy.productCheck.intro}</p>
       </div>
 
       {analyzing ? (
         <p className="rounded-[14px] border border-teal-100 bg-teal-50/70 px-3 py-2 text-xs leading-5 text-teal-950">
-          Анализируем фото товара…
+          {copy.productCheck.analyzingShort}
         </p>
       ) : null}
 
@@ -108,9 +102,9 @@ export function ProductCheckPanel({
       {analysis && !analyzing ? (
         <dl className="grid grid-cols-1 gap-2 rounded-[12px] border border-slate-200/80 bg-slate-50/60 px-3 py-2.5 text-xs">
           <div className="flex justify-between gap-3">
-            <dt className="text-slate-500">Сценарий</dt>
+            <dt className="text-slate-500">{copy.productCheck.scenarioLabel}</dt>
             <dd className="text-right font-medium text-slate-900">
-              {SCENARIO_LABELS[scenario]}
+              {getModelScenarioLabel(locale, scenario)}
             </dd>
           </div>
           {sourcePhotoSummary ? (
@@ -145,23 +139,25 @@ export function ProductCheckPanel({
           htmlFor="product-description-check"
           className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500"
         >
-          Описание товара
+          {copy.productCheck.descriptionTitle}
         </label>
         {analyzing ? (
           <p className="rounded-[12px] border border-border bg-slate-50 px-3 py-2.5 text-sm leading-5 text-slate-500">
-            Ожидаем результат анализа…
+            {copy.productCheck.waitingAnalysis}
           </p>
         ) : (
           <ReadOnlyAutoHeightDescription
             id="product-description-check"
             value={description}
             analyzing={false}
-            placeholder="Описание появится после анализа фото"
+            placeholder={copy.productCheck.descriptionPlaceholder}
           />
         )}
         {!analyzing && description.length >= PRODUCT_POSE_DESCRIPTION_RU_MAX ? (
           <p className="text-[11px] leading-4 text-slate-500">
-            Текст обрезан до {PRODUCT_POSE_DESCRIPTION_RU_MAX} символов.
+            {formatStudioString(copy.productCheck.truncated, {
+              max: PRODUCT_POSE_DESCRIPTION_RU_MAX,
+            })}
           </p>
         ) : null}
       </div>
@@ -177,7 +173,7 @@ export function ProductCheckPanel({
           className={cn("h-4 w-4", analyzing && "animate-spin")}
           aria-hidden
         />
-        Повторить анализ AI
+        {copy.productCheck.retry}
       </Button>
     </div>
   );

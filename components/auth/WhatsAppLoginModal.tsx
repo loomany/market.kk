@@ -38,6 +38,15 @@ export function WhatsAppLoginModal() {
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const openLogin = () => setOpen(true);
+    window.addEventListener("vitrina-open-login", openLogin);
+    return () => window.removeEventListener("vitrina-open-login", openLogin);
+  }, []);
+
+  useEffect(() => {
     void fetch("/api/auth/me")
       .then((res) => res.json())
       .then((data: { user: User }) => setUser(data.user))

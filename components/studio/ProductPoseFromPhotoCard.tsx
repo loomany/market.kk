@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/Button";
 import type { ResolvedModelAngle } from "@/lib/ai/modelAngles";
 import { productPoseLabelForUi } from "@/lib/ai/productPoseSummary";
+import { useStudioCopy } from "./StudioLocaleContext";
 
 type ProductPoseFromPhotoCardProps = {
   disabled?: boolean;
@@ -21,6 +22,9 @@ export function ProductPoseFromPhotoCard({
   onApply,
   onClear,
 }: ProductPoseFromPhotoCardProps) {
+  const { copy } = useStudioCopy();
+  const p = copy.productPoseFromPhoto;
+
   if (
     useProductSampleAngles &&
     productSampleAngles &&
@@ -29,7 +33,7 @@ export function ProductPoseFromPhotoCard({
     return (
       <div className="space-y-2 rounded-[14px] border border-emerald-200 bg-emerald-50/60 p-3">
         <p className="text-xs font-semibold text-emerald-900">
-          Поза по фото товара
+          {p.matchedTitle}
         </p>
         <p className="text-sm font-medium leading-6 text-emerald-950">
           {productSampleAngles[0]
@@ -43,7 +47,7 @@ export function ProductPoseFromPhotoCard({
             onClick={onClear}
             className="text-xs font-medium text-emerald-800 underline-offset-2 hover:underline"
           >
-            Описать позу вручную
+            {p.describeManual}
           </button>
         ) : null}
       </div>
@@ -54,11 +58,8 @@ export function ProductPoseFromPhotoCard({
 
   return (
     <div className="space-y-2 rounded-[14px] border border-teal-100 bg-teal-50/50 p-3">
-      <p className="text-xs font-medium text-teal-950">Поза с фото товара</p>
-      <p className="text-xs leading-5 text-teal-950">
-        AI посмотрит на загруженное фото товара и подберёт похожую позу для
-        генерации модели.
-      </p>
+      <p className="text-xs font-medium text-teal-950">{p.title}</p>
+      <p className="text-xs leading-5 text-teal-950">{p.hint}</p>
       <Button
         type="button"
         variant="secondary"
@@ -68,7 +69,7 @@ export function ProductPoseFromPhotoCard({
         disabled={disabled || analyzing}
         onClick={onApply}
       >
-        Подобрать позу по фото товара
+        {p.cta}
       </Button>
     </div>
   );

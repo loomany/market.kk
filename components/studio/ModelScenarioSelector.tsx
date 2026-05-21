@@ -1,39 +1,10 @@
 "use client";
 
+import { useMemo } from "react";
 import { Select } from "@/components/ui/Select";
 import { isAdultModelAge } from "@/lib/ai/modelAge";
+import { useStudioCopy } from "./StudioLocaleContext";
 import type { ModelCategoryContext } from "./types";
-
-const SCENARIO_OPTIONS: {
-  id: ModelCategoryContext;
-  label: string;
-  hint: string;
-}[] = [
-  {
-    id: "clothing",
-    label: "Одежда",
-    hint: "Повседневная и деловая одежда, детская и взрослая",
-  },
-  {
-    id: "lingerie",
-    label: "Бельё / купальники",
-    hint: "Только 18+, нейтральная взрослая подача для карточки товара",
-  },
-  {
-    id: "jewelry",
-    label: "Украшения",
-    hint: "Видны шея, уши и зона украшения без лишних аксессуаров",
-  },
-  {
-    id: "general",
-    label: "Универсально",
-    hint: "Когда категория неочевидна или смешанный ассортимент",
-  },
-];
-
-function scenarioHint(value: ModelCategoryContext): string {
-  return SCENARIO_OPTIONS.find((item) => item.id === value)?.hint ?? "";
-}
 
 type ModelScenarioSelectorProps = {
   value: ModelCategoryContext;
@@ -48,14 +19,30 @@ export function ModelScenarioSelector({
   onChange,
   disabled = false,
 }: ModelScenarioSelectorProps) {
+  const { copy } = useStudioCopy();
+  const ms = copy.modelScenario;
+
+  const scenarioOptions = useMemo(
+    () =>
+      (
+        [
+          { id: "clothing" as const, label: ms.clothing },
+          { id: "lingerie" as const, label: ms.lingerie },
+          { id: "jewelry" as const, label: ms.jewelry },
+          { id: "general" as const, label: ms.general },
+        ] as const
+      ).map((opt) => ({ ...opt, hint: ms.hint })),
+    [ms]
+  );
+
   const isMinor = !isAdultModelAge(modelAge);
 
   return (
     <Select
-      label="Сценарий"
-      helper={scenarioHint(value)}
+      label={ms.label}
+      helper={ms.hint}
       value={value}
-      options={SCENARIO_OPTIONS.map((opt) => ({
+      options={scenarioOptions.map((opt) => ({
         value: opt.id,
         label: opt.label,
         disabled: isMinor && opt.id === "lingerie",

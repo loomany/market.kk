@@ -164,8 +164,11 @@ const publishedEnNumbers = new Set([
   6, 7, 9, 10, 19, 20, 29, 34, 35, 36, 49, 55, 60, 61, 63, 67, 75, 77, 94, 96,
 ]);
 
-/** KK Stage 5/6: top 10 Kaspi/marketplace articles — published when QA approved */
-const publishedKkNumbers = new Set([1, 2, 3, 4, 5, 11, 12, 16, 31, 64]);
+/** KK Stage 5 (10) + Stage 13 Wave 2 (8) — published when QA approved */
+const publishedKkNumbers = new Set([
+  1, 2, 3, 4, 5, 11, 12, 16, 31, 64,
+  6, 7, 9, 10, 20, 61, 63, 77,
+]);
 
 const ruSlugOverrides: Record<number, string> = {
   1: "ai-foto-tovarov-dlya-marketpleysov",
@@ -196,11 +199,19 @@ const kkSlugOverrides: Record<number, string> = {
   3: "onim-ushin-ak-fon-kalay-zhasau",
   4: "fotosurysyz-onim-fotosyn-zhetildiru",
   5: "kadirdik-onim-fotosynan-kartochka",
+  6: "ai-marketpleisterge-satushylaryna-komek-korsetedi",
+  7: "tauar-fotosynyn-satu-tusiretin-katelikteri",
+  9: "ai-nege-tauardy-ozgertedi",
+  10: "ai-fotoda-tus-pishindi-saktau",
   11: "kiim-ai-model-fotosy",
   12: "kiimdi-ai-modelge-kiyu",
   16: "ish-kiyim-ai-model-fotosy",
+  20: "ai-primerka-ushin-kiim-fotosyn-dayandau",
   31: "kaspi-ushin-onim-fotosy",
+  61: "ai-tauar-fotosy-kashan-sajkes-kelmeidi",
+  63: "ai-kartochka-sapasyn-tekseru",
   64: "onim-fonyn-alu",
+  77: "ai-model-zhane-shyn-model",
 };
 
 const kkTitleOverrides: Record<number, string> = {
@@ -209,11 +220,19 @@ const kkTitleOverrides: Record<number, string> = {
   3: "Тауарға ақ фон қалай жасауға болады",
   4: "Фотосуретшісіз тауар фотосын қалай жақсартуға болады",
   5: "Қарапайым фотодан тауар карточкасын қалай жасауға болады",
+  6: "AI маркетплейс сатушыларына қалай көмектеседі: Kaspi workflow және шектеулер",
+  7: "Сату түсіретін тауар фотосы қателері: Kaspi сатушыларына чеклист",
+  9: "AI неге тауарды өзгертуі мүмкін және қалай азайтуға болады",
+  10: "AI фотода тауар түсі мен пішінін сақтау: Kaspi карточкасы workflow",
   11: "Киімді AI модельде көрсету: маркетплейс workflow",
   12: "Киімді AI модельге кию: виртуалды примерка workflow",
   16: "Іш киім фотосы AI модельде: қауіпсіз каталог стилі",
+  20: "AI виртуалды примерка үшін киім фотосын дайындау",
   31: "Kaspi үшін тауар фотосы: дайындау және тексеру",
+  61: "AI тауар фотосы қашан сәйкес келмейді: адал шектеулер",
+  63: "AI тауар карточкасының сапасын қалай тексеруге болады",
   64: "Тауар фонын алу: AI және қолмен QA",
+  77: "AI модель ме, нақты модель ме: Kaspi киім каталогы",
 };
 
 const p0KeywordOverrides: Record<number, { ru?: string; en?: string; ruSecondary?: string[]; enSecondary?: string[] }> = {

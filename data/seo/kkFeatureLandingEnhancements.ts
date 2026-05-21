@@ -62,8 +62,9 @@ export const kkFeatureLandingEnhancements: Partial<
     internalLinks: [
       { label: "Студияны ашу", href: "/studio" },
       { label: "Бағалар", href: "/kk/cost" },
+      { label: "AI сатушыларға", href: "/kk/blog/ai-marketpleisterge-satushylaryna-komek-korsetedi" },
+      { label: "Түс пішін сақтау", href: "/kk/blog/ai-fotoda-tus-pishindi-saktau" },
       { label: "Kaspi фото", href: "/kk/blog/kaspi-ushin-onim-fotosy" },
-      { label: "Блог", href: "/kk/blog" },
     ],
   },
   productPhotoForMarketplaces: {
@@ -85,13 +86,19 @@ export const kkFeatureLandingEnhancements: Partial<
         body:
           "Kaspi-де нақты тауар мен визуал сәйкестігі маңызды. Бір сағат QA популяр SKU-да қайтарудан арзан.",
       },
+      {
+        title: "Қосымша материалдар",
+        body:
+          "Сату түсіретін фото қателері, AI карточка сапасын тексеру және AI шектеулері туралы мақалалар блогта — тек жарияланған kk беттерге сілтеме.",
+      },
     ],
     faq: commonFaq,
     internalLinks: [
       { label: "Студияны ашу", href: "/studio" },
-      { label: "AI тауар фотосы", href: "/kk/blog/ai-onim-fotografiyasi" },
+      { label: "Фото қателері", href: "/kk/blog/tauar-fotosynyn-satu-tusiretin-katelikteri" },
+      { label: "AI сапа тексеру", href: "/kk/blog/ai-kartochka-sapasyn-tekseru" },
       { label: "Kaspi", href: "/kk/blog/kaspi-ushin-onim-fotosy" },
-      { label: "Маркетплейс фото", href: "/kk/marketpleisterge-onim-fotosy" },
+      { label: "Маркетплейс LP", href: "/kk/marketpleisterge-onim-fotosy" },
     ],
   },
   fashionModelPhotos: {
@@ -117,9 +124,9 @@ export const kkFeatureLandingEnhancements: Partial<
     faq: commonFaq,
     internalLinks: [
       { label: "Студияны ашу", href: "/studio" },
+      { label: "Примерка дайындау", href: "/kk/blog/ai-primerka-ushin-kiim-fotosyn-dayandau" },
+      { label: "AI vs нақты модель", href: "/kk/blog/ai-model-zhane-shyn-model" },
       { label: "Киім модельде", href: "/kk/blog/kiim-ai-model-fotosy" },
-      { label: "Модельге кию", href: "/kk/blog/kiimdi-ai-modelge-kiyu" },
-      { label: "Тексеру", href: "/kk/blog/marketpleisterge-onim-fotosu-kalay-zhasau" },
     ],
   },
   productVideoGenerator: {
@@ -184,7 +191,8 @@ export const kkFeatureLandingEnhancements: Partial<
     internalLinks: [
       { label: "Студияны ашу", href: "/studio" },
       { label: "Фонды алу", href: "/kk/blog/onim-fonyn-alu" },
-      { label: "Ақ фон", href: "/kk/blog/onim-ushin-ak-fon-kalay-zhasau" },
+      { label: "Түс пішін сақтау", href: "/kk/blog/ai-fotoda-tus-pishindi-saktau" },
+      { label: "AI өзгертуі", href: "/kk/blog/ai-nege-tauardy-ozgertedi" },
       { label: "Kaspi", href: "/kk/blog/kaspi-ushin-onim-fotosy" },
     ],
   },

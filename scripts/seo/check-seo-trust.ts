@@ -5,6 +5,7 @@
 import { getExamplePagesForLocale } from "@/data/seo/examplesPages";
 import { staticSeoPages } from "@/data/seo/staticPages";
 import { indexableLocales } from "@/lib/i18n/localeConfig";
+import { isKkTrustPageApproved } from "@/lib/seo/kkIndexPolicy";
 import { shouldIndexPage } from "@/lib/seo/qualityGate";
 
 const trustKeys = ["howItWorks", "quality", "faq"] as const;
@@ -63,6 +64,21 @@ for (const key of trustKeys) {
 
   const kk = page.content.kk;
   if (kk) {
+    const expectIndex = isKkTrustPageApproved(key);
+    if (expectIndex && kk.status !== "published") {
+      fail(`${key} kk approved but status=${kk.status}`);
+    }
+    if (kk.title.length < 18) fail(`${key} kk title short`);
+    if (kk.metaDescription.length < 55) fail(`${key} kk meta short`);
+    if (kk.h1.length < 8) fail(`${key} kk h1 short`);
+    if (kk.sections.length < 2) fail(`${key} kk sections`);
+    if (!kk.faq || kk.faq.length < 3) fail(`${key} kk FAQ`);
+    if (!kk.relatedLinks || kk.relatedLinks.length < 2) fail(`${key} kk links`);
+    const hasStudioCta = kk.relatedLinks?.some((l) => l.href === "/studio") ?? false;
+    if (expectIndex && !hasStudioCta) {
+      fail(`${key} kk missing Студияны ашу CTA (/studio)`);
+    }
+
     const kkIndex = shouldIndexPage({
       locale: "kk",
       title: kk.title,
@@ -74,8 +90,12 @@ for (const key of trustKeys) {
       hasCanonical: true,
       hasHreflang: true,
     });
-    if (kkIndex) {
-      fail(`${key} kk should be noindex (ready_for_review)`);
+    if (expectIndex && !kkIndex) {
+      fail(`${key} kk should be indexable (published)`);
+    } else if (!expectIndex && kkIndex) {
+      fail(`${key} kk should be noindex until approved`);
+    } else if (expectIndex) {
+      ok(`${key} kk indexable (${kk.faq!.length} FAQ, published)`);
     } else {
       ok(`${key} kk noindex until QA (${kk.status})`);
     }

@@ -10,7 +10,9 @@ import { getArticleByTopicId } from "../../data/seo/blogArticles";
 import { getBlogPathByLocale } from "../../lib/blog/blogResolve";
 import { indexableLocales, supportedLocaleHreflangs } from "../../lib/i18n/localeConfig";
 import { localeCodes } from "../../lib/i18n/locales";
-import { isKkBlogTopicApproved } from "../../lib/seo/kkIndexPolicy";
+import { staticSeoPages } from "../../data/seo/staticPages";
+import { buildLocalizedPathMap, type StaticRouteKey } from "../../lib/i18n/routeSlugs";
+import { isKkBlogTopicApproved, isKkTrustPageApproved } from "../../lib/seo/kkIndexPolicy";
 import { shouldIndexPage } from "../../lib/seo/qualityGate";
 import {
   absoluteUrl,
@@ -197,6 +199,15 @@ function auditSitemapEntries() {
     ok("KK product video not in sitemap");
   }
 
+  for (const segment of ["how-it-works", "quality", "faq"] as const) {
+    const trustUrl = kkUrls.find((u) => u.endsWith(`/kk/${segment}`));
+    if (!trustUrl) {
+      fail(`Approved KK trust page missing from sitemap: /kk/${segment}`);
+    } else {
+      ok(`KK trust in sitemap: /kk/${segment}`);
+    }
+  }
+
   for (const entry of entries) {
     const path = new URL(entry.url).pathname;
     const parts = path.split("/").filter(Boolean);
@@ -252,10 +263,10 @@ function checkHreflangPolicy() {
       }
     }
   }
-  if (triads !== 10) {
-    fail(`Expected 10 kk triads, got ${triads}`);
+  if (triads !== 18) {
+    fail(`Expected 18 kk triads, got ${triads}`);
   } else {
-    ok("10 ru/en/kk triads; 30 ru/en-only pairs");
+    ok("18 ru/en/kk triads; 22 ru/en-only pairs");
   }
 
   const enOnlyPair = blogTopics.find(
@@ -271,6 +282,36 @@ function checkHreflangPolicy() {
     }
   }
 
+  const trustKeys = ["howItWorks", "quality", "faq"] as const satisfies readonly StaticRouteKey[];
+  let trustTriads = 0;
+  for (const key of trustKeys) {
+    if (!isKkTrustPageApproved(key)) {
+      fail(`${key}: not in KK approved trust policy`);
+      continue;
+    }
+    const page = staticSeoPages.find((p) => p.key === key);
+    if (page?.content.kk?.status !== "published") {
+      fail(`${key}: kk trust must be published for hreflang`);
+      continue;
+    }
+    const paths = {
+      ru: buildLocalizedPathMap(key).ru,
+      en: buildLocalizedPathMap(key).en,
+      kk: buildLocalizedPathMap(key).kk,
+    };
+    const alts = buildLanguageAlternates(paths);
+    if (!alts.kk || !alts.ru || !alts.en) {
+      fail(`${key}: trust triad missing hreflang`);
+    } else {
+      trustTriads++;
+    }
+  }
+  if (trustTriads !== 3) {
+    fail(`Expected 3 kk trust hreflang triads, got ${trustTriads}`);
+  } else {
+    ok("3 ru/en/kk trust hreflang triads");
+  }
+
   if (!isProductionSiteUrl()) {
     warn("Canonical/hreflang absolute URLs currently use dev/placeholder base — production deploy must set NEXT_PUBLIC_SITE_URL");
   } else {
@@ -281,9 +322,27 @@ function checkHreflangPolicy() {
 function checkRoutePolicy() {
   console.log("\n=== Route policy (static paths) ===");
 
-  const core = ["/ru", "/en", "/kk", "/ru/cost", "/en/cost", "/kk/cost"];
+  const core = [
+    "/ru",
+    "/en",
+    "/kk",
+    "/ru/cost",
+    "/en/cost",
+    "/kk/cost",
+    "/kk/how-it-works",
+    "/kk/quality",
+    "/kk/faq",
+  ];
   for (const path of core) {
     ok(`Core path exists in routing: ${path}`);
+  }
+
+  const ruTrust = "/ru/how-it-works";
+  const kkTrust = resolveLocaleSwitchPath(ruTrust, "kk");
+  if (kkTrust !== "/kk/how-it-works") {
+    fail(`Trust locale switch expected /kk/how-it-works, got ${kkTrust}`);
+  } else {
+    ok("Locale switch preserves KK trust path");
   }
 
   const ruSamples = ["blog_031", "blog_001", "blog_002"];
@@ -341,8 +400,26 @@ function checkAssets() {
     }
   }
 
-  if (!existsSync("public/favicon.ico")) {
-    ok("No public/favicon.ico — Next app/icon.png serves favicon (acceptable)");
+  const iconChecks: Array<{ path: string; maxBytes: number }> = [
+    { path: "public/favicon.ico", maxBytes: 64_000 },
+    { path: "public/icon-192.png", maxBytes: 128_000 },
+    { path: "public/icon-512.png", maxBytes: 256_000 },
+    { path: "public/apple-touch-icon.png", maxBytes: 64_000 },
+    { path: "app/favicon.ico", maxBytes: 64_000 },
+    { path: "app/icon.png", maxBytes: 8_000 },
+    { path: "app/apple-icon.png", maxBytes: 64_000 },
+  ];
+  for (const { path, maxBytes } of iconChecks) {
+    if (!existsSync(path)) {
+      fail(`Missing brand icon: ${path}`);
+      continue;
+    }
+    const size = statSync(path).size;
+    if (size > maxBytes) {
+      fail(`${path} too large (${size} bytes) — run npm run icons:generate`);
+    } else {
+      ok(`${path} (${size} bytes)`);
+    }
   }
 
   const manifestSrc = readFileSync("app/manifest.ts", "utf8");

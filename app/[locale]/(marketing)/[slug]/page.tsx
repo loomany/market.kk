@@ -166,7 +166,27 @@ export default async function StaticSeoPage({ params }: PageProps) {
       ) : null}
 
       <div className="mt-10 flex flex-wrap gap-3">
-        <Link href="/studio" prefetch={false} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">
+        {page.kind === "pricing" ? (
+          <Link
+            href={`/${locale}/tokens`}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white"
+          >
+            {locale === "ru"
+              ? "Купить 10 токенов"
+              : locale === "kk"
+                ? "10 токен сатып алу"
+                : "Buy 10 tokens"}
+          </Link>
+        ) : null}
+        <Link
+          href="/studio"
+          prefetch={false}
+          className={
+            page.kind === "pricing"
+              ? "rounded-lg border border-border bg-white px-4 py-2 text-sm font-semibold text-slate-800"
+              : "rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white"
+          }
+        >
           {locale === "ru" ? "Открыть студию" : locale === "kk" ? "Студияны ашу" : "Open studio"}
         </Link>
         <Link href={`/${locale}/use-cases`} className="rounded-lg border border-border bg-white px-4 py-2 text-sm font-semibold text-slate-800">

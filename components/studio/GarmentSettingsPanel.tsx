@@ -1,19 +1,24 @@
 "use client";
 
 import { Select } from "@/components/ui/Select";
-import { GARMENT_PHOTO_TYPES, type GarmentPhotoType } from "./types";
+import { getGarmentPhotoTypes } from "@/lib/studio/i18n/studioOptionLists";
+import type { GarmentPhotoType } from "./types";
+import { useStudioCopy } from "./StudioLocaleContext";
 
 /** Ручной override garmentPhotoType — только в «Дополнительные настройки». */
 export function GarmentPhotoTypeAdvancedSelect(props: {
   garmentPhotoType: GarmentPhotoType;
   onGarmentPhotoTypeChange: (v: GarmentPhotoType) => void;
 }) {
+  const { locale, copy } = useStudioCopy();
+  const g = copy.garmentSettings;
+
   return (
     <Select
-      label="Тип исходного фото"
-      helper="По умолчанию AI определяет автоматически. Меняйте только если примерка ошибается."
+      label={g.photoTypeLabel}
+      helper={g.photoTypeHelper}
       value={props.garmentPhotoType}
-      options={GARMENT_PHOTO_TYPES.map((opt) => ({
+      options={getGarmentPhotoTypes(locale).map((opt) => ({
         value: opt.id,
         label: opt.label,
       }))}

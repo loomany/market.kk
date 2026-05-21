@@ -1,7 +1,6 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Languages } from "lucide-react";
 import { Select } from "@/components/ui/Select";
 import {
   indexableLocales,
@@ -67,8 +66,7 @@ export function LanguageSwitcher({
   }
 
   return (
-    <div className={cn("inline-flex items-center gap-1.5", className)}>
-      <Languages className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
+    <div className={cn("inline-flex items-center", className)}>
       <span className="sr-only">Language</span>
       <Select
         className="w-auto"
