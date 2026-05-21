@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   type ReactNode,
 } from "react";
@@ -60,6 +61,8 @@ export function StudioLocaleProvider({
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  const searchKey = searchParams.toString();
+
   const locale = useMemo(() => {
     const queryLang = searchParams.get("lang");
     const queryLocale = queryLang ? toStudioLocale(queryLang) : null;
@@ -71,9 +74,24 @@ export function StudioLocaleProvider({
       readStoredLocale() ??
       toStudioLocale("ru")
     );
-  }, [routeLocale, pathname, searchParams]);
+  }, [routeLocale, pathname, searchKey]);
 
   const copy = useMemo(() => getStudioCopy(locale), [locale]);
+
+  const studioPathForLocale = useCallback((next: StudioLocale) => {
+    if (next === "ru") return "/studio";
+    return `/${next}/studio`;
+  }, []);
+
+  /** Canonical URLs: /studio (ru) and /en/studio, /kk/studio — ?lang= kept for old links. */
+  useEffect(() => {
+    if (pathname !== "/studio") return;
+    const queryLang = searchParams.get("lang");
+    if (!queryLang) return;
+    const target = toStudioLocale(queryLang);
+    if (target === "ru") return;
+    router.replace(studioPathForLocale(target));
+  }, [pathname, searchKey, router, studioPathForLocale, searchParams]);
 
   const setLocale = useCallback(
     (next: StudioLocale) => {
@@ -82,15 +100,12 @@ export function StudioLocaleProvider({
       if (pathLocale) {
         const segments = pathname.split("/").filter(Boolean);
         segments[0] = next;
-        router.push(`/${segments.join("/")}`);
+        router.replace(`/${segments.join("/")}`);
         return;
       }
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("lang", next);
-      const base = pathname.startsWith("/studio") ? pathname : "/studio";
-      router.push(`${base}?${params.toString()}`);
+      router.replace(studioPathForLocale(next));
     },
-    [pathname, router, searchParams]
+    [pathname, router, studioPathForLocale]
   );
 
   const value = useMemo(

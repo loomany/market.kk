@@ -65,7 +65,10 @@ export function resolveLocaleSwitchPath(
   }
 
   if (rest[0] === "studio") {
-    return "/studio";
+    if (targetLocale === "ru") {
+      return "/studio";
+    }
+    return `/${targetLocale}/studio`;
   }
 
   if (rest.length === 1 && SECTION_ROUTES.has(rest[0])) {
