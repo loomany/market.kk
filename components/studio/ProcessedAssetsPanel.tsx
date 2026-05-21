@@ -49,12 +49,15 @@ import {
   type SaasQualityTier,
 } from "./ImageSettingsForm";
 import { StudioAssetPreview } from "./StudioAssetPreview";
+import { tryApplyTokenBillingError } from "@/lib/tokens/billingErrorPayload";
+import type { TokenBillingErrorPayload } from "@/lib/tokens/billingErrorPayload";
 
 type ProcessedAssetsPanelProps = {
   assets: StudioSessionAsset[];
   mockMode: boolean;
   paidAiRunsAllowed: boolean;
   promptLocale: Locale;
+  onTokenBillingError?: (payload: TokenBillingErrorPayload) => void;
   onDeleteAsset: (id: string) => void;
   onAssetCreated: (asset: StudioSessionAsset) => void;
   onUpdateAsset: (id: string, patch: Partial<StudioSessionAsset>) => void;
@@ -86,6 +89,7 @@ export function ProcessedAssetsPanel({
   mockMode,
   paidAiRunsAllowed,
   promptLocale,
+  onTokenBillingError,
   onDeleteAsset,
   onAssetCreated,
   onUpdateAsset,
@@ -167,7 +171,15 @@ export function ProcessedAssetsPanel({
         }),
       });
       const data = (await res.json()) as ProductPreservationResponse;
-      if (!data.ok) return null;
+      if (!data.ok) {
+        if (
+          onTokenBillingError &&
+          tryApplyTokenBillingError(data, onTokenBillingError)
+        ) {
+          return null;
+        }
+        return null;
+      }
 
       const snapshot: NonNullable<StudioSessionAsset["productPreservation"]> = {
         analysis: data.analysis,
@@ -365,6 +377,13 @@ export function ProcessedAssetsPanel({
         });
         const data = (await res.json()) as VideoGenerateResponse;
         if (!data.ok) {
+          if (
+            onTokenBillingError &&
+            tryApplyTokenBillingError(data, onTokenBillingError)
+          ) {
+            onUpdateAsset(pendingId, { status: "error", errorMessage: "" });
+            return;
+          }
           const msg = friendlyPostProcessError(data.message);
           onUpdateAsset(pendingId, {
             status: "error",
@@ -433,6 +452,13 @@ export function ProcessedAssetsPanel({
       });
       const data = (await res.json()) as ImageEnhanceResponse;
       if (!data.ok) {
+        if (
+          onTokenBillingError &&
+          tryApplyTokenBillingError(data, onTokenBillingError)
+        ) {
+          onUpdateAsset(pendingId, { status: "error", errorMessage: "" });
+          return;
+        }
         setLastImageEnhanceDebug(data.debug ?? null);
         const msg = friendlyPostProcessError(data.error);
         onUpdateAsset(pendingId, {

@@ -1,7 +1,8 @@
 import type { Locale } from "@/lib/i18n/localeConfig";
 import {
   defaultLocale,
-  supportedLocaleCodes,
+  indexableLocales,
+  type IndexableLocale,
   supportedLocaleHreflangs,
   xDefaultLocale,
 } from "@/lib/i18n/localeConfig";
@@ -27,16 +28,27 @@ export function withoutTrailingSlash(path: string): string {
 }
 
 export function buildLanguageAlternates(
-  pathByLocale: Record<Locale, string>
+  pathByLocale: Partial<Record<Locale, string>> | Record<Locale, string>
 ): Record<string, string> {
+  const activeLocales = indexableLocales.filter(
+    (locale): locale is IndexableLocale =>
+      typeof pathByLocale[locale] === "string" && Boolean(pathByLocale[locale])
+  );
+
   const languages = Object.fromEntries(
-    supportedLocaleCodes.map((locale) => [
+    activeLocales.map((locale) => [
       supportedLocaleHreflangs[locale],
-      absoluteUrl(pathByLocale[locale]),
+      absoluteUrl(pathByLocale[locale]!),
     ])
   ) as Record<string, string>;
 
-  languages["x-default"] = absoluteUrl(pathByLocale[xDefaultLocale]);
+  const xDefaultPath = pathByLocale[xDefaultLocale as IndexableLocale];
+  if (activeLocales.includes("ru") && xDefaultPath) {
+    languages["x-default"] = absoluteUrl(xDefaultPath);
+  } else if (activeLocales.length > 0) {
+    languages["x-default"] = absoluteUrl(pathByLocale[activeLocales[0]]!);
+  }
+
   return languages;
 }
 

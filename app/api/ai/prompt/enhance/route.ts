@@ -11,6 +11,7 @@ import {
 } from "@/lib/ai/promptLocale";
 import type { Locale } from "@/lib/i18n/locales";
 import { sanitizeImageEnhancerOutputText } from "@/lib/studio/imageEnhancerOutputSanitizer";
+import { wrapAiPost } from "@/lib/tokens/wrapAiPost";
 
 export const runtime = "nodejs";
 
@@ -147,6 +148,10 @@ function extractOutputText(response: unknown) {
 }
 
 export async function POST(request: Request) {
+  return wrapAiPost(request, "prompt-enhance", ROUTE_ID, handlePromptEnhancePost);
+}
+
+async function handlePromptEnhancePost(request: Request) {
   let body: unknown;
   try {
     body = await request.json();

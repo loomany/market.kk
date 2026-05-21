@@ -15,6 +15,15 @@ export const defaultLocale: Locale = "ru";
 export const globalDefaultLocale: Locale = "en";
 export const xDefaultLocale: Locale = defaultLocale;
 
+/** Locales with published marketing content — safe for index + hreflang (kk: approved pages only via qualityGate). */
+export const indexableLocales = ["ru", "en", "kk"] as const satisfies readonly Locale[];
+
+export type IndexableLocale = (typeof indexableLocales)[number];
+
+export function isIndexableLocale(locale: Locale): locale is IndexableLocale {
+  return (indexableLocales as readonly Locale[]).includes(locale);
+}
+
 export const supportedLocales = locales;
 export const supportedLocaleCodes = localeCodes;
 export const supportedLocaleHreflangs = localeHreflangs;

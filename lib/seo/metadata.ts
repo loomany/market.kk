@@ -6,7 +6,7 @@ import { getRobotsPolicy, type SeoQualityInput } from "./qualityGate";
 export type SeoMetadataInput = SeoQualityInput & {
   title: string;
   description: string;
-  pathByLocale: Record<Locale, string>;
+  pathByLocale: Partial<Record<Locale, string>> | Record<Locale, string>;
   images?: string[];
 };
 

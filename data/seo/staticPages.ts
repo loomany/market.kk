@@ -16,6 +16,7 @@ export type StaticSeoPage = {
       intro: string;
       sections: Array<{ title: string; body: string }>;
       faq?: Array<{ question: string; answer: string }>;
+      relatedLinks?: Array<{ label: string; href: string }>;
       status: TranslationStatus;
     }
   >;
@@ -274,8 +275,217 @@ function createLegalPage(seed: (typeof legalSeeds)[number]): StaticSeoPage {
   };
 }
 
+const pricingPage: StaticSeoPage = {
+  key: "cost",
+  kind: "pricing",
+  indexPolicy: "index",
+  content: Object.fromEntries(
+    supportedLocaleCodes.map((locale) => {
+      if (locale === "ru") {
+        return [
+          locale,
+          {
+            slug: getRouteSlug(locale, "cost"),
+            title: "Тарифы и токены Vitrina AI — Vitrina AI Studio",
+            metaDescription:
+              "Токены Vitrina AI: 1 токен = export const staticSeoPages, одна AI-задача = 1 токен, пополнение 10 токенов за $10. Демо без списаний, оплата через Lemon Squeezy.",
+            h1: "Тарифы и токены",
+            intro:
+              "Оплата идёт токенами: 1 токен = export const staticSeoPages. Каждая успешная AI-генерация в студии списывает 1 токен. Минимальное пополнение — 10 токенов за $10.",
+            sections: [
+              {
+                title: "Токены",
+                body: "1 токен = export const staticSeoPages. Одна AI-задача (примерка, фон, карточка, улучшение и др.) = 1 токен. Баланс виден в шапке после входа.",
+              },
+              {
+                title: "Пополнение",
+                body: "Пакет 10 токенов за $10 через безопасную оплату Lemon Squeezy. После подтверждения платежа баланс обновляется автоматически (webhook), не по кнопке «успех» на сайте.",
+              },
+              {
+                title: "Гость без входа",
+                body: "Одна бесплатная генерация с водяным знаком vitrina.help на результате. Вторая гостевая генерация недоступна — войдите и пополните баланс.",
+              },
+              {
+                title: "Демо-режим",
+                body: "При AI_MOCK_MODE демо показывает интерфейс без реальных списаний и без оплаты провайдеров — для обучения команды.",
+              },
+            ],
+            faq: [
+              {
+                question: "Сколько стоит одна генерация?",
+                answer:
+                  "1 токен (export const staticSeoPages) за одну успешную AI-задачу. Если генерация не удалась, токен не списывается.",
+              },
+              {
+                question: "Как купить токены?",
+                answer:
+                  "Войдите в аккаунт → страница «Токены» → «Купить 10 токенов» ($10). Не используйте сторонние share-ссылки оплаты.",
+              },
+              {
+                question: "Можно ли использовать для Kaspi?",
+                answer:
+                  "Да, сервис помогает подготовить изображения для карточек, но не гарантирует принятие модерацией Kaspi. Правила площадки проверяет продавец.",
+              },
+              {
+                question: "Есть ли бесплатный пробный запуск?",
+                answer:
+                  "Да: одна гостевая генерация с watermark или демо-режим без списаний.",
+              },
+            ],
+            relatedLinks: [
+              { label: "Пополнить токены", href: "/ru/tokens" },
+              { label: "Как работает", href: "/ru/how-it-works" },
+              { label: "FAQ", href: "/ru/faq" },
+            ],
+            status: "published" as TranslationStatus,
+          },
+        ];
+      }
+
+      if (locale === "kk") {
+        return [
+          locale,
+          {
+            slug: getRouteSlug(locale, "cost"),
+            title: "Vitrina AI тарифтері және токендер — Vitrina AI Studio",
+            metaDescription:
+              "Vitrina AI токендері: 1 токен = export const staticSeoPages, бір AI тапсырмасы = 1 токен, 10 токен $10. Демо төлемсіз, Lemon Squeezy арқылы толтыру.",
+            h1: "Тарифтер және токендер",
+            intro:
+              "Төлем токенмен: 1 токен = export const staticSeoPages. Әр сәтті AI генерациясы 1 токен алады. Ең төмен толтыру — 10 токен, $10.",
+            sections: [
+              {
+                title: "Токендер",
+                body: "1 токен = export const staticSeoPages. Бір AI тапсырмасы = 1 токен. Баланс кіргеннен кейін тақтада көрінеді.",
+              },
+              {
+                title: "Толтыру",
+                body: "10 токен $10 — Lemon Squeezy. Төлем расталғаннан кейін баланс webhook арқылы жаңарады.",
+              },
+              {
+                title: "Қонақ",
+                body: "Бір тегін генерация — vitrina.help су белгісімен. Екінші қонақ генерация жабық.",
+              },
+              {
+                title: "Демо",
+                body: "Mock режимінде нақты төлем және токен есебі жоқ — командаға үйрету үшін.",
+              },
+            ],
+            faq: [
+              {
+                question: "Бір генерация қанша?",
+                answer: "1 токен (export const staticSeoPages), тек сәтті нәтиже үшін.",
+              },
+              {
+                question: "Токенді қалай сатып аламын?",
+                answer: "Аккаунтқа кіріңіз → «Токендер» → 10 токен сатып алу ($10).",
+              },
+              {
+                question: "Kaspi үшін пайдалануға бола ма?",
+                answer:
+                  "Иә, студия карточка суретін дайындауға көмектеседі, бірақ Kaspi модерациясын кепілдемейді. Ережелерді сатушы өзі тексереді.",
+              },
+              {
+                question: "Тегін сынау бар ма?",
+                answer: "Иә: бір қонақ генерация немесе демо режим.",
+              },
+            ],
+            relatedLinks: [
+              { label: "Токен сатып алу", href: "/kk/tokens" },
+              { label: "Қалай жұмыс істейді", href: "/kk/how-it-works" },
+              { label: "FAQ", href: "/kk/faq" },
+            ],
+            status: "published" as TranslationStatus,
+          },
+        ];
+      }
+
+      if (locale === "en") {
+        return [
+          locale,
+          {
+            slug: getRouteSlug(locale, "cost"),
+            title: "Vitrina AI pricing & tokens — Vitrina AI Studio",
+            metaDescription:
+              "Vitrina AI tokens: 1 token = export const staticSeoPages, one AI task = 1 token, top up 10 tokens for $10. Demo mode has no charges; checkout via Lemon Squeezy.",
+            h1: "Pricing & tokens",
+            intro:
+              "You pay with tokens: 1 token = export const staticSeoPages. Each successful AI task in the studio costs 1 token. Minimum top-up is 10 tokens for $10.",
+            sections: [
+              {
+                title: "Tokens",
+                body: "1 token = export const staticSeoPages. One AI task (try-on, background, product card, enhance, etc.) = 1 token. Balance appears in the header after sign-in.",
+              },
+              {
+                title: "Top up",
+                body: "10 tokens for $10 via Lemon Squeezy. Balance updates after payment confirmation (webhook), not from the success URL alone.",
+              },
+              {
+                title: "Guest without sign-in",
+                body: "One free generation with a vitrina.help watermark. A second guest run is blocked — sign in and top up to continue.",
+              },
+              {
+                title: "Demo mode",
+                body: "With AI mock mode enabled, the studio runs without token charges or paid provider calls — for training only.",
+              },
+            ],
+            faq: [
+              {
+                question: "How much is one generation?",
+                answer:
+                  "1 token (export const staticSeoPages) per successful AI task. Failed runs are not charged.",
+              },
+              {
+                question: "How do I buy tokens?",
+                answer:
+                  "Sign in → Tokens page → Buy 10 tokens ($10). Use in-app checkout only.",
+              },
+              {
+                question: "Can I use it for Kaspi?",
+                answer:
+                  "Yes, the studio helps prepare listing images, but it does not guarantee Kaspi moderation acceptance. Sellers must verify current platform rules.",
+              },
+              {
+                question: "Is there a free trial?",
+                answer:
+                  "Yes: one guest generation with watermark, or demo mode without charges.",
+              },
+            ],
+            relatedLinks: [
+              { label: "Buy tokens", href: "/en/tokens" },
+              { label: "How it works", href: "/en/how-it-works" },
+              { label: "FAQ", href: "/en/faq" },
+            ],
+            status: "published" as TranslationStatus,
+          },
+        ];
+      }
+
+      return [
+        locale,
+        {
+          slug: getRouteSlug(locale, "cost"),
+          title: "Vitrina AI pricing — Vitrina AI Studio",
+          metaDescription:
+            "Vitrina AI Studio pricing overview. Published plans are available in Russian and English.",
+          h1: "Vitrina AI pricing",
+          intro: "Pricing details are published for Russian and English locales.",
+          sections: [
+            {
+              title: "Availability",
+              body: "See /ru/cost or /en/cost for the current pricing overview.",
+            },
+          ],
+          status: "needs_review" as TranslationStatus,
+        },
+      ];
+    })
+  ) as StaticSeoPage["content"],
+};
+
 export const staticSeoPages: StaticSeoPage[] = [
   ...featurePages.map(createFeaturePage),
+  pricingPage,
   ...legalSeeds.map(createLegalPage),
 ];
 

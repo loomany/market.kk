@@ -8,13 +8,18 @@ import {
   isPaidAiGuardError,
   paidAiGuardResponse,
 } from "@/lib/ai/paidAiGuard";
-import { MAX_PRODUCT_PHOTOS } from "@/lib/studio/productPhotos";
+import { MAX_CLOTHING_PRODUCT_SET } from "@/lib/studio/productPhotos";
+import { wrapAiPost } from "@/lib/tokens/wrapAiPost";
 
 export const runtime = "nodejs";
 
 const ROUTE_ID = "/api/ai/analyze-product-angles";
 
 export async function POST(request: Request) {
+  return wrapAiPost(request, "angles-analyze", ROUTE_ID, handleAnalyzeProductAnglesPost);
+}
+
+async function handleAnalyzeProductAnglesPost(request: Request) {
   let formData: FormData;
   try {
     formData = await request.formData();
@@ -55,12 +60,12 @@ export async function POST(request: Request) {
     );
   }
 
-  if (files.length > MAX_PRODUCT_PHOTOS) {
+  if (files.length > MAX_CLOTHING_PRODUCT_SET) {
     return NextResponse.json(
       {
         ok: false,
         errorCode: "VALIDATION_ERROR",
-        message: "Загрузите одно фото товара за раз.",
+        message: `Можно загрузить до ${MAX_CLOTHING_PRODUCT_SET} фото за раз.`,
       },
       { status: 400 }
     );

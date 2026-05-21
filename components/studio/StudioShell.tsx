@@ -24,6 +24,7 @@ import {
   sanitizeModelSettingsForAge,
 } from "@/lib/ai/modelAge";
 import {
+  FAL_MODEL_ASPECT_RATIOS,
   FAL_MODEL_RESOLUTIONS,
   DEFAULT_MODEL_OUTPUT_SIZE,
   type FalModelAspectRatio,
@@ -90,7 +91,14 @@ import {
   parseSavedModelSnapshot,
 } from "@/lib/studio/savedModelSettings";
 import { Button } from "@/components/ui/Button";
+import { TokenBalancePill } from "@/components/auth/TokenBalancePill";
 import { WhatsAppLoginModal } from "@/components/auth/WhatsAppLoginModal";
+import { TokenBillingModal } from "@/components/studio/TokenBillingModal";
+import type { TokenBillingErrorPayload } from "@/lib/tokens/billingErrorPayload";
+import {
+  tryApplyTokenBillingError,
+} from "@/lib/tokens/billingErrorPayload";
+import type { IndexableLocale } from "@/lib/i18n/localeConfig";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { ProductPhotosUploader } from "./ProductPhotosUploader";
@@ -347,6 +355,8 @@ export function StudioShell({
   const [results, setResults] = useState<StudioResultImage[]>([]);
   const [sessionAssets, setSessionAssets] = useState<StudioSessionAsset[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [tokenBilling, setTokenBilling] =
+    useState<TokenBillingErrorPayload | null>(null);
   const [generationSeed, setGenerationSeed] = useState(42);
   const [modelGenerationSeed, setModelGenerationSeed] = useState(42);
   const [maskEditorOpen, setMaskEditorOpen] = useState(false);
@@ -1286,6 +1296,10 @@ export function StudioShell({
         };
 
         if (!data.ok) {
+          if (tryApplyTokenBillingError(data, setTokenBilling)) {
+            endModelGeneration();
+            return;
+          }
           if (collected.length > 0) {
             setGeneratedModelPreviews([...collected]);
             setGeneratedModelUrl(collected[0]!.url);
@@ -1519,6 +1533,7 @@ export function StudioShell({
       const data = parsed.data;
 
       if (!data.ok) {
+        if (tryApplyTokenBillingError(data, setTokenBilling)) return;
         setError(friendlyAiError(data.errorCode, data.message));
         return;
       }
@@ -1600,6 +1615,7 @@ export function StudioShell({
       const bgData = await removeBackgroundForProduct(bgSourceFile);
 
       if (!bgData.ok) {
+        if (tryApplyTokenBillingError(bgData, setTokenBilling)) return;
         setError(friendlyAiError(bgData.errorCode, bgData.message));
         return;
       }
@@ -1937,7 +1953,10 @@ export function StudioShell({
           <span className="hidden text-sm font-bold tracking-tight text-slate-950 sm:inline">
             Vitrina <span className="text-teal-700">AI</span>
           </span>
-          <WhatsAppLoginModal />
+          <div className="flex items-center gap-2">
+            <TokenBalancePill />
+            <WhatsAppLoginModal />
+          </div>
         </div>
       </header>
 
@@ -1965,6 +1984,7 @@ export function StudioShell({
             mockMode={mockMode}
             paidAiRunsAllowed={paidAiRunsAllowed}
             promptLocale={promptLocale}
+            onTokenBillingError={setTokenBilling}
             onDeleteAsset={deleteSessionAsset}
             onAssetCreated={addSingleAssetToSession}
             onUpdateAsset={updateSessionAsset}
@@ -2369,6 +2389,13 @@ export function StudioShell({
         </div>
         )}
       </main>
+
+      <TokenBillingModal
+        open={tokenBilling !== null}
+        payload={tokenBilling}
+        onClose={() => setTokenBilling(null)}
+        locale={promptLocale as IndexableLocale}
+      />
     </div>
   );
 }

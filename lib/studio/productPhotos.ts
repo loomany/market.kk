@@ -1,6 +1,13 @@
 /** Один товар за запуск — следующий SKU: замените фото и снова «Создать фото на модели». */
 export const MAX_PRODUCT_PHOTOS = 1;
 
+/** Максимум фото в комплекте одежды (мульти-ракурс). */
+export const MAX_CLOTHING_PRODUCT_SET = 5;
+
+export function isProductSetMode(photoCount: number): boolean {
+  return photoCount > 1;
+}
+
 export type StudioProductPhoto = {
   id: string;
   file: File;

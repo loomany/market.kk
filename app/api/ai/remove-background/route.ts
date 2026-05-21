@@ -15,6 +15,7 @@ import {
   paidAiGuardResponse,
   type PaidAiGuardInput,
 } from "@/lib/ai/paidAiGuard";
+import { wrapAiPost } from "@/lib/tokens/wrapAiPost";
 
 export const runtime = "nodejs";
 
@@ -139,6 +140,10 @@ async function runRemoveBackground(imageUrl: string, syncMode: boolean) {
 }
 
 export async function POST(request: Request) {
+  return wrapAiPost(request, "background", ROUTE_ID, handleRemoveBackgroundPost);
+}
+
+async function handleRemoveBackgroundPost(request: Request) {
   const contentType = request.headers.get("content-type") ?? "";
 
   if (contentType.includes("multipart/form-data")) {

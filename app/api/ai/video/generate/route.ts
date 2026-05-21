@@ -11,14 +11,21 @@ import { getVideoModel } from "@/lib/ai/videoModels";
 import { videoGenerateRequestSchema } from "@/lib/ai/videoSchemas";
 import { defaultLocale } from "@/lib/i18n/localeConfig";
 import { translatePromptToEnglish } from "@/lib/ai/promptTranslate";
+import { wrapAiPost } from "@/lib/tokens/wrapAiPost";
 
 export const runtime = "nodejs";
+
+const ROUTE_ID = "/api/ai/video/generate";
 
 function isMockMode() {
   return process.env.AI_MOCK_MODE !== "0";
 }
 
 export async function POST(request: Request) {
+  return wrapAiPost(request, "video", ROUTE_ID, handleVideoGeneratePost);
+}
+
+async function handleVideoGeneratePost(request: Request) {
   let body: unknown;
   try {
     body = await request.json();
