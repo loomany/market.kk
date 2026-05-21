@@ -54,6 +54,7 @@ import {
 import { prepareImagePromptPackage } from "@/lib/ai/imagePromptPackage";
 import { defaultLocale } from "@/lib/i18n/localeConfig";
 import { wrapAiPost } from "@/lib/tokens/wrapAiPost";
+import { withGenerationIdempotency } from "@/lib/studio/withGenerationIdempotency";
 
 export const runtime = "nodejs";
 
@@ -201,6 +202,17 @@ async function handleImageEnhancePost(request: Request) {
 
   const estimatedCost = estimateCostForEditor(editor, data.quality);
 
+  return withGenerationIdempotency(
+    {
+      clientAssetId: data.clientAssetId,
+      jobType: "enhance",
+      route: ROUTE_ID,
+      requestPayload: data as unknown as Record<string, unknown>,
+      provider: "fal",
+      model: modelIdForEditor(editor),
+      estimatedCost,
+    },
+    async () => {
   let packagedGenerationPrompt: string;
   try {
     const packaged = await prepareImagePromptPackage({
@@ -805,4 +817,6 @@ async function handleImageEnhancePost(request: Request) {
     effectiveResolution: trace.partial.effectiveResolution,
   });
   return NextResponse.json(response);
+    }
+  );
 }

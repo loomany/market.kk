@@ -51,6 +51,7 @@ export type StudioCopy = {
     oneProductPhoto: string;
     clearAllTitle: string;
     previewAlt: string;
+    uploading: string;
   };
   common: {
     product: string;

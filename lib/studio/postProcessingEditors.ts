@@ -38,7 +38,7 @@ export const VIDEO_EDITORS: PostProcessingEditor[] = [
     description: "Перенос движения с референс-видео на фото.",
     technicalModel: "fal-ai/kling-video/v2.6/standard/motion-control",
     pros: "Танец, жесты, сложная мимика с MP4.",
-    limitations: "Нужна прямая ссылка на референс-видео.",
+    limitations: "Загрузите MP4 в блоке «Свой файл» выше.",
     available: true,
   },
   {

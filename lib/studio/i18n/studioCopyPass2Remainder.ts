@@ -273,6 +273,24 @@ export const pass2RemainderRu = {
     previewAlt: "Предпросмотр: {title}",
     resultTitle: "Результат",
   },
+  postProcessingUpload: {
+    sectionTitle: "Свой файл",
+    description:
+      "Загрузите фото или видео — улучшите кадр или сделайте ролик. Для MP4 доступен только Kling Motion Control (движение с вашего видео).",
+    dropLabel: "Фото или видео",
+    dropHint: "JPEG, PNG, WebP или MP4/MOV до 200 МБ",
+    dropAction: "Выберите фото или видео, либо перетащите сюда",
+    replaceFile: "Заменить",
+    clearFile: "Убрать",
+    saveFile: "Сохранить",
+    cancelUpload: "Отменить",
+    uploading: "Загружаем…",
+    uploadFailed: "Не удалось загрузить файл.",
+    videoMotionOnly:
+      "Для видео используется Kling Motion Control: первый кадр — внешность, движение — из вашего ролика.",
+    previewPhoto: "Загруженное фото",
+    previewVideo: "Загруженное видео",
+  },
   postProcessingDesktop: {
     backToFiles: "Назад к файлам",
     galleryTitle: "Мои файлы",
@@ -306,7 +324,7 @@ export const pass2RemainderRu = {
   },
   postProcessingActions: {
     whatCreate: "Что создать?",
-    image: "Изображение",
+    image: "Прокачать изображение",
     video: "Видео",
   },
   productCardExport: {
@@ -596,6 +614,24 @@ export const pass2RemainderEn = {
     previewAlt: "Preview: {title}",
     resultTitle: "Result",
   },
+  postProcessingUpload: {
+    sectionTitle: "Your file",
+    description:
+      "Upload a photo or video to enhance the frame or create a clip. For MP4, only Kling Motion Control is available (motion from your video).",
+    dropLabel: "Photo or video",
+    dropHint: "JPEG, PNG, WebP, or MP4/MOV up to 200 MB",
+    dropAction: "Select a photo or video, or drag it here",
+    replaceFile: "Replace",
+    clearFile: "Remove",
+    saveFile: "Save",
+    cancelUpload: "Cancel",
+    uploading: "Uploading…",
+    uploadFailed: "Could not upload the file.",
+    videoMotionOnly:
+      "Videos use Kling Motion Control: first frame sets appearance, motion comes from your clip.",
+    previewPhoto: "Uploaded photo",
+    previewVideo: "Uploaded video",
+  },
   postProcessingDesktop: {
     backToFiles: "Back to files",
     galleryTitle: "My files",
@@ -629,7 +665,7 @@ export const pass2RemainderEn = {
   },
   postProcessingActions: {
     whatCreate: "What to create?",
-    image: "Image",
+    image: "Enhance image",
     video: "Video",
   },
   productCardExport: {
@@ -919,6 +955,24 @@ export const pass2RemainderKk = {
     previewAlt: "Алдын ала қарау: {title}",
     resultTitle: "Нәтиже",
   },
+  postProcessingUpload: {
+    sectionTitle: "Өз файлыңыз",
+    description:
+      "Фото немесе бейне жүктеңіз — кадрды жақсартыңыз немесе ролик жасаңыз. MP4 үшін тек Kling Motion Control (қозғалыс сіздің бейнеден).",
+    dropLabel: "Фото немесе бейне",
+    dropHint: "JPEG, PNG, WebP немесе MP4/MOV — 200 МБ дейін",
+    dropAction: "Фото немесе бейне таңдаңыз, немесе осында сүйреңіз",
+    replaceFile: "Ауыстыру",
+    clearFile: "Өшіру",
+    saveFile: "Сақтау",
+    cancelUpload: "Болдырмау",
+    uploading: "Жүктелуде…",
+    uploadFailed: "Файлды жүктеу сәтсіз аяқталды.",
+    videoMotionOnly:
+      "Бейне үшін Kling Motion Control: бірінші кадр — сыртқы түр, қозғалыс — сіздің роликтен.",
+    previewPhoto: "Жүктелген фото",
+    previewVideo: "Жүктелген бейне",
+  },
   postProcessingDesktop: {
     backToFiles: "Файлдарға қайту",
     galleryTitle: "Менің файлдарым",
@@ -952,7 +1006,7 @@ export const pass2RemainderKk = {
   },
   postProcessingActions: {
     whatCreate: "Не жасау керек?",
-    image: "Сурет",
+    image: "Суретті жақсарту",
     video: "Видео",
   },
   productCardExport: {

@@ -73,6 +73,7 @@ export const studioCopyKk: StudioCopy = {
     oneProductPhoto: "1 тауар фотосы",
     clearAllTitle: "Фото, рамка және карточканы қалпына келтіру",
     previewAlt: "Тауар алдын ала қарауы",
+    uploading: "Жүктелуде…",
   },
   common: {
     product: "Тауар",

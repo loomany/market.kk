@@ -12,6 +12,14 @@ export const previewCardShared = {
 export const saasPreviewCardClass =
   "w-full ring-2 ring-slate-100/90 shadow-lg shadow-slate-200/50 lg:w-full lg:ring-1 lg:shadow-sm lg:shadow-slate-200/50";
 
+/** «Свой файл» / «Мои файлы» — одна ширина и тонкая обводка Card. */
+export const postProcessingSectionCardClass =
+  "mx-auto w-full max-w-[656px] overflow-hidden";
+
+/** Плитка файла в галерее — без ring, как секции выше. */
+export const postProcessingGalleryTileClass =
+  "w-full rounded-2xl border border-border/80 bg-white shadow-sm shadow-slate-200/40";
+
 export function StudioPreviewTabButton({
   label,
   active,

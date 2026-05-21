@@ -91,6 +91,13 @@ import {
   buildSavedModelSnapshot,
   parseSavedModelSnapshot,
 } from "@/lib/studio/savedModelSettings";
+import { removePendingGenerationJob } from "@/lib/studio/pendingGenerationClient";
+import {
+  loadStudioSessionAssets,
+  removeStudioSessionAsset,
+  saveStudioSessionAssets,
+  upsertStudioSessionAsset,
+} from "@/lib/studio/studioSessionPersistence";
 import { Button } from "@/components/ui/Button";
 import { TokenBalancePill } from "@/components/auth/TokenBalancePill";
 import { WhatsAppLoginModal } from "@/components/auth/WhatsAppLoginModal";
@@ -1123,16 +1130,34 @@ function StudioShellInner({
     : undefined;
 
   const persistAsset = useCallback(async (asset: StudioSessionAsset) => {
+    const payload = {
+      ...asset,
+      url: asset.url || asset.sourceImageUrl || "pending",
+    };
     try {
       await fetch("/api/studio/assets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(asset),
+        body: JSON.stringify(payload),
       });
     } catch {
       // Session-only mode must keep working when auth or Supabase is absent.
     }
   }, []);
+
+  const mergeSessionAssets = useCallback(
+    (incoming: StudioSessionAsset[]) => {
+      if (incoming.length === 0) return;
+      setSessionAssets((prev) => {
+        const savedIds = new Set(incoming.map((asset) => asset.id));
+        return [
+          ...incoming,
+          ...prev.filter((asset) => !savedIds.has(asset.id)),
+        ].slice(0, 48);
+      });
+    },
+    []
+  );
 
   const loadSavedAssets = useCallback(async () => {
     try {
@@ -1142,17 +1167,11 @@ function StudioShellInner({
         assets?: StudioSessionAsset[];
       };
       if (!data.ok || !data.assets?.length) return;
-      setSessionAssets((prev) => {
-        const savedIds = new Set(data.assets?.map((asset) => asset.id));
-        return [
-          ...(data.assets ?? []),
-          ...prev.filter((asset) => !savedIds.has(asset.id)),
-        ].slice(0, 48);
-      });
+      mergeSessionAssets(data.assets);
     } catch {
       // History is an enhancement; anonymous/local studio flow should not fail.
     }
-  }, []);
+  }, [mergeSessionAssets]);
 
   useEffect(() => {
     const loadAuth = () => {
@@ -1174,6 +1193,8 @@ function StudioShellInner({
 
   useEffect(() => {
     const runPersistedLoad = () => {
+      const local = loadStudioSessionAssets();
+      if (local.length > 0) mergeSessionAssets(local);
       void loadSavedAssets();
       void loadPersistedSavedModel();
     };
@@ -1186,17 +1207,30 @@ function StudioShellInner({
     const handler = () => runPersistedLoad();
     window.addEventListener("vitrina-auth-changed", handler);
     return () => window.removeEventListener("vitrina-auth-changed", handler);
-  }, [loadSavedAssets, loadPersistedSavedModel]);
+  }, [loadSavedAssets, loadPersistedSavedModel, mergeSessionAssets]);
 
   const addAssetsToSession = useCallback((assets: StudioSessionAsset[]) => {
-    setSessionAssets((prev) => [...assets, ...prev].slice(0, 48));
-    assets.forEach((asset) => void persistAsset(asset));
+    setSessionAssets((prev) => {
+      const next = [...assets, ...prev].slice(0, 48);
+      saveStudioSessionAssets(next);
+      return next;
+    });
+    assets.forEach((asset) => {
+      if (asset.status !== "error") {
+        void persistAsset(asset);
+      }
+    });
   }, [persistAsset]);
 
   const addSingleAssetToSession = useCallback(
     (asset: StudioSessionAsset) => {
-      setSessionAssets((prev) => [asset, ...prev].slice(0, 48));
-      if (asset.status !== "processing" && asset.status !== "error") {
+      setSessionAssets((prev) => {
+        const next = [asset, ...prev].slice(0, 48);
+        saveStudioSessionAssets(next);
+        return next;
+      });
+      upsertStudioSessionAsset(asset);
+      if (asset.status !== "error") {
         void persistAsset(asset);
       }
     },
@@ -1210,14 +1244,15 @@ function StudioShellInner({
           asset.id === id ? { ...asset, ...patch } : asset
         );
         const updated = next.find((asset) => asset.id === id);
-        if (
-          updated &&
-          updated.status !== "processing" &&
-          updated.status !== "error" &&
-          updated.url
-        ) {
-          void persistAsset(updated);
+        if (updated && updated.status !== "error") {
+          upsertStudioSessionAsset(updated);
+          if (updated.status !== "processing" && updated.url) {
+            void persistAsset(updated);
+          } else if (updated.status === "processing") {
+            void persistAsset(updated);
+          }
         }
+        saveStudioSessionAssets(next);
         return next;
       });
     },
@@ -1225,7 +1260,13 @@ function StudioShellInner({
   );
 
   const deleteSessionAsset = useCallback((id: string) => {
-    setSessionAssets((prev) => prev.filter((asset) => asset.id !== id));
+    setSessionAssets((prev) => {
+      const next = prev.filter((asset) => asset.id !== id);
+      saveStudioSessionAssets(next);
+      return next;
+    });
+    removeStudioSessionAsset(id);
+    removePendingGenerationJob(id);
     void fetch("/api/studio/assets", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
@@ -2349,6 +2390,7 @@ function StudioShellInner({
                         onSelectPhoto={setActiveProductId}
                         onRemovePhoto={handleRemoveProductPhoto}
                         onClearAll={clearProductPhotos}
+                        uploading={productAnalyzing}
                       />
                       {isClothingMode ? (
                         <div className="mt-6 space-y-6 border-t border-border/50 pt-6">

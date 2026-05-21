@@ -12,7 +12,7 @@ import { StudioAssetMediaView } from "./StudioAssetMediaView";
 import { isVideoAsset } from "@/lib/studio/assetDisplayLabels";
 import { getPostProcessingCarouselAssets } from "@/lib/studio/postProcessingAssetGroup";
 import type { PostProcessingMode } from "@/lib/studio/postProcessingEditors";
-import { saasPreviewCardClass } from "./StudioSaaSPreviewChrome";
+import { postProcessingGalleryTileClass } from "./StudioSaaSPreviewChrome";
 import { useStudioCopy } from "./StudioLocaleContext";
 import { cn } from "@/lib/utils";
 
@@ -50,7 +50,9 @@ export function PostProcessingGalleryCard({
   const safeIndex = Math.min(frameIndex, Math.max(0, group.length - 1));
   const displayAsset = group[safeIndex] ?? asset;
   const isVideo = isVideoAsset(asset);
-  const downloadable = Boolean(asset.url) && asset.status !== "processing";
+  const motionSource = Boolean(asset.referenceVideoUrl?.trim());
+  const isProcessing = asset.status === "processing";
+  const downloadable = Boolean(asset.url) && !isProcessing;
 
   const cycle = (delta: number) => {
     setFrameIndex((i) => (i + delta + group.length) % group.length);
@@ -59,8 +61,8 @@ export function PostProcessingGalleryCard({
   return (
     <article
       className={cn(
-        "flex w-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white",
-        saasPreviewCardClass
+        "flex min-w-0 flex-col overflow-hidden",
+        postProcessingGalleryTileClass
       )}
     >
       <div className="w-full bg-gradient-to-b from-slate-50 via-white to-slate-100/80 p-2 pb-0 sm:p-3">
@@ -77,46 +79,53 @@ export function PostProcessingGalleryCard({
         />
       </div>
 
-      <div className="flex flex-col gap-1.5 border-b border-slate-100/90 px-2.5 py-2 sm:px-3 sm:py-2.5">
-        <button
-          type="button"
-          disabled={!downloadable}
-          onClick={onDownload}
-          className="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-[12px] border border-border bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-teal-200 hover:bg-teal-50/70 disabled:opacity-50"
-        >
-          <Download className="h-3.5 w-3.5" />
-          {sf.download}
-        </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-[12px] border border-border bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-red-200 hover:bg-red-50/70"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          {sf.delete}
-        </button>
-      </div>
+      {!isProcessing ? (
+        <div className="flex flex-col gap-1.5 border-b border-slate-100/90 px-2.5 py-2 sm:px-3 sm:py-2.5">
+          <button
+            type="button"
+            disabled={!downloadable}
+            onClick={onDownload}
+            className="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-[12px] border border-border bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-teal-200 hover:bg-teal-50/70 disabled:opacity-50"
+          >
+            <Download className="h-3.5 w-3.5" />
+            {sf.download}
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-[12px] border border-border bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-red-200 hover:bg-red-50/70"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            {sf.delete}
+          </button>
+        </div>
+      ) : null}
 
       <div className="flex flex-col gap-2 p-2.5 sm:p-3">
-        {!isVideo ? (
-          <>
-            <ActionButton
-              icon={ImageIcon}
-              label={pa.createImage}
-              onClick={onCreateImage}
-              disabled={asset.status === "processing"}
-              active={activeMode === "image"}
-            />
-            <ActionButton
-              icon={Clapperboard}
-              label={pa.createVideo}
-              onClick={onCreateVideo}
-              disabled={asset.status === "processing"}
-              active={activeMode === "video"}
-            />
-          </>
+        {isProcessing ? (
+          <p className="py-2 text-center text-xs font-medium text-slate-600">
+            {copy.studioAssetPreview.processing}
+          </p>
         ) : null}
-        {isVideo ? (
+        {!isProcessing && !isVideo ? (
+          <ActionButton
+            icon={ImageIcon}
+            label={pa.createImage}
+            onClick={onCreateImage}
+            disabled={asset.status === "processing"}
+            active={activeMode === "image"}
+          />
+        ) : null}
+        {!isProcessing && (!isVideo || motionSource) ? (
+          <ActionButton
+            icon={Clapperboard}
+            label={pa.createVideo}
+            onClick={onCreateVideo}
+            disabled={isProcessing}
+            active={activeMode === "video"}
+          />
+        ) : null}
+        {!isProcessing && isVideo && !motionSource ? (
           <button
             type="button"
             disabled

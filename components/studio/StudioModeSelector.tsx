@@ -36,14 +36,22 @@ export function StudioModeSelector({
               type="button"
               onClick={() => onChange(mode.id)}
               className={cn(
-                "min-h-[150px] rounded-[24px] border p-4 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2",
+                "min-h-0 rounded-[24px] border p-4 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 md:min-h-[150px]",
                 selected
                   ? "border-teal-500 bg-teal-50 shadow-xl shadow-teal-900/10"
                   : "border-border bg-white shadow-md shadow-slate-200/60 hover:border-teal-200 hover:bg-teal-50/40"
               )}
               aria-pressed={selected}
             >
-              <span className="flex items-start justify-between gap-3">
+              <span className="flex items-center gap-3 md:hidden">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-white text-teal-700 shadow-sm">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <span className="text-base font-semibold text-slate-950">
+                  {mode.label}
+                </span>
+              </span>
+              <span className="hidden items-start justify-between gap-3 md:flex">
                 <span className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-white text-teal-700 shadow-sm">
                   <Icon className="h-6 w-6" />
                 </span>
@@ -58,7 +66,7 @@ export function StudioModeSelector({
                   {mode.recommendedFor}
                 </span>
               </span>
-              <span className="mt-4 block text-base font-semibold text-slate-950">
+              <span className="mt-4 hidden text-base font-semibold text-slate-950 md:block">
                 {mode.label}
               </span>
               <span className="mt-2 block text-sm leading-6 text-slate-600">

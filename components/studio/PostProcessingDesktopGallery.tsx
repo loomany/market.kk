@@ -6,6 +6,7 @@ import type { StudioSessionAsset } from "./types";
 import { PostProcessingGalleryCard } from "./PostProcessingGalleryCard";
 import { StudioFilesPagination } from "./StudioFilesPagination";
 import { StudioFilesSectionHeader } from "./StudioFilesSectionHeader";
+import { postProcessingSectionCardClass } from "./StudioSaaSPreviewChrome";
 import { useStudioCopy } from "./StudioLocaleContext";
 const PAGE_SIZE = 4;
 
@@ -28,11 +29,11 @@ export function PostProcessingDesktopGallery({
   const d = copy.postProcessingDesktop;
   const [page, setPage] = useState(1);
 
-  const selectable = useMemo(
-    () => assets.filter((a) => a.status !== "processing"),
+  const galleryAssets = useMemo(
+    () => assets.filter((a) => !a.parentAssetId || a.status === "processing"),
     [assets]
   );
-  const totalPages = Math.max(1, Math.ceil(selectable.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(galleryAssets.length / PAGE_SIZE));
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
@@ -40,19 +41,19 @@ export function PostProcessingDesktopGallery({
 
   const paginated = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
-    return selectable.slice(start, start + PAGE_SIZE);
-  }, [selectable, page]);
+    return galleryAssets.slice(start, start + PAGE_SIZE);
+  }, [galleryAssets, page]);
 
   if (assets.length === 0) {
     return null;
   }
 
   return (
-    <Card className="overflow-hidden">
-      <div className="mx-auto w-full max-w-[656px] border-b border-border/60 px-4 py-3">
+    <Card className={postProcessingSectionCardClass}>
+      <div className="border-b border-border/60 px-4 py-3">
         <StudioFilesSectionHeader title={d.galleryTitle} />
       </div>
-      <CardContent className="mx-auto grid w-full max-w-[656px] grid-cols-1 gap-4 p-4 sm:grid-cols-2">
+      <CardContent className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
         {paginated.map((asset) => (
           <PostProcessingGalleryCard
             key={asset.id}

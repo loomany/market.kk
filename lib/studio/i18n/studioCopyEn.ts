@@ -73,6 +73,7 @@ export const studioCopyEn: StudioCopy = {
     oneProductPhoto: "1 product photo",
     clearAllTitle: "Remove photos, frame, and reset card",
     previewAlt: "Product preview",
+    uploading: "Uploading…",
   },
   common: {
     product: "Product",

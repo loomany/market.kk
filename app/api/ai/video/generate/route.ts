@@ -15,6 +15,7 @@ import {
 import { defaultLocale } from "@/lib/i18n/localeConfig";
 import { prepareVideoPromptPackage } from "@/lib/ai/videoPromptPackage";
 import { wrapAiPost } from "@/lib/tokens/wrapAiPost";
+import { withGenerationIdempotency } from "@/lib/studio/withGenerationIdempotency";
 
 export const runtime = "nodejs";
 
@@ -125,6 +126,17 @@ async function handleVideoGeneratePost(request: Request) {
   const estimatedCost = estimateVideoOrThrow(variantId, data.durationSeconds);
   const { capabilities } = variant;
 
+  return withGenerationIdempotency(
+    {
+      clientAssetId: data.clientAssetId,
+      jobType: "video",
+      route: ROUTE_ID,
+      requestPayload: data as unknown as Record<string, unknown>,
+      provider: "fal",
+      model: variant.falEndpoint,
+      estimatedCost,
+    },
+    async () => {
   if (
     capabilities.supportsDuration &&
     variant.durationOptions.length > 0 &&
@@ -310,4 +322,6 @@ async function handleVideoGeneratePost(request: Request) {
       { status: 500 }
     );
   }
+    }
+  );
 }

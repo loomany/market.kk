@@ -259,6 +259,8 @@ export type StudioSessionAsset = {
   type: StudioAssetType;
   url: string;
   sourceImageUrl?: string;
+  /** Motion Control reference when the gallery item is an uploaded MP4. */
+  referenceVideoUrl?: string;
   mode: StudioMode | "video" | "scene";
   provider?: string;
   model?: string;

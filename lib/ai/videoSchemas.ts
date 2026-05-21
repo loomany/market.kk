@@ -45,6 +45,8 @@ export const videoGenerateRequestSchema = z
     useNegativePrompt: z.boolean().optional().default(false),
     negativePrompt: z.string().trim().max(1000).optional(),
     keepReferenceSound: z.boolean().optional().default(false),
+    /** Pending gallery asset id — idempotency & resume after reload. */
+    clientAssetId: z.string().uuid().optional(),
   })
   .superRefine((data, ctx) => {
     if (!data.variantId && !data.modelKey) {

@@ -87,7 +87,7 @@ export const pass2Ru = {
     imagePromptAiNotice:
       "Перед созданием наш ИИ соберёт основной промпт и исключения в один запрос для модели — смысл кадра не меняем, только формулировки.",
     createVideo: "Создать видео",
-    createImage: "Создать изображение",
+    createImage: "Прокачать изображение",
     enhancedPhoto: "Улучшенное фото",
     selectFileFirst: "Сначала выберите файл и что создать.",
     needPromptAndEditor: "Напишите, что сделать с фото, и выберите доступный редактор.",
@@ -260,7 +260,7 @@ export const pass2En = {
     imagePromptAiNotice:
       "Before creation, our AI merges your main prompt and exclusions into one model request — we do not change the shot’s meaning, only wording.",
     createVideo: "Create video",
-    createImage: "Create image",
+    createImage: "Enhance image",
     enhancedPhoto: "Enhanced photo",
     selectFileFirst: "Select a file and output type first.",
     needPromptAndEditor: "Describe what to do and pick an available editor.",
@@ -430,7 +430,7 @@ export const pass2Kk = {
     imagePromptAiNotice:
       "Жасау алдында ИИ негізгі промпт пен алып тастауды бір сұранысқа жинайды — кадр мазмұнын өзгертпейміз.",
     createVideo: "Видео жасау",
-    createImage: "Сурет жасау",
+    createImage: "Суретті жақсарту",
     enhancedPhoto: "Жақсартылған фото",
     selectFileFirst: "Алдымен файл мен түрді таңдаңыз.",
     needPromptAndEditor: "Не істеу керектігін жазыңыз және редакторды таңдаңыз.",

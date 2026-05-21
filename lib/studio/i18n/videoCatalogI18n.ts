@@ -5,20 +5,31 @@ import {
 } from "@/lib/ai/videoCatalog";
 import { getStudioCopy, type StudioLocale } from "./index";
 
-export function getVideoProviderOptions(locale: StudioLocale) {
+export function getVideoProviderOptions(
+  locale: StudioLocale,
+  options?: { motionOnly?: boolean }
+) {
   const p = getStudioCopy(locale).videoProviders;
-  return (
-    [
-      { value: "kling" as const, label: p.kling.label, hint: p.kling.hint },
-      {
-        value: "kling-motion" as const,
-        label: p.klingMotion.label,
-        hint: p.klingMotion.hint,
-      },
-      { value: "minimax" as const, label: p.minimax.label, hint: p.minimax.hint },
-      { value: "veo" as const, label: p.veo.label, hint: p.veo.hint },
-    ] satisfies { value: VideoProviderId; label: string; hint: string }[]
-  );
+  const all = {
+    kling: { value: "kling" as const, label: p.kling.label, hint: p.kling.hint },
+    "kling-motion": {
+      value: "kling-motion" as const,
+      label: p.klingMotion.label,
+      hint: p.klingMotion.hint,
+    },
+    minimax: {
+      value: "minimax" as const,
+      label: p.minimax.label,
+      hint: p.minimax.hint,
+    },
+    veo: { value: "veo" as const, label: p.veo.label, hint: p.veo.hint },
+  } satisfies Record<VideoProviderId, { value: VideoProviderId; label: string; hint: string }>;
+
+  const ids: VideoProviderId[] = options?.motionOnly
+    ? ["kling-motion"]
+    : ["kling", "minimax", "veo"];
+
+  return ids.map((id) => all[id]);
 }
 
 export function getVideoVariantOptions(

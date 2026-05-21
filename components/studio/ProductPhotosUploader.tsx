@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Upload, X } from "lucide-react";
+import { Loader2, Upload, X } from "lucide-react";
 import { formatStudioString } from "@/lib/studio/i18n";
 import { validateStudioImageFile } from "@/lib/studio/i18n/validateStudioImageFile";
 import {
@@ -9,6 +9,8 @@ import {
   type StudioProductPhoto,
 } from "@/lib/studio/productPhotos";
 import { cn } from "@/lib/utils";
+import { StudioFileUploadDropzone } from "./StudioFileUploadDropzone";
+import { StudioFileUploadLoadingOverlay } from "./StudioFileUploadLoadingOverlay";
 import { useStudioCopy } from "./StudioLocaleContext";
 
 type ProductPhotosUploaderProps = {
@@ -22,6 +24,8 @@ type ProductPhotosUploaderProps = {
   onSelectPhoto: (id: string) => void;
   onRemovePhoto: (id: string) => void;
   onClearAll: () => void;
+  /** Server / AI processing after pick (e.g. product analysis). */
+  uploading?: boolean;
   className?: string;
 };
 
@@ -36,10 +40,10 @@ export function ProductPhotosUploader({
   onSelectPhoto,
   onRemovePhoto,
   onClearAll,
+  uploading = false,
   className,
 }: ProductPhotosUploaderProps) {
   const { locale, copy } = useStudioCopy();
-  const [dragActive, setDragActive] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const activePhoto =
     photos.find((item) => item.id === activePhotoId) ?? photos[0] ?? null;
@@ -94,53 +98,22 @@ export function ProductPhotosUploader({
       ) : null}
 
       {!hasPhoto ? (
-        <label
-          onDragEnter={(event) => {
-            event.preventDefault();
-            setDragActive(true);
-          }}
-          onDragOver={(event) => {
-            event.preventDefault();
-            setDragActive(true);
-          }}
-          onDragLeave={(event) => {
-            event.preventDefault();
-            setDragActive(false);
-          }}
-          onDrop={(event) => {
-            event.preventDefault();
-            setDragActive(false);
-            ingestFiles(event.dataTransfer.files);
-          }}
-          className={cn(
-            "flex min-h-[120px] cursor-pointer flex-col items-center justify-center rounded-[22px] border-2 border-dashed px-4 py-5 text-center transition-colors",
-            dragActive
-              ? "border-teal-500 bg-teal-50"
-              : "border-border bg-slate-50/80 hover:border-teal-300 hover:bg-teal-50/60"
-          )}
-        >
-          <Upload className="mb-2 h-6 w-6 text-teal-700" />
-          <span className="text-sm font-semibold text-slate-800">
-            {singlePhotoMode
+        <StudioFileUploadDropzone
+          label={
+            singlePhotoMode
               ? copy.upload.dropzoneSingle
-              : formatStudioString(copy.upload.dropzoneMulti, { max: maxPhotos })}
-          </span>
-          <span className="mt-1 text-xs text-slate-500">
-            {singlePhotoMode
+              : formatStudioString(copy.upload.dropzoneMulti, { max: maxPhotos })
+          }
+          hint={
+            singlePhotoMode
               ? copy.upload.dropzoneHintSingle
-              : copy.upload.dropzoneHintMulti}
-          </span>
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            multiple={!singlePhotoMode && maxPhotos > 1}
-            className="hidden"
-            onChange={(event) => {
-              ingestFiles(event.target.files);
-              event.target.value = "";
-            }}
-          />
-        </label>
+              : copy.upload.dropzoneHintMulti
+          }
+          uploading={uploading}
+          accept="image/jpeg,image/png,image/webp"
+          multiple={!singlePhotoMode && maxPhotos > 1}
+          onFiles={ingestFiles}
+        />
       ) : (
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-2">
@@ -196,6 +169,11 @@ export function ProductPhotosUploader({
 
           {activePhoto ? (
             <div className="relative overflow-hidden rounded-[22px] border border-border bg-slate-50">
+              {uploading ? (
+                <StudioFileUploadLoadingOverlay
+                  label={copy.productCheck.analyzingShort}
+                />
+              ) : null}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={activePhoto.previewUrl}
@@ -214,14 +192,24 @@ export function ProductPhotosUploader({
           ) : null}
 
           {!atLimit && !singlePhotoMode ? (
-            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-[16px] border border-dashed border-border bg-white px-3 py-2.5 text-xs font-medium text-teal-800 hover:bg-teal-50/50">
-              <Upload className="h-4 w-4" />
-              {copy.upload.dropzoneSelect}
+            <label
+              className={cn(
+                "flex cursor-pointer items-center justify-center gap-2 rounded-[16px] border border-dashed border-border bg-white px-3 py-2.5 text-xs font-medium text-teal-800 hover:bg-teal-50/50",
+                uploading && "pointer-events-none opacity-70"
+              )}
+            >
+              {uploading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-teal-600" />
+              ) : (
+                <Upload className="h-4 w-4" />
+              )}
+              {uploading ? copy.upload.uploading : copy.upload.dropzoneSelect}
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 multiple
                 className="hidden"
+                disabled={uploading}
                 onChange={(event) => {
                   ingestFiles(event.target.files);
                   event.target.value = "";
@@ -229,12 +217,21 @@ export function ProductPhotosUploader({
               />
             </label>
           ) : singlePhotoMode ? (
-            <label className="flex cursor-pointer items-center justify-center rounded-[16px] border border-border bg-white px-3 py-2.5 text-xs font-semibold text-teal-800 hover:bg-teal-50/50">
-              {copy.upload.replacePhoto}
+            <label
+              className={cn(
+                "flex cursor-pointer items-center justify-center gap-2 rounded-[16px] border border-border bg-white px-3 py-2.5 text-xs font-semibold text-teal-800 hover:bg-teal-50/50",
+                uploading && "pointer-events-none opacity-70"
+              )}
+            >
+              {uploading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-teal-600" />
+              ) : null}
+              {uploading ? copy.upload.uploading : copy.upload.replacePhoto}
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 className="hidden"
+                disabled={uploading}
                 onChange={(event) => {
                   ingestFiles(event.target.files);
                   event.target.value = "";

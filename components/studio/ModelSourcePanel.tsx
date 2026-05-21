@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Sparkles, Trash2, Upload, X } from "lucide-react";
+import { Check, Loader2, Sparkles, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { validateStudioImageFile } from "@/lib/studio/i18n/validateStudioImageFile";
+import { StudioFileUploadDropzone } from "./StudioFileUploadDropzone";
 import { useStudioCopy } from "./StudioLocaleContext";
 
 export type ModelSourceKind = "upload" | "saved" | null;
@@ -20,6 +21,7 @@ type ModelSourcePanelProps = {
   selectedFile?: File | null;
   onFileSelect?: (file: File) => void;
   onClearFile?: () => void;
+  uploading?: boolean;
   className?: string;
   /** SaaS: compact upload-only layout for «Своя модель» tab */
   uiMode?: "default" | "saas";
@@ -37,6 +39,7 @@ export function ModelSourcePanel({
   selectedFile,
   onFileSelect,
   onClearFile,
+  uploading = false,
   className,
   uiMode = "default",
 }: ModelSourcePanelProps) {
@@ -46,7 +49,6 @@ export function ModelSourcePanel({
   const up = copy.upload;
 
   const isSaas = uiMode === "saas";
-  const [dragActive, setDragActive] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const canUploadFile = Boolean(onFileSelect);
   const savedSelected = modelSource === "saved" && Boolean(savedModelUrl);
@@ -76,47 +78,13 @@ export function ModelSourcePanel({
   };
 
   const dropZone = (
-    <label
-      onDragEnter={(event) => {
-        event.preventDefault();
-        setDragActive(true);
-      }}
-      onDragOver={(event) => {
-        event.preventDefault();
-        setDragActive(true);
-      }}
-      onDragLeave={(event) => {
-        event.preventDefault();
-        setDragActive(false);
-      }}
-      onDrop={(event) => {
-        event.preventDefault();
-        setDragActive(false);
-        ingestFiles(event.dataTransfer.files);
-      }}
-      className={cn(
-        "flex min-h-[120px] cursor-pointer flex-col items-center justify-center rounded-[22px] border-2 border-dashed px-4 py-5 text-center transition-colors",
-        dragActive
-          ? "border-teal-500 bg-teal-50"
-          : "border-border bg-slate-50/80 hover:border-teal-300 hover:bg-teal-50/60"
-      )}
-    >
-      <Upload className="mb-2 h-6 w-6 text-teal-700" />
-      <span className="text-sm font-semibold text-slate-800">
-        {ms.uploadYourModel}
-      </span>
-      <span className="mt-1 text-xs text-slate-500">{ms.orDragHere}</span>
-      <span className="mt-1 text-[11px] text-slate-400">{ms.jpegPngWebp}</span>
-      <input
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        className="hidden"
-        onChange={(event) => {
-          ingestFiles(event.target.files);
-          event.target.value = "";
-        }}
-      />
-    </label>
+    <StudioFileUploadDropzone
+      label={ms.uploadYourModel}
+      hint={`${ms.orDragHere} · ${ms.jpegPngWebp}`}
+      uploading={uploading}
+      accept="image/jpeg,image/png,image/webp"
+      onFiles={ingestFiles}
+    />
   );
 
   return (
@@ -249,12 +217,21 @@ export function ModelSourcePanel({
               </div>
             ) : null}
 
-            <label className="flex cursor-pointer items-center justify-center rounded-[14px] border border-border bg-white px-3 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:border-teal-300 hover:bg-teal-50/50">
-              {up.replacePhoto}
+            <label
+              className={cn(
+                "flex cursor-pointer items-center justify-center gap-2 rounded-[14px] border border-border bg-white px-3 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:border-teal-300 hover:bg-teal-50/50",
+                uploading && "pointer-events-none opacity-70"
+              )}
+            >
+              {uploading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-teal-600" />
+              ) : null}
+              {uploading ? up.uploading : up.replacePhoto}
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 className="hidden"
+                disabled={uploading}
                 onChange={(event) => {
                   ingestFiles(event.target.files);
                   event.target.value = "";

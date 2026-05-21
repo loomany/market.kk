@@ -245,6 +245,11 @@ export async function finalizeGenerationBilling(
   ctx: GenerationBillingContext,
   responseBody: Record<string, unknown> & { ok?: boolean }
 ): Promise<Record<string, unknown>> {
+  if (responseBody._skipBilling === true) {
+    const { _skipBilling: _, ...rest } = responseBody;
+    return rest;
+  }
+
   if (ctx.mode === "skip" || !responseBody.ok) {
     return responseBody;
   }

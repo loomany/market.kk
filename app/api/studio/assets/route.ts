@@ -31,6 +31,9 @@ const assetSchema = z.object({
   format: z.string().optional(),
   label: z.string().optional(),
   reviewStatus: z.string().optional(),
+  referenceVideoUrl: z.string().url().optional(),
+  parentAssetId: z.string().optional(),
+  status: z.enum(["ready", "processing", "error"]).optional(),
 });
 
 function serializeAsset(row: {
@@ -68,6 +71,32 @@ function serializeAsset(row: {
       typeof row.settings?.duration === "number" ? row.settings.duration : undefined,
     format: typeof row.settings?.format === "string" ? row.settings.format : undefined,
     label: typeof row.settings?.label === "string" ? row.settings.label : undefined,
+    referenceVideoUrl: (() => {
+      if (typeof row.settings?.referenceVideoUrl === "string") {
+        return row.settings.referenceVideoUrl;
+      }
+      const mode = String(row.settings?.mode ?? "");
+      if (
+        row.type === "video" &&
+        mode === "post-processing" &&
+        row.result_url &&
+        row.source_url &&
+        row.result_url !== row.source_url
+      ) {
+        return row.result_url;
+      }
+      return undefined;
+    })(),
+    parentAssetId:
+      typeof row.settings?.parentAssetId === "string"
+        ? row.settings.parentAssetId
+        : undefined,
+    status:
+      row.settings?.status === "ready" ||
+      row.settings?.status === "processing" ||
+      row.settings?.status === "error"
+        ? (row.settings.status as "ready" | "processing" | "error")
+        : undefined,
   };
 }
 
@@ -138,7 +167,7 @@ export async function POST(request: Request) {
   }
 
   const asset = parsed.data;
-  const settings = {
+  const settings: Record<string, unknown> = {
     mode: asset.mode,
     width: asset.width,
     height: asset.height,
@@ -146,6 +175,15 @@ export async function POST(request: Request) {
     format: asset.format,
     label: asset.label,
   };
+  if (asset.referenceVideoUrl) {
+    settings.referenceVideoUrl = asset.referenceVideoUrl;
+  }
+  if (asset.parentAssetId) {
+    settings.parentAssetId = asset.parentAssetId;
+  }
+  if (asset.status) {
+    settings.status = asset.status;
+  }
 
   const { error: assetError } = await admin.from("studio_assets").upsert({
     id: asset.id,
@@ -182,6 +220,7 @@ export async function POST(request: Request) {
     model: asset.model,
     request_payload: {
       sourceImageUrl: asset.sourceImageUrl,
+      referenceVideoUrl: asset.referenceVideoUrl,
       prompt: asset.prompt,
       settings,
     },

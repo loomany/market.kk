@@ -9,15 +9,18 @@ type VideoProviderSelectProps = {
   value: VideoProviderId;
   onChange: (provider: VideoProviderId) => void;
   disabled?: boolean;
+  /** Uploaded reference video → only Kling Motion Control. */
+  motionOnly?: boolean;
 };
 
 export function VideoProviderSelect({
   value,
   onChange,
   disabled,
+  motionOnly = false,
 }: VideoProviderSelectProps) {
   const { locale, copy } = useStudioCopy();
-  const options = getVideoProviderOptions(locale);
+  const options = getVideoProviderOptions(locale, { motionOnly });
   const selected = options.find((o) => o.value === value);
 
   return (

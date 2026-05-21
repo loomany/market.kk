@@ -41,14 +41,12 @@ type VideoSettingsFormProps = {
   durationSeconds: number;
   aspectRatio: VideoAspectRatio;
   motionPreset: VideoMotionPresetId;
-  referenceVideoUrl: string;
-  characterOrientation: KlingMotionOrientation;
+  characterOrientation?: KlingMotionOrientation;
+  onCharacterOrientationChange?: (orientation: KlingMotionOrientation) => void;
   onQualityChange: (tier: SaasQualityTier) => void;
   onDurationChange: (seconds: number) => void;
   onAspectRatioChange: (ratio: VideoAspectRatio) => void;
   onMotionPresetChange: (preset: VideoMotionPresetId) => void;
-  onReferenceVideoUrlChange: (url: string) => void;
-  onCharacterOrientationChange: (orientation: KlingMotionOrientation) => void;
   generateAudio: boolean;
   soundPrompt: string;
   useNegativePrompt: boolean;
@@ -70,14 +68,12 @@ export function VideoSettingsForm({
   durationSeconds,
   aspectRatio,
   motionPreset,
-  referenceVideoUrl,
-  characterOrientation,
+  characterOrientation = "video",
+  onCharacterOrientationChange,
   onQualityChange,
   onDurationChange,
   onAspectRatioChange,
   onMotionPresetChange,
-  onReferenceVideoUrlChange,
-  onCharacterOrientationChange,
   generateAudio,
   soundPrompt,
   useNegativePrompt,
@@ -116,7 +112,6 @@ export function VideoSettingsForm({
     () => getOrientOptions(locale),
     [locale]
   );
-
   const frameOptions = frameOptionsAll.filter((opt) =>
     variant.aspectRatioOptions.includes(opt.value as VideoAspectRatio)
   );
@@ -149,35 +144,19 @@ export function VideoSettingsForm({
         <p className="text-xs leading-5 text-slate-500">{selectedVariantHint}</p>
       ) : null}
 
-      {caps.requiresReferenceVideo ? (
-        <div className="space-y-2">
-          <label className="block space-y-1.5 text-sm font-semibold text-slate-950">
-            <span>{vs.referenceVideo}</span>
-            <input
-              type="url"
-              value={referenceVideoUrl}
-              disabled={disabled}
-              placeholder="https://…/motion.mp4"
-              onChange={(e) => onReferenceVideoUrlChange(e.target.value)}
-              className="w-full rounded-[16px] border border-border px-3 py-3 text-sm font-normal outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 disabled:bg-slate-50"
-            />
-          </label>
-          <p className="text-xs leading-5 text-slate-500">{vs.referenceVideoHint}</p>
-          {caps.supportsMotionOrientation ? (
-            <Select
-              label={vs.motionOrientationLabel}
-              value={characterOrientation}
-              disabled={disabled}
-              onChange={(value) =>
-                onCharacterOrientationChange(value as KlingMotionOrientation)
-              }
-              options={orientOptions.map((o) => ({
-                value: o.value,
-                label: o.label,
-              }))}
-            />
-          ) : null}
-        </div>
+      {caps.requiresReferenceVideo && caps.supportsMotionOrientation ? (
+        <Select
+          label={vs.motionOrientationLabel}
+          value={characterOrientation}
+          disabled={disabled}
+          onChange={(value) =>
+            onCharacterOrientationChange?.(value as KlingMotionOrientation)
+          }
+          options={orientOptions.map((o) => ({
+            value: o.value,
+            label: o.label,
+          }))}
+        />
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2">

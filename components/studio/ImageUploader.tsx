@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { ImagePlus, Upload, X } from "lucide-react";
+import { ImagePlus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatFileSize } from "@/lib/ai/clientImageValidation";
 import { formatStudioString } from "@/lib/studio/i18n";
+import { StudioFileUploadDropzone } from "./StudioFileUploadDropzone";
 import { useStudioCopy } from "./StudioLocaleContext";
 
 type ImageUploaderProps = {
@@ -14,6 +14,7 @@ type ImageUploaderProps = {
   selectedFile?: File | null;
   onFileSelect?: (file: File) => void;
   onClearFile?: () => void;
+  uploading?: boolean;
   className?: string;
 };
 
@@ -24,11 +25,11 @@ export function ImageUploader({
   selectedFile,
   onFileSelect,
   onClearFile,
+  uploading = false,
   className,
 }: ImageUploaderProps) {
   const { copy } = useStudioCopy();
   const u = copy.imageUploader;
-  const [dragActive, setDragActive] = useState(false);
   const canUploadFile = Boolean(onFileSelect);
 
   const selectFile = (file: File | undefined) => {
@@ -48,45 +49,13 @@ export function ImageUploader({
       </div>
 
       {canUploadFile && (
-        <label
-          onDragEnter={(event) => {
-            event.preventDefault();
-            setDragActive(true);
-          }}
-          onDragOver={(event) => {
-            event.preventDefault();
-            setDragActive(true);
-          }}
-          onDragLeave={(event) => {
-            event.preventDefault();
-            setDragActive(false);
-          }}
-          onDrop={(event) => {
-            event.preventDefault();
-            setDragActive(false);
-            selectFile(event.dataTransfer.files?.[0]);
-          }}
-          className={cn(
-            "flex min-h-[148px] cursor-pointer flex-col items-center justify-center rounded-[22px] border-2 border-dashed px-4 py-6 text-center transition-colors",
-            dragActive
-              ? "border-teal-500 bg-teal-50"
-              : "border-border bg-slate-50/80 hover:border-teal-300 hover:bg-teal-50/60"
-          )}
-        >
-          <Upload className="mb-3 h-7 w-7 text-teal-700" />
-          <span className="text-sm font-semibold text-slate-800">
-            {u.dropzone}
-          </span>
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="hidden"
-            onChange={(event) => {
-              selectFile(event.target.files?.[0]);
-              event.target.value = "";
-            }}
-          />
-        </label>
+        <StudioFileUploadDropzone
+          label={u.dropzone}
+          uploading={uploading}
+          accept="image/jpeg,image/png,image/webp"
+          minHeightClass="min-h-[148px]"
+          onFiles={(fileList) => selectFile(fileList?.[0])}
+        />
       )}
 
       {selectedFile && (

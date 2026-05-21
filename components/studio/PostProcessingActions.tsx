@@ -9,16 +9,19 @@ type PostProcessingActionsProps = {
   value: PostProcessingMode | null;
   onChange: (mode: PostProcessingMode) => void;
   disabled?: boolean;
+  /** When set, only these modes are shown (e.g. video-only for uploaded MP4). */
+  allowedModes?: PostProcessingMode[];
 };
 
 export function PostProcessingActions({
   value,
   onChange,
   disabled,
+  allowedModes,
 }: PostProcessingActionsProps) {
   const { copy } = useStudioCopy();
   const p = copy.postProcessingActions;
-  const actions: {
+  const allActions: {
     id: PostProcessingMode;
     label: string;
     icon: typeof Clapperboard;
@@ -26,6 +29,9 @@ export function PostProcessingActions({
     { id: "image", label: p.image, icon: ImageIcon },
     { id: "video", label: p.video, icon: Clapperboard },
   ];
+  const actions = allowedModes
+    ? allActions.filter((a) => allowedModes.includes(a.id))
+    : allActions;
 
   return (
     <div className="space-y-2">

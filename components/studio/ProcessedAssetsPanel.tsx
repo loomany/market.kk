@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Clapperboard, ImageIcon, Layers, Sparkles } from "lucide-react";
+import { Clapperboard, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import {
@@ -29,6 +29,17 @@ import {
   isVideoAsset,
 } from "@/lib/studio/assetDisplayLabels";
 import type { PostProcessingMode } from "@/lib/studio/postProcessingEditors";
+import {
+  type PostProcessingUploadedSource,
+  uploadedSourceToGalleryAsset,
+} from "@/lib/studio/postProcessingUpload";
+import {
+  clearPostProcessingUploadDraft,
+  draftToUploadedSource,
+  loadPostProcessingUploadDraft,
+} from "@/lib/studio/postProcessingUploadDraft";
+import { PostProcessingUploadSection } from "./PostProcessingUploadSection";
+import { StudioFilesSectionHeader } from "./StudioFilesSectionHeader";
 import { getLocalizedImageEditors } from "@/lib/studio/i18n/postProcessingEditorsI18n";
 import { formatStudioString } from "@/lib/studio/i18n";
 import { useStudioCopy } from "./StudioLocaleContext";
@@ -37,9 +48,9 @@ import { normalizePostProcessPrompt } from "@/lib/studio/postProcessPromptNormal
 import { PostProcessingMobileSheet } from "./PostProcessingMobileSheet";
 import { useStudioMobileLayout } from "./useStudioMobileLayout";
 import { PostProcessingMobileGallery } from "./PostProcessingMobileGallery";
-import { PostProcessingActions } from "./PostProcessingActions";
 import { PostProcessingDesktopGallery } from "./PostProcessingDesktopGallery";
 import { PostProcessingDesktopEditor } from "./PostProcessingDesktopEditor";
+import { postProcessingSectionCardClass } from "./StudioSaaSPreviewChrome";
 import { ImageEditorSelect } from "./ImageEditorSelect";
 import { VideoProviderSelect } from "./VideoProviderSelect";
 import {
@@ -57,6 +68,17 @@ import {
 import { TokenChargeHint } from "./TokenChargeHint";
 import { tryApplyTokenBillingError } from "@/lib/tokens/billingErrorPayload";
 import type { TokenBillingErrorPayload } from "@/lib/tokens/billingErrorPayload";
+import {
+  getPendingGenerationJob,
+  isPendingGenerationStale,
+  removePendingGenerationJob,
+  savePendingGenerationJob,
+} from "@/lib/studio/pendingGenerationClient";
+import {
+  resumePendingGeneration,
+  runImageGenerationRequest,
+  runVideoGenerationRequest,
+} from "@/lib/studio/postProcessingGenerationClient";
 
 type ProcessedAssetsPanelProps = {
   assets: StudioSessionAsset[];
@@ -129,9 +151,11 @@ export function ProcessedAssetsPanel({
   const [videoVariantId, setVideoVariantId] = useState<VideoVariantId>(
     DEFAULT_VARIANT_BY_PROVIDER.kling
   );
-  const [referenceVideoUrl, setReferenceVideoUrl] = useState("");
   const [characterOrientation, setCharacterOrientation] =
-    useState<KlingMotionOrientation>("image");
+    useState<KlingMotionOrientation>("video");
+  const [uploadedSource, setUploadedSource] =
+    useState<PostProcessingUploadedSource | null>(null);
+  const [uploadBusy, setUploadBusy] = useState(false);
   const [imageEditorId, setImageEditorId] = useState<ImageEditorId>("nano-banana-pro");
   /** Inline hint shown when switching editor reset incompatible options. */
   const [editorSwitchHint, setEditorSwitchHint] = useState<string | null>(null);
@@ -244,9 +268,13 @@ export function ProcessedAssetsPanel({
     selectableAssets[0] ??
     assets[0];
 
-  const sourceImageUrl = selectedAsset
+  const gallerySourceImageUrl = selectedAsset
     ? assetProcessingSourceUrl(selectedAsset)
     : null;
+
+  const effectiveSourceImageUrl = gallerySourceImageUrl;
+
+  const motionVideoUpload = Boolean(selectedAsset?.referenceVideoUrl?.trim());
 
   /** Active analysis for the currently selected asset (dev debug). */
   const activePreservation = selectedAsset
@@ -255,7 +283,7 @@ export function ProcessedAssetsPanel({
         null)
     : null;
 
-  const canProcessSource = Boolean(sourceImageUrl);
+  const canProcessSource = Boolean(effectiveSourceImageUrl);
 
   const activeImageEditor = imageEditors.find((e) => e.id === imageEditorId);
   const imageEditorReady =
@@ -288,15 +316,16 @@ export function ProcessedAssetsPanel({
       setVideoProvider(variantProvider);
     }
   }, [activeVideoVariant.provider, videoProvider]);
+
+  const minVideoPromptLength = motionVideoUpload ? 4 : 8;
   const videoGenerationReady =
-    activeVideoVariant.capabilities.requiresReferenceVideo
-      ? referenceVideoUrl.trim().length > 8
-      : promptNormalization.normalizedUserIntent.length >= 4;
+    promptNormalization.normalizedUserIntent.length >= minVideoPromptLength;
+
+  const workflowReady = Boolean(selectedAsset && processingMode);
 
   const canGenerate = Boolean(
-    selectedAsset &&
-      processingMode &&
-      sourceImageUrl &&
+    workflowReady &&
+      effectiveSourceImageUrl &&
       !generationLoading &&
       (processingMode === "video" ? videoGenerationReady : imageEditorReady)
   );
@@ -324,7 +353,15 @@ export function ProcessedAssetsPanel({
     if (!c.supportsReferenceVideoSound) setVideoKeepReferenceSound(false);
   };
 
+  useEffect(() => {
+    if (!selectedAsset?.referenceVideoUrl?.trim()) return;
+    setVideoProvider("kling-motion");
+    applyVideoVariant("kling-v2.6-motion-control");
+    setCharacterOrientation("video");
+  }, [selectedAsset?.id, selectedAsset?.referenceVideoUrl]);
+
   const handleVideoProviderChange = (provider: VideoProviderId) => {
+    if (motionVideoUpload && provider !== "kling-motion") return;
     setVideoProvider(provider);
     applyVideoVariant(DEFAULT_VARIANT_BY_PROVIDER[provider]);
   };
@@ -335,7 +372,8 @@ export function ProcessedAssetsPanel({
   };
 
   const handleGenerate = async () => {
-    if (!selectedAsset || !sourceImageUrl || !processingMode) {
+    const parentId = selectedAsset?.id;
+    if (!parentId || !effectiveSourceImageUrl || !processingMode) {
       setError(pa.selectFileFirst);
       return;
     }
@@ -355,8 +393,8 @@ export function ProcessedAssetsPanel({
       id: pendingId,
       type: isVideo ? "video" : "scene",
       url: "",
-      sourceImageUrl,
-      parentAssetId: selectedAsset.id,
+      sourceImageUrl: effectiveSourceImageUrl,
+      parentAssetId: parentId,
       mode: isVideo ? "video" : "scene",
       createdAt: startedAt,
       startedAt,
@@ -372,73 +410,75 @@ export function ProcessedAssetsPanel({
     try {
       if (isVideo) {
         const apiQuality = mapSaasQualityToVideoApi(videoVariantId, saasQuality);
-        const res = await fetch("/api/ai/video/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sourceImageUrl,
-            prompt: userIntent,
-            variantId: videoVariantId,
-            quality: apiQuality,
-            durationSeconds,
-            aspectRatio: videoAspectRatio,
-            motionPreset,
-            referenceVideoUrl: referenceVideoUrl.trim() || undefined,
-            characterOrientation,
-            promptLocale,
-            generateAudio: videoGenerateAudio,
-            soundPrompt:
-              videoGenerateAudio && activeVideoVariant.capabilities.supportsNativeAudio
-                ? videoSoundPrompt.trim() || undefined
-                : undefined,
-            useNegativePrompt: videoUseNegativePrompt,
-            negativePrompt: videoNegativePrompt.trim() || undefined,
-            keepReferenceSound: videoKeepReferenceSound,
-          }),
+        const videoBody = {
+          clientAssetId: pendingId,
+          sourceImageUrl: effectiveSourceImageUrl,
+          prompt: userIntent,
+          variantId: videoVariantId,
+          quality: apiQuality,
+          durationSeconds,
+          aspectRatio: videoAspectRatio,
+          motionPreset,
+          referenceVideoUrl: selectedAsset?.referenceVideoUrl,
+          characterOrientation: motionVideoUpload
+            ? characterOrientation
+            : undefined,
+          promptLocale,
+          generateAudio: videoGenerateAudio,
+          soundPrompt:
+            videoGenerateAudio && activeVideoVariant.capabilities.supportsNativeAudio
+              ? videoSoundPrompt.trim() || undefined
+              : undefined,
+          useNegativePrompt: videoUseNegativePrompt,
+          negativePrompt: videoNegativePrompt.trim() || undefined,
+          keepReferenceSound: videoKeepReferenceSound,
+        };
+        savePendingGenerationJob({
+          kind: "video",
+          clientAssetId: pendingId,
+          parentAssetId: parentId,
+          startedAt,
+          body: videoBody,
         });
-        const data = (await res.json()) as VideoGenerateResponse;
-        if (!data.ok) {
-          if (
-            onTokenBillingError &&
-            tryApplyTokenBillingError(data, onTokenBillingError)
-          ) {
-            onUpdateAsset(pendingId, {
-              status: "error",
-              errorMessage: data.message ?? pa.fileFailed,
-            });
-            return;
+        const outcome = await runVideoGenerationRequest(videoBody);
+        if (outcome.kind === "success") {
+          applyVideoSuccess(pendingId, outcome.data, userIntent);
+          return;
+        }
+        if (outcome.kind === "error") {
+          if (outcome.billing && onTokenBillingError) {
+            tryApplyTokenBillingError(
+              { ok: false, errorCode: "INSUFFICIENT_TOKENS", message: outcome.message },
+              onTokenBillingError
+            );
           }
-          const msg = friendlyPostProcessError(data.message, pa);
-          onUpdateAsset(pendingId, {
-            status: "error",
-            errorMessage: msg,
-          });
+          const msg = friendlyPostProcessError(outcome.message, pa);
+          failPendingAsset(pendingId, msg);
           setError(msg);
           return;
         }
-        onUpdateAsset(pendingId, {
-          status: "ready",
-          url: data.video.url,
-          provider: data.provider,
-          model: data.model,
-          requestId: data.requestId,
-          estimatedCost: data.estimatedCost,
-          width: data.video.width,
-          height: data.video.height,
-          duration: data.video.duration,
-          format: data.video.format ?? "mp4",
-          label: pa.modeVideo,
-          prompt: userIntent,
+        const polled = await resumePendingGeneration({
+          kind: "video",
+          clientAssetId: pendingId,
+          parentAssetId: parentId,
+          startedAt,
+          body: videoBody,
         });
+        if (polled.kind === "success" && polled.data.ok && "video" in polled.data) {
+          applyVideoSuccess(pendingId, polled.data as VideoGenerateResponse, userIntent);
+        } else if (polled.kind === "error") {
+          failPendingAsset(pendingId, friendlyPostProcessError(polled.message, pa));
+          setError(friendlyPostProcessError(polled.message, pa));
+        }
         return;
       }
 
       // Vision-based product preservation snapshot (cached per asset).
       // Only requested when the user keeps "Сохранять товар точно" on.
-      const preservation = preserveProduct
+      const preservation = preserveProduct && selectedAsset
         ? await resolveProductPreservation(
             selectedAsset,
-            sourceImageUrl,
+            effectiveSourceImageUrl,
             userIntent
           )
         : null;
@@ -446,8 +486,9 @@ export function ProcessedAssetsPanel({
       const apiOutputFormat: ImageEnhanceRequest["outputFormat"] =
         outputFormat === "jpeg" ? "jpg" : outputFormat;
 
-      const enhanceRequest: ImageEnhanceRequest = {
-        sourceImageUrl,
+      const enhanceRequest: ImageEnhanceRequest & { clientAssetId: string } = {
+        clientAssetId: pendingId,
+        sourceImageUrl: effectiveSourceImageUrl,
         userPrompt: userIntent,
         preserveProduct,
         aspectRatio: imageAspectRatio,
@@ -455,7 +496,7 @@ export function ProcessedAssetsPanel({
         quality: saasQuality === "ultra" ? "high" : saasQuality,
         locale: promptLocale,
         selectedEditor: imageEditorId,
-        sourceAssetId: selectedAsset.id,
+        sourceAssetId: parentId,
         productPreservationBlock:
           preservation?.externalPreservationBlock ?? null,
         useNegativePrompt: imageUseNegativePrompt,
@@ -463,51 +504,46 @@ export function ProcessedAssetsPanel({
         skipPromptPackage: !promptNormalization.shouldRunEnhancer,
       };
 
-      const res = await fetch("/api/ai/image/enhance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(enhanceRequest),
+      savePendingGenerationJob({
+        kind: "image",
+        clientAssetId: pendingId,
+        parentAssetId: parentId,
+        startedAt,
+        body: enhanceRequest,
       });
-      const data = (await res.json()) as ImageEnhanceResponse;
-      if (!data.ok) {
-        setLastImageEnhanceDebug(data.debug ?? null);
-        if (
-          onTokenBillingError &&
-          tryApplyTokenBillingError(data, onTokenBillingError)
-        ) {
-          onUpdateAsset(pendingId, {
-            status: "error",
-            errorMessage: data.error ?? pa.fileFailed,
-          });
-          return;
+
+      const outcome = await runImageGenerationRequest(enhanceRequest);
+      if (outcome.kind === "success") {
+        applyImageSuccess(pendingId, outcome.data, outputFormat);
+        return;
+      }
+      if (outcome.kind === "error") {
+        if (outcome.billing && onTokenBillingError) {
+          tryApplyTokenBillingError(
+            { ok: false, errorCode: "INSUFFICIENT_TOKENS", message: outcome.message },
+            onTokenBillingError
+          );
         }
-        const msg = friendlyPostProcessError(data.error, pa);
-        onUpdateAsset(pendingId, {
-          status: "error",
-          errorMessage: msg,
-        });
+        const msg = friendlyPostProcessError(outcome.message, pa);
+        failPendingAsset(pendingId, msg);
         setError(msg);
         return;
       }
-      setLastFinalPrompt(data.promptUsed ?? null);
-      setLastImageEnhanceDebug(data.debug ?? null);
-      onUpdateAsset(pendingId, {
-        status: "ready",
-        url: data.imageUrl,
-        type: "scene",
-        provider: data.provider,
-        model: data.model,
-        requestId: data.requestId ?? undefined,
-        estimatedCost: data.estimatedCostUsd ?? undefined,
-        format: outputFormat,
-        label: pa.enhancedPhoto,
-        prompt: data.promptUsed,
+      const polled = await resumePendingGeneration({
+        kind: "image",
+        clientAssetId: pendingId,
+        parentAssetId: parentId,
+        startedAt,
+        body: enhanceRequest,
       });
+      if (polled.kind === "success" && polled.data.ok && "imageUrl" in polled.data) {
+        applyImageSuccess(pendingId, polled.data as ImageEnhanceResponse, outputFormat);
+      } else if (polled.kind === "error") {
+        failPendingAsset(pendingId, friendlyPostProcessError(polled.message, pa));
+        setError(friendlyPostProcessError(polled.message, pa));
+      }
     } catch {
-      onUpdateAsset(pendingId, {
-        status: "error",
-        errorMessage: pa.fileFailed,
-      });
+      failPendingAsset(pendingId, pa.fileFailed);
       setError(pa.fileFailed);
     } finally {
       setGenerationLoading(false);
@@ -538,7 +574,154 @@ export function ProcessedAssetsPanel({
     setError(null);
   };
 
-  const closeMobileSheet = () => setMobileSheetOpen(false);
+  const closeMobileSheet = () => {
+    setMobileSheetOpen(false);
+    setProcessingMode(null);
+    setEditorSwitchHint(null);
+    setError(null);
+  };
+
+  const handleUploadSourceChange = (next: PostProcessingUploadedSource | null) => {
+    setUploadedSource(next);
+    if (!next) {
+      clearPostProcessingUploadDraft();
+      setProcessingMode(null);
+      setDesktopEditorOpen(false);
+      setMobileSheetOpen(false);
+    }
+  };
+
+  const uploadDraftRestoredRef = useRef(false);
+  useEffect(() => {
+    if (uploadDraftRestoredRef.current) return;
+    const draft = loadPostProcessingUploadDraft();
+    if (!draft) return;
+    uploadDraftRestoredRef.current = true;
+    setUploadedSource(draftToUploadedSource(draft));
+  }, []);
+
+  const resumeInFlightRef = useRef<Set<string>>(new Set());
+
+  const applyVideoSuccess = (
+    pendingId: string,
+    data: VideoGenerateResponse,
+    userIntent: string
+  ) => {
+    if (!data.ok) return;
+    onUpdateAsset(pendingId, {
+      status: "ready",
+      url: data.video.url,
+      provider: data.provider,
+      model: data.model,
+      requestId: data.requestId,
+      estimatedCost: data.estimatedCost,
+      width: data.video.width,
+      height: data.video.height,
+      duration: data.video.duration,
+      format: data.video.format ?? "mp4",
+      label: pa.modeVideo,
+      prompt: userIntent,
+    });
+    removePendingGenerationJob(pendingId);
+  };
+
+  const applyImageSuccess = (
+    pendingId: string,
+    data: ImageEnhanceResponse,
+    outputFormat: ImageOutputFormat
+  ) => {
+    if (!data.ok) return;
+    setLastFinalPrompt(data.promptUsed ?? null);
+    setLastImageEnhanceDebug(data.debug ?? null);
+    onUpdateAsset(pendingId, {
+      status: "ready",
+      url: data.imageUrl,
+      type: "scene",
+      provider: data.provider,
+      model: data.model,
+      requestId: data.requestId ?? undefined,
+      estimatedCost: data.estimatedCostUsd ?? undefined,
+      format: outputFormat,
+      label: pa.enhancedPhoto,
+      prompt: data.promptUsed,
+    });
+    removePendingGenerationJob(pendingId);
+  };
+
+  const failPendingAsset = (pendingId: string, message: string) => {
+    onUpdateAsset(pendingId, {
+      status: "error",
+      errorMessage: message,
+    });
+    removePendingGenerationJob(pendingId);
+  };
+
+  useEffect(() => {
+    for (const asset of assets) {
+      if (asset.status !== "processing") continue;
+      if (resumeInFlightRef.current.has(asset.id)) continue;
+
+      const job = getPendingGenerationJob(asset.id);
+      if (!job) continue;
+
+      if (isPendingGenerationStale(job.startedAt)) {
+        failPendingAsset(asset.id, pa.fileFailed);
+        continue;
+      }
+
+      resumeInFlightRef.current.add(asset.id);
+      void (async () => {
+        try {
+          const outcome = await resumePendingGeneration(job);
+          if (outcome.kind === "success") {
+            const payload = outcome.data;
+            if (job.kind === "video" && payload.ok && "video" in payload) {
+              applyVideoSuccess(
+                asset.id,
+                payload as VideoGenerateResponse,
+                job.body.prompt
+              );
+            } else if (job.kind === "image" && payload.ok && "imageUrl" in payload) {
+              const fmt =
+                job.body.outputFormat === "jpg" ? "jpeg" : job.body.outputFormat;
+              applyImageSuccess(
+                asset.id,
+                payload as ImageEnhanceResponse,
+                fmt as ImageOutputFormat
+              );
+            } else {
+              failPendingAsset(asset.id, pa.fileFailed);
+            }
+            return;
+          }
+          if (outcome.kind === "error") {
+            if (outcome.billing && onTokenBillingError) {
+              tryApplyTokenBillingError(
+                { ok: false, errorCode: "INSUFFICIENT_TOKENS", message: outcome.message },
+                onTokenBillingError
+              );
+            }
+            failPendingAsset(asset.id, friendlyPostProcessError(outcome.message, pa));
+            setError(friendlyPostProcessError(outcome.message, pa));
+          }
+        } catch {
+          failPendingAsset(asset.id, pa.fileFailed);
+          setError(pa.fileFailed);
+        } finally {
+          resumeInFlightRef.current.delete(asset.id);
+        }
+      })();
+    }
+  }, [assets, pa, onTokenBillingError, onUpdateAsset]);
+
+  const handleSaveUploadedSource = () => {
+    if (!uploadedSource) return;
+    const asset = uploadedSourceToGalleryAsset(uploadedSource);
+    onAssetCreated(asset);
+    setSelectedAssetId(asset.id);
+    handleUploadSourceChange(null);
+    setError(null);
+  };
 
   useEffect(() => {
     if (!isMobileLayout) setMobileSheetOpen(false);
@@ -559,25 +742,7 @@ export function ProcessedAssetsPanel({
     void downloadImageFile(asset.url, filename);
   };
 
-  if (assets.length === 0) {
-    return (
-      <Card>
-        <CardContent className="flex min-h-[360px] items-center justify-center p-6 text-center">
-          <div className="max-w-md">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[20px] bg-teal-50 text-teal-700">
-              <Layers className="h-7 w-7" />
-            </div>
-            <h2 className="mt-4 text-xl font-semibold text-slate-950">
-              {pa.emptyTitle}
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              {pa.emptyHint}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  const editorAsset = selectedAsset;
 
   const mobileSheetTitle =
     processingMode === "video" ? pa.createVideo : pa.createImage;
@@ -595,6 +760,7 @@ export function ProcessedAssetsPanel({
               value={videoProvider}
               onChange={handleVideoProviderChange}
               disabled={generationLoading}
+              motionOnly={motionVideoUpload}
             />
           ) : null}
 
@@ -701,13 +867,11 @@ export function ProcessedAssetsPanel({
               durationSeconds={durationSeconds}
               aspectRatio={videoAspectRatio}
               motionPreset={motionPreset}
-              referenceVideoUrl={referenceVideoUrl}
-              characterOrientation={characterOrientation}
               onQualityChange={setSaasQuality}
               onDurationChange={setDurationSeconds}
               onAspectRatioChange={setVideoAspectRatio}
               onMotionPresetChange={setMotionPreset}
-              onReferenceVideoUrlChange={setReferenceVideoUrl}
+              characterOrientation={characterOrientation}
               onCharacterOrientationChange={setCharacterOrientation}
               generateAudio={videoGenerateAudio}
               soundPrompt={videoSoundPrompt}
@@ -1096,29 +1260,46 @@ export function ProcessedAssetsPanel({
     </>
   );
 
-  if (
-    !isMobileLayout &&
-    desktopEditorOpen &&
-    processingMode &&
-    selectedAsset
-  ) {
-    return (
-      <PostProcessingDesktopEditor
-        asset={selectedAsset}
-        allAssets={assets}
-        title={
-          processingMode === "video" ? pa.createVideo : pa.createImage
-        }
-        onBack={closeDesktopEditor}
-        settings={settingsBody}
-      />
-    );
-  }
+  const d = copy.postProcessingDesktop;
 
   return (
-    <>
+    <div className="space-y-4">
+      <PostProcessingUploadSection
+        source={uploadedSource}
+        uploading={uploadBusy}
+        onUploadingChange={setUploadBusy}
+        onSourceChange={handleUploadSourceChange}
+        onSave={handleSaveUploadedSource}
+        disabled={generationLoading}
+      />
+
+      {!isMobileLayout &&
+      desktopEditorOpen &&
+      processingMode &&
+      editorAsset ? (
+        <PostProcessingDesktopEditor
+          asset={editorAsset}
+          allAssets={assets}
+          title={
+            processingMode === "video" ? pa.createVideo : pa.createImage
+          }
+          onBack={closeDesktopEditor}
+          settings={settingsBody}
+        />
+      ) : null}
+
       {isMobileLayout ? (
         <>
+          {assets.length === 0 ? (
+            <Card className={postProcessingSectionCardClass}>
+              <div className="border-b border-border/60 px-4 py-3">
+                <StudioFilesSectionHeader title={d.galleryTitle} />
+              </div>
+              <CardContent className="p-4">
+                <p className="text-sm leading-6 text-slate-600">{pa.emptyHint}</p>
+              </CardContent>
+            </Card>
+          ) : (
           <PostProcessingMobileGallery
             assets={assets}
             onCreateImage={(id) => openMobileWorkflow(id, "image")}
@@ -1130,6 +1311,7 @@ export function ProcessedAssetsPanel({
               mobileSheetOpen && processingMode ? processingMode : null
             }
           />
+          )}
           <PostProcessingMobileSheet
             open={mobileSheetOpen}
             title={mobileSheetTitle}
@@ -1141,7 +1323,7 @@ export function ProcessedAssetsPanel({
             </div>
           </PostProcessingMobileSheet>
         </>
-      ) : (
+      ) : assets.length > 0 ? (
         <PostProcessingDesktopGallery
           assets={assets}
           onCreateImage={(id) => openDesktopEditor(id, "image")}
@@ -1149,7 +1331,16 @@ export function ProcessedAssetsPanel({
           onDownloadAsset={handleDownloadAsset}
           onDeleteAsset={onDeleteAsset}
         />
+      ) : (
+        <Card className={postProcessingSectionCardClass}>
+          <div className="border-b border-border/60 px-4 py-3">
+            <StudioFilesSectionHeader title={d.galleryTitle} />
+          </div>
+          <CardContent className="p-4">
+            <p className="text-sm leading-6 text-slate-600">{pa.emptyHint}</p>
+          </CardContent>
+        </Card>
       )}
-    </>
+    </div>
   );
 }

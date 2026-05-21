@@ -73,6 +73,7 @@ export const studioCopyRu: StudioCopy = {
     oneProductPhoto: "1 фото товара",
     clearAllTitle: "Удалить фото, рамку и сбросить карточку",
     previewAlt: "Предпросмотр товара",
+    uploading: "Загружаем…",
   },
   common: {
     product: "Товар",

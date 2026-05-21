@@ -97,6 +97,8 @@ export const imageEnhanceRequestSchema = z.object({
   negativePrompt: z.string().trim().max(1000).optional(),
   /** When true, skip OpenAI packaging (user pasted a full AI prompt). */
   skipPromptPackage: z.boolean().optional().default(false),
+  /** Pending gallery asset id — idempotency & resume after reload. */
+  clientAssetId: z.string().uuid().optional(),
 });
 
 export type ImageEnhanceRequest = z.infer<typeof imageEnhanceRequestSchema>;
