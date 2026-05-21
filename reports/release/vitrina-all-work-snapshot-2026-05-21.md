@@ -14,8 +14,9 @@
 |------|--------|
 | Branch | `snapshot/vitrina-all-work-2026-05-21` |
 | Base (до snapshot) | `release/vitrina-seo-audience-pages` @ working tree |
-| Commit | `5356110` — `chore: save Vitrina tokens, studio i18n, SEO audience and assets work` |
-| Files in commit | **147** (+17300 / −1180 lines) |
+| Snapshot commit | `5356110` — `chore: save Vitrina tokens, studio i18n, SEO audience and assets work` (147 files) |
+| Docs commits | `89326d8`, `6cd3e2a` — packaging report |
+| **HEAD (green)** | `a67e6fc` — `fix(studio): localize token billing modal` |
 | Push | `origin/snapshot/vitrina-all-work-2026-05-21` |
 | PR (optional) | https://github.com/loomany/market.kk/pull/new/snapshot/vitrina-all-work-2026-05-21 |
 | Main | **не трогали** |
@@ -98,13 +99,25 @@
 
 ---
 
-## Проверки (на момент коммита)
+## Проверки
+
+### После `a67e6fc` (TokenBillingModal i18n fix) — **актуально**
 
 | Command | Result |
 |---------|--------|
 | `npm run test:tokens` | **PASS** |
-| `npm run check:studio:i18n` | **FAIL** — `TokenBillingModal.tsx`: hardcoded RU/KK строки (баланс, «Закрыть», CTA); не блокирует snapshot, но нужно до production |
+| `npm run check:studio:i18n` | **PASS** (536 keys) |
 | `npm run build` | **PASS** (1282 static pages) |
+
+Fix: `fix(studio): localize token billing modal` — `useStudioCopy()`, `tokenBilling` в `studioCopyPass2.ts`. Отчёт: `reports/studio/vitrina-token-billing-modal-i18n-fix-2026-05-21.md`.
+
+### На момент первого snapshot commit `5356110`
+
+| Command | Result |
+|---------|--------|
+| `npm run test:tokens` | **PASS** |
+| `npm run check:studio:i18n` | **FAIL** (исправлено в `a67e6fc`) |
+| `npm run build` | **PASS** |
 | `npm run smoke:seo:public` | **PASS** |
 | `npm run smoke:seo:hreflang` | **PASS** |
 
@@ -116,7 +129,7 @@
 |----------|-----|
 | Backup / восстановление всей работы | **да** — полный snapshot всех scope |
 | Code review «что накопилось» | **да** |
-| Production deploy | **нет** — нужен полный smoke, fix `check:studio:i18n`, prod env, migration на DB, Lemon webhook |
+| Production deploy | **нет** — нужен `smoke:seo:prelaunch`, prod env, migration на DB, Lemon webhook |
 | Test payment | **нет** — только по явному OK |
 
 ---
@@ -142,4 +155,4 @@
 
 1. Держать snapshot branch на remote как страховку.
 2. Продолжить split PRs из dirty tree / backup при необходимости.
-3. Перед deploy: исправить `TokenBillingModal` i18n, `smoke:seo:prelaunch`, prod secrets, DB migration, live token smoke.
+3. Перед deploy: `smoke:seo:prelaunch`, prod secrets, DB migration, live token smoke (`TokenBillingModal` i18n — **done** в `a67e6fc`).
