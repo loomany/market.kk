@@ -61,6 +61,7 @@ type ProcessedAssetsPanelProps = {
   mockMode: boolean;
   paidAiRunsAllowed: boolean;
   promptLocale: Locale;
+  requireAuthForGeneration?: () => boolean;
   onTokenBillingError?: (payload: TokenBillingErrorPayload) => void;
   onDeleteAsset: (id: string) => void;
   onAssetCreated: (asset: StudioSessionAsset) => void;
@@ -96,6 +97,7 @@ export function ProcessedAssetsPanel({
   mockMode,
   paidAiRunsAllowed,
   promptLocale,
+  requireAuthForGeneration,
   onTokenBillingError,
   onDeleteAsset,
   onAssetCreated,
@@ -343,6 +345,9 @@ export function ProcessedAssetsPanel({
   const handleGenerate = async () => {
     if (!selectedAsset || !sourceImageUrl || !processingMode) {
       setError(pa.selectFileFirst);
+      return;
+    }
+    if (requireAuthForGeneration && !requireAuthForGeneration()) {
       return;
     }
     if (!canGenerate) {

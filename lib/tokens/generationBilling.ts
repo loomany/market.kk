@@ -14,7 +14,7 @@ import {
   guestGenerationRemaining,
   markGuestGenerationUsed,
 } from "@/lib/tokens/guestGeneration";
-import { isValidUserUuid } from "@/lib/tokens/config";
+import { guestFreeGenerationLimit, isValidUserUuid } from "@/lib/tokens/config";
 import { getUserTokenBalance } from "@/lib/tokens/tokenLedger";
 import type { IndexableLocale } from "@/lib/i18n/localeConfig";
 import { assertLocale, indexableLocales } from "@/lib/i18n/localeConfig";
@@ -37,9 +37,9 @@ const ERROR_COPY = {
     insufficientBody:
       "Для этой AI-операции нужен 1 токен. Пополните баланс, чтобы продолжить.",
     topUp: "Пополнить баланс",
-    guestUsedTitle: "Бесплатная генерация уже использована",
+    guestUsedTitle: "Нужна регистрация",
     guestUsedBody:
-      "Войдите в аккаунт и пополните баланс, чтобы продолжить без водяного знака.",
+      "Займёт около 10 секунд через WhatsApp. После входа сохранятся все загруженные фото и настройки.",
     login: "Войти",
     buyTokens: "Купить токены",
   },
@@ -48,9 +48,9 @@ const ERROR_COPY = {
     insufficientBody:
       "This AI operation requires 1 token. Top up your balance to continue.",
     topUp: "Top up balance",
-    guestUsedTitle: "Free generation already used",
+    guestUsedTitle: "Sign in required",
     guestUsedBody:
-      "Sign in and top up your balance to continue without a watermark.",
+      "WhatsApp sign-in takes about 10 seconds. Your uploads and settings will stay as they are.",
     login: "Sign in",
     buyTokens: "Buy tokens",
   },
@@ -59,9 +59,9 @@ const ERROR_COPY = {
     insufficientBody:
       "Бұл AI операциясына 1 токен керек. Жалғастыру үшін балансты толтырыңыз.",
     topUp: "Балансты толтыру",
-    guestUsedTitle: "Тегін генерация қолданылды",
+    guestUsedTitle: "Тіркелу қажет",
     guestUsedBody:
-      "Су белгісіз жалғастыру үшін аккаунтқа кіріп, балансты толтырыңыз.",
+      "WhatsApp арқылы ~10 секунд. Жүктелген фото мен баптаулар сақталады.",
     login: "Кіру",
     buyTokens: "Токен сатып алу",
   },
@@ -155,36 +155,50 @@ export async function beginGenerationBilling(params: {
     };
   }
 
-  const guest = await getGuestGenerationState();
-  if (guestGenerationRemaining(guest) <= 0) {
+  const guestLimit = guestFreeGenerationLimit();
+  if (guestLimit > 0) {
+    const guest = await getGuestGenerationState();
+    if (guestGenerationRemaining(guest) <= 0) {
+      return {
+        ok: false,
+        response: NextResponse.json(
+          {
+            ok: false,
+            errorCode: "GUEST_GENERATION_LIMIT",
+            title: copy.guestUsedTitle,
+            message: copy.guestUsedBody,
+            cta: [{ label: copy.login, action: "login" as const }],
+          },
+          { status: 402 }
+        ),
+      };
+    }
+
     return {
-      ok: false,
-      response: NextResponse.json(
-        {
-          ok: false,
-          errorCode: "GUEST_GENERATION_LIMIT",
-          title: copy.guestUsedTitle,
-          message: copy.guestUsedBody,
-          cta: [
-            { label: copy.login, action: "login" as const },
-            { label: copy.buyTokens, href: `/${locale}/tokens` },
-          ],
-        },
-        { status: 402 }
-      ),
+      ok: true,
+      ctx: {
+        mode: "guest_free",
+        operationType: params.operationType,
+        route: params.route,
+        costTokens,
+        locale,
+        spendCommitted: false,
+      },
     };
   }
 
   return {
-    ok: true,
-    ctx: {
-      mode: "guest_free",
-      operationType: params.operationType,
-      route: params.route,
-      costTokens,
-      locale,
-      spendCommitted: false,
-    },
+    ok: false,
+    response: NextResponse.json(
+      {
+        ok: false,
+        errorCode: "GUEST_LOGIN_REQUIRED",
+        title: copy.guestUsedTitle,
+        message: copy.guestUsedBody,
+        cta: [{ label: copy.login, action: "login" as const }],
+      },
+      { status: 402 }
+    ),
   };
 }
 

@@ -12,7 +12,8 @@ export type TokenBillingCta = TokenBillingCtaHref | TokenBillingCtaLogin;
 
 export type TokenBillingErrorCode =
   | "INSUFFICIENT_TOKENS"
-  | "GUEST_GENERATION_LIMIT";
+  | "GUEST_GENERATION_LIMIT"
+  | "GUEST_LOGIN_REQUIRED";
 
 export type TokenBillingErrorPayload = {
   errorCode: TokenBillingErrorCode;
@@ -26,6 +27,7 @@ export type TokenBillingErrorPayload = {
 const BILLING_CODES: ReadonlySet<string> = new Set([
   "INSUFFICIENT_TOKENS",
   "GUEST_GENERATION_LIMIT",
+  "GUEST_LOGIN_REQUIRED",
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {

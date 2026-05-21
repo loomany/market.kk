@@ -95,6 +95,7 @@ import { Button } from "@/components/ui/Button";
 import { TokenBalancePill } from "@/components/auth/TokenBalancePill";
 import { WhatsAppLoginModal } from "@/components/auth/WhatsAppLoginModal";
 import { TokenBillingModal } from "@/components/studio/TokenBillingModal";
+import { StudioSignupGateModal } from "@/components/studio/StudioSignupGateModal";
 import type { TokenBillingErrorPayload } from "@/lib/tokens/billingErrorPayload";
 import {
   TokenBillingBlockedError,
@@ -318,6 +319,7 @@ function StudioShellInner({
   const [modelSource, setModelSource] = useState<ModelSourceKind>(null);
   const [modelInputMode, setModelInputMode] = useState<ModelInputMode>("create");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [signupGateOpen, setSignupGateOpen] = useState(false);
   const savedModelUrl = savedStudioModel?.url ?? null;
   const [modelGenerating, setModelGenerating] = useState(false);
   const [modelGenerateError, setModelGenerateError] = useState<string | null>(
@@ -451,6 +453,20 @@ function StudioShellInner({
     productAnalysis,
     productShotSettings,
   ]);
+
+  const flushStudioDraftBeforeLogin = useCallback(() => {
+    persistStudioWorkspace();
+    if (isStudioProductPhotoMode(studioMode)) {
+      void persistModeProductPhotos(studioMode);
+    }
+  }, [persistStudioWorkspace, persistModeProductPhotos, studioMode]);
+
+  const requireAuthForGeneration = useCallback((): boolean => {
+    if (isAuthenticated) return true;
+    flushStudioDraftBeforeLogin();
+    setSignupGateOpen(true);
+    return false;
+  }, [isAuthenticated, flushStudioDraftBeforeLogin]);
 
   const handleStudioModeChange = useCallback(
     async (next: StudioMode) => {
@@ -1139,12 +1155,19 @@ function StudioShellInner({
   }, []);
 
   useEffect(() => {
-    void fetch("/api/auth/me", { cache: "no-store" })
-      .then((res) => res.json())
-      .then((data: { user?: { id: string } | null }) => {
-        setIsAuthenticated(Boolean(data.user));
-      })
-      .catch(() => setIsAuthenticated(false));
+    const loadAuth = () => {
+      void fetch("/api/auth/me", { cache: "no-store" })
+        .then((res) => res.json())
+        .then((data: { user?: { id: string } | null }) => {
+          const signedIn = Boolean(data.user);
+          setIsAuthenticated(signedIn);
+          if (signedIn) setSignupGateOpen(false);
+        })
+        .catch(() => setIsAuthenticated(false));
+    };
+    loadAuth();
+    window.addEventListener("vitrina-auth-changed", loadAuth);
+    return () => window.removeEventListener("vitrina-auth-changed", loadAuth);
   }, []);
 
   const persistedLoadStartedRef = useRef(false);
@@ -2116,6 +2139,7 @@ function StudioShellInner({
   };
 
   const handlePrimaryAction = () => {
+    if (!requireAuthForGeneration()) return;
     if (studioMode === "clothing-tryon") return void handleCreatePhotoOnModel();
     return handleProductShot();
   };
@@ -2283,6 +2307,7 @@ function StudioShellInner({
             mockMode={mockMode}
             paidAiRunsAllowed={paidAiRunsAllowed}
             promptLocale={promptLocale}
+            requireAuthForGeneration={requireAuthForGeneration}
             onTokenBillingError={setTokenBilling}
             onDeleteAsset={deleteSessionAsset}
             onAssetCreated={addSingleAssetToSession}
@@ -2766,6 +2791,11 @@ function StudioShellInner({
         )}
       </main>
 
+      <StudioSignupGateModal
+        open={signupGateOpen}
+        onClose={() => setSignupGateOpen(false)}
+        onBeforeLogin={flushStudioDraftBeforeLogin}
+      />
       <TokenBillingModal
         open={tokenBilling !== null}
         payload={tokenBilling}

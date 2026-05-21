@@ -1,6 +1,6 @@
 import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { isValidUserUuid } from "@/lib/tokens/config";
+import { isValidUserUuid, welcomeTokensForNewUser } from "@/lib/tokens/config";
 import {
   resolveGenerationCost,
   type GenerationOperationType,
@@ -82,6 +82,34 @@ export async function creditPurchasedTokens(
     credited: Boolean(row?.credited),
     balanceAfter: Number(row?.balance_after ?? 0),
   };
+}
+
+/** One-time welcome grant after WhatsApp signup (idempotent per user). */
+export async function creditWelcomeTokens(
+  userId: string
+): Promise<{ credited: boolean; balanceAfter: number }> {
+  const tokens = welcomeTokensForNewUser();
+  if (tokens <= 0) {
+    return { credited: false, balanceAfter: await getUserTokenBalance(userId) };
+  }
+
+  try {
+    return await creditPurchasedTokens({
+      userId,
+      tokens,
+      amountCents: 0,
+      currency: "USD",
+      provider: "vitrina_signup",
+      providerEventId: `welcome_bonus:${userId}`,
+      metadata: { reason: "new_user_welcome" },
+    });
+  } catch (err) {
+    console.error(
+      "[tokenLedger] creditWelcomeTokens:",
+      err instanceof Error ? err.message : err
+    );
+    return { credited: false, balanceAfter: await getUserTokenBalance(userId) };
+  }
 }
 
 export type SpendUserTokensParams = {

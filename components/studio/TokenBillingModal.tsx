@@ -51,7 +51,10 @@ export function TokenBillingModal({
     if (payload.errorCode === "INSUFFICIENT_TOKENS") {
       return { title: tb.insufficientTitle, message: tb.insufficientBody };
     }
-    if (payload.errorCode === "GUEST_GENERATION_LIMIT") {
+    if (
+      payload.errorCode === "GUEST_GENERATION_LIMIT" ||
+      payload.errorCode === "GUEST_LOGIN_REQUIRED"
+    ) {
       return { title: tb.guestUsedTitle, message: tb.guestUsedBody };
     }
     return { title: payload.title, message: payload.message };
@@ -74,7 +77,12 @@ export function TokenBillingModal({
 
   const primaryActionLabel = useMemo(() => {
     if (!payload) return tb.buyTokens;
-    if (payload.errorCode === "GUEST_GENERATION_LIMIT") return tb.buyTokens;
+    if (
+      payload.errorCode === "GUEST_GENERATION_LIMIT" ||
+      payload.errorCode === "GUEST_LOGIN_REQUIRED"
+    ) {
+      return tb.signIn;
+    }
     return tb.topUpBalance;
   }, [payload, tb]);
 

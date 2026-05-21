@@ -7,6 +7,7 @@ import {
   verifyCodeHash,
 } from "@/lib/auth/whatsapp";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { creditWelcomeTokens } from "@/lib/tokens/tokenLedger";
 
 export const runtime = "nodejs";
 
@@ -106,6 +107,10 @@ export async function POST(request: Request) {
     phone,
     createdAt: new Date().toISOString(),
   });
+
+  if (isNewUser && admin) {
+    await creditWelcomeTokens(userId);
+  }
 
   return NextResponse.json({
     ok: true,

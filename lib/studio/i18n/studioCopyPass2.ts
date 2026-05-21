@@ -138,6 +138,14 @@ export const pass2Ru = {
     backgroundRemoveFailed: "Не удалось убрать фон",
   },
   editorActions: { download: "Скачать", open: "Открыть", delete: "Удалить" },
+  signupGate: {
+    title: "Регистрация займёт ~10 секунд",
+    body: "Войдите через WhatsApp — все загруженные фото и настройки останутся на месте. После входа сразу нажмите «Создать».",
+    bonus: "После регистрации — 2 токена на старт (любые 2 AI-действия по 1 токену).",
+    cta: "Продолжить с WhatsApp",
+    later: "Позже",
+    close: "Закрыть",
+  },
   tokenBilling: {
     insufficientTitle: "Недостаточно токенов",
     insufficientBody:
@@ -146,9 +154,9 @@ export const pass2Ru = {
     topUpBalance: "Пополнить баланс",
     close: "Закрыть",
     buyTokens: "Купить токены",
-    guestUsedTitle: "Бесплатная генерация уже использована",
+    guestUsedTitle: "Нужна регистрация",
     guestUsedBody:
-      "Войдите в аккаунт и пополните баланс, чтобы продолжить без водяного знака.",
+      "Займёт около 10 секунд через WhatsApp. Все загруженные фото и настройки сохранятся.",
     signIn: "Войти",
   },
   postProcessingEditors: {
@@ -295,6 +303,14 @@ export const pass2En = {
   saasPreview: { previewAvailable: "Preview available", previewAria: "Preview" },
   warnings: { exactCardNoMask: "Exact card without manual mask", backgroundRemoveFailed: "Could not remove background" },
   editorActions: { download: "Download", open: "Open", delete: "Delete" },
+  signupGate: {
+    title: "Sign up takes ~10 seconds",
+    body: "Continue with WhatsApp — your uploads and settings stay in place. Then hit Create.",
+    bonus: "After sign-up you get 2 starter tokens (any two AI actions, 1 token each).",
+    cta: "Continue with WhatsApp",
+    later: "Later",
+    close: "Close",
+  },
   tokenBilling: {
     insufficientTitle: "Not enough tokens",
     insufficientBody:
@@ -303,9 +319,9 @@ export const pass2En = {
     topUpBalance: "Top up balance",
     close: "Close",
     buyTokens: "Buy tokens",
-    guestUsedTitle: "Free generation already used",
+    guestUsedTitle: "Sign in required",
     guestUsedBody:
-      "Sign in and top up your balance to continue without a watermark.",
+      "WhatsApp sign-in takes about 10 seconds. Your uploads and settings are kept.",
     signIn: "Sign in",
   },
   postProcessingEditors: {
@@ -452,6 +468,14 @@ export const pass2Kk = {
   saasPreview: { previewAvailable: "Алдын ала қарау бар", previewAria: "Алдын ала қарау" },
   warnings: { exactCardNoMask: "Қолмен маскасыз нақты карточка", backgroundRemoveFailed: "Фон өшірілмеді" },
   editorActions: { download: "Жүктеп алу", open: "Ашу", delete: "Өшіру" },
+  signupGate: {
+    title: "Тіркелу ~10 секунд алады",
+    body: "WhatsApp арқылы кіріңіз — жүктелген фото мен баптаулар сақталады. Содан кейін «Жасау» басыңыз.",
+    bonus: "Тіркелгеннен кейін — 2 бастапқы токен (1 токен = 1 AI әрекет).",
+    cta: "WhatsApp арқылы жалғастыру",
+    later: "Кейінірек",
+    close: "Жабу",
+  },
   tokenBilling: {
     insufficientTitle: "Токен жеткіліксіз",
     insufficientBody:
@@ -460,9 +484,9 @@ export const pass2Kk = {
     topUpBalance: "Балансты толтыру",
     close: "Жабу",
     buyTokens: "Токен сатып алу",
-    guestUsedTitle: "Тегін генерация қолданылып қойды",
+    guestUsedTitle: "Тіркелу қажет",
     guestUsedBody:
-      "Су таңбасыз жалғастыру үшін аккаунтқа кіріп, балансты толтырыңыз.",
+      "WhatsApp арқылы ~10 секунд. Жүктелген фото мен баптаулар сақталады.",
     signIn: "Кіру",
   },
   postProcessingEditors: {

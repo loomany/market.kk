@@ -25,9 +25,15 @@ export function minTokenTopup(): number {
 }
 
 export function guestFreeGenerationLimit(): number {
-  const raw = process.env.GUEST_FREE_GENERATION_LIMIT ?? "1";
+  const raw = process.env.GUEST_FREE_GENERATION_LIMIT ?? "0";
   const value = Number(raw);
-  return Number.isFinite(value) && value >= 0 ? Math.floor(value) : 1;
+  return Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0;
+}
+
+export function welcomeTokensForNewUser(): number {
+  const raw = process.env.NEW_USER_WELCOME_TOKENS ?? "2";
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 2;
 }
 
 export function lemonApiKey(): string | null {
