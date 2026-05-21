@@ -14,7 +14,9 @@ const MS = {
   paid_traffic: 24 * 60 * 60 * 1000,
 };
 
-function wasSentWithin(
+const SESSION_ENTRY_MS = 30 * 60 * 1000;
+
+export function wasSentWithin(
   profile: VisitorProfile,
   key: string,
   windowMs: number,
@@ -163,6 +165,14 @@ export function shouldAllowSessionSummary(
     return { allow: false, notificationKey: key };
   }
   return { allow: true, notificationKey: key };
+}
+
+export function wasSessionEntryNotified(
+  profile: VisitorProfile,
+  sessionId: string,
+  now: number
+): boolean {
+  return wasSentWithin(profile, `session_entry:${sessionId}`, SESSION_ENTRY_MS, now);
 }
 
 export function paidTrafficSourceChanged(

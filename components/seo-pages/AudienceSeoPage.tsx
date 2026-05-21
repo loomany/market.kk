@@ -2,6 +2,11 @@ import Link from "next/link";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import type { AudienceLocalized } from "@/data/seo/audiencePages";
 import type { Locale } from "@/lib/i18n/localeConfig";
+import {
+  isStudioEntryHref,
+  resolvePublicHref,
+  studioEntryPath,
+} from "@/lib/i18n/siteLocalePreference";
 import { getAudienceHubSegment } from "@/lib/seo/audiencePaths";
 
 type AudienceSeoPageProps = {
@@ -31,7 +36,7 @@ export function AudienceSeoPage({ locale, content, hubLabel }: AudienceSeoPagePr
 
       <div className="mt-8 flex flex-col gap-3 sm:flex-row">
         <Link
-          href="/studio"
+          href={studioEntryPath(locale)}
           prefetch={false}
           className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-primary px-6 text-base font-semibold text-white shadow-lg shadow-teal-900/15 transition-colors hover:bg-teal-800"
         >
@@ -138,8 +143,8 @@ export function AudienceSeoPage({ locale, content, hubLabel }: AudienceSeoPagePr
           {content.relatedLinks.map((link) => (
             <Link
               key={link.href}
-              href={link.href}
-              prefetch={link.href === "/studio" ? false : undefined}
+              href={resolvePublicHref(link.href, locale)}
+              prefetch={isStudioEntryHref(link.href) ? false : undefined}
               className="rounded-full border border-border bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-teal-200 hover:text-teal-800"
             >
               {link.label}

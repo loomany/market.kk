@@ -1,5 +1,10 @@
 import { getTelegramConfig } from "@/lib/telegram/telegramConfig";
 
+export type TelegramInlineButton = {
+  text: string;
+  url: string;
+};
+
 export type SendMessageResult = {
   ok: boolean;
   error?: string;
@@ -7,13 +12,23 @@ export type SendMessageResult = {
 
 export async function sendTelegramHtml(
   text: string,
-  config = getTelegramConfig()
+  config = getTelegramConfig(),
+  opts?: { inlineButtons?: TelegramInlineButton[] }
 ): Promise<SendMessageResult> {
   if (!config.enabled || !config.botToken || !config.adminChatId) {
     return { ok: true };
   }
 
   const url = `https://api.telegram.org/bot${config.botToken}/sendMessage`;
+
+  const replyMarkup =
+    opts?.inlineButtons && opts.inlineButtons.length > 0
+      ? {
+          inline_keyboard: [
+            opts.inlineButtons.map((b) => ({ text: b.text, url: b.url })),
+          ],
+        }
+      : undefined;
 
   try {
     const res = await fetch(url, {
@@ -24,6 +39,7 @@ export async function sendTelegramHtml(
         text,
         parse_mode: "HTML",
         disable_web_page_preview: true,
+        ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
       }),
     });
 

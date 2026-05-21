@@ -8,6 +8,7 @@ import {
   indexableLocales,
   type IndexableLocale,
 } from "@/lib/i18n/localeConfig";
+import { resolvePublicHref } from "@/lib/i18n/siteLocalePreference";
 import { createSeoMetadata } from "@/lib/seo/metadata";
 import { breadcrumbJsonLd } from "@/lib/seo/jsonLd";
 
@@ -98,7 +99,7 @@ export default async function AiSummaryPage({ params }: PageProps) {
           <ul className="mt-4 grid gap-2 font-semibold text-teal-800">
             {content.links.map((link) => (
               <li key={link.href}>
-                <Link href={link.href} className="hover:text-teal-950">
+                <Link href={resolvePublicHref(link.href, locale)} className="hover:text-teal-950">
                   {link.label}
                 </Link>
               </li>

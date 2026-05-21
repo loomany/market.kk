@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Locale } from "@/lib/i18n/localeConfig";
+import { studioEntryPath } from "@/lib/i18n/siteLocalePreference";
 import type { getLandingCopy } from "@/lib/i18n/translations";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 import { TokenBalancePill } from "@/components/auth/TokenBalancePill";
@@ -28,7 +29,7 @@ export function SaasHeader({ locale, copy }: { locale: Locale; copy: LandingCopy
             {copy.nav.blog}
           </Link>
           <Link
-            href="/studio"
+            href={studioEntryPath(locale)}
             prefetch={false}
             data-telegram-event="cta_click"
             data-telegram-label="nav_studio"

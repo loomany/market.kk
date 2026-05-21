@@ -9,6 +9,7 @@ import {
   supportedLocaleCodes,
   type Locale,
 } from "@/lib/i18n/localeConfig";
+import { studioEntryPath } from "@/lib/i18n/siteLocalePreference";
 import { createSeoMetadata } from "@/lib/seo/metadata";
 import { breadcrumbJsonLd, faqJsonLd, serviceJsonLd, webPageJsonLd } from "@/lib/seo/jsonLd";
 
@@ -140,7 +141,7 @@ export default async function PlatformDetailPage({ params }: PageProps) {
             </Link>
           ))}
           <Link
-            href="/studio"
+            href={studioEntryPath(locale)}
             prefetch={false}
             className="rounded-lg border border-teal-200 bg-teal-50 p-4 text-sm font-semibold text-teal-800 hover:bg-teal-100"
           >

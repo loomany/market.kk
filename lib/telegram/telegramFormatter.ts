@@ -215,6 +215,33 @@ export function formatImportantAction(
     .join("\n");
 }
 
+/** Single Telegram alert when a human enters the site (per session). */
+export function formatSessionEntryAlert(
+  event: SiteEvent,
+  traffic: TrafficClassification,
+  visitorType: "new" | "returning"
+): string {
+  const device = summarizeUserAgent(event.userAgent);
+  const title =
+    visitorType === "new" ? "Новый визит на Vitrina" : "Повторный визит на Vitrina";
+  const emoji = visitorType === "new" ? "👤" : "🔄";
+
+  return [
+    `${emoji} <b>${escapeHtml(title)}</b>`,
+    "",
+    "Дальнейшие шаги — в карточке пользователя (кнопка ниже).",
+    "",
+    `Источник: ${escapeHtml(traffic.label)}`,
+    `Язык: ${escapeHtml(localeLabel(event.locale))}`,
+    `Страница входа: ${escapeHtml(event.path)}`,
+    `Referrer: ${escapeHtml(referrerShort(event.referrer))}`,
+    `UTM: ${escapeHtml(formatUtm(event))}`,
+    `Устройство: ${escapeHtml(device)}`,
+    `Visitor: #${escapeHtml(shortId(event.visitorId))}`,
+    `Session: #${escapeHtml(shortId(event.sessionId))}`,
+  ].join("\n");
+}
+
 export function formatTestMessage(siteUrl: string, envLabel: string): string {
   const time = new Date().toISOString();
   return [

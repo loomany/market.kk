@@ -7,6 +7,7 @@ import {
   supportedLocales,
   type Locale,
 } from "@/lib/i18n/localeConfig";
+import { persistSiteLocale } from "@/lib/i18n/siteLocalePreference";
 import { resolveLocaleSwitchPath } from "@/lib/i18n/switchLocalePath";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +34,7 @@ export function LanguageSwitcher({
   );
 
   const navigate = (code: Locale) => {
+    persistSiteLocale(code);
     const targetPath = resolveLocaleSwitchPath(pathname, code);
     window.location.assign(targetPath);
   };

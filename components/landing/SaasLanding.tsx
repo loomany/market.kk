@@ -13,6 +13,7 @@ import {
   Wand2,
 } from "lucide-react";
 import type { Locale } from "@/lib/i18n/localeConfig";
+import { studioEntryPath } from "@/lib/i18n/siteLocalePreference";
 import { getLandingCopy } from "@/lib/i18n/translations";
 import { getPlatformById, platformPages } from "@/data/seo/platforms";
 import { useCasePages } from "@/data/seo/useCases";
@@ -69,7 +70,7 @@ export function SaasLanding({ locale }: { locale: Locale }) {
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link
-                  href="/studio"
+                  href={studioEntryPath(locale)}
                   prefetch={false}
                   data-telegram-event="cta_click"
                   data-telegram-label="hero_start"

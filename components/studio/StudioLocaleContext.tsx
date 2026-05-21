@@ -9,14 +9,17 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { assertLocale, type IndexableLocale, type Locale } from "@/lib/i18n/localeConfig";
+import { assertLocale, type IndexableLocale } from "@/lib/i18n/localeConfig";
+import {
+  persistSiteLocale,
+  readStoredSiteLocale,
+  studioEntryPath,
+} from "@/lib/i18n/siteLocalePreference";
 import { getStudioCopy, toStudioLocale } from "@/lib/studio/i18n";
 import type {
   StudioCopyFull,
   StudioLocale,
 } from "@/lib/studio/i18n/studioCopyTypes";
-
-const STORAGE_KEY = "vitrina-studio-locale";
 
 export type StudioLocaleContextValue = {
   locale: StudioLocale;
@@ -25,24 +28,6 @@ export type StudioLocaleContextValue = {
 };
 
 const StudioLocaleContext = createContext<StudioLocaleContextValue | null>(null);
-
-function readStoredLocale(): StudioLocale | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? toStudioLocale(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function persistLocale(locale: StudioLocale) {
-  try {
-    localStorage.setItem(STORAGE_KEY, locale);
-  } catch {
-    /* ignore */
-  }
-}
 
 function localeFromPathname(pathname: string): StudioLocale | null {
   const segment = pathname.split("/").filter(Boolean)[0];
@@ -71,31 +56,34 @@ export function StudioLocaleProvider({
       toStudioLocale(routeLocale) ??
       pathLocale ??
       queryLocale ??
-      readStoredLocale() ??
+      (() => {
+        const stored = readStoredSiteLocale();
+        return stored ? toStudioLocale(stored) : null;
+      })() ??
       toStudioLocale("ru")
     );
   }, [routeLocale, pathname, searchKey]);
 
   const copy = useMemo(() => getStudioCopy(locale), [locale]);
 
-  const studioPathForLocale = useCallback((next: StudioLocale) => {
-    if (next === "ru") return "/studio";
-    return `/${next}/studio`;
-  }, []);
-
   /** Canonical URLs: /studio (ru) and /en/studio, /kk/studio — ?lang= kept for old links. */
   useEffect(() => {
     if (pathname !== "/studio") return;
     const queryLang = searchParams.get("lang");
-    if (!queryLang) return;
-    const target = toStudioLocale(queryLang);
-    if (target === "ru") return;
-    router.replace(studioPathForLocale(target));
-  }, [pathname, searchKey, router, studioPathForLocale, searchParams]);
+    if (queryLang) {
+      const target = toStudioLocale(queryLang);
+      if (target !== "ru") router.replace(studioEntryPath(target));
+      return;
+    }
+    const stored = readStoredSiteLocale();
+    if (stored && stored !== "ru") {
+      router.replace(studioEntryPath(stored));
+    }
+  }, [pathname, searchKey, router, searchParams]);
 
   const setLocale = useCallback(
     (next: StudioLocale) => {
-      persistLocale(next);
+      persistSiteLocale(next);
       const pathLocale = localeFromPathname(pathname);
       if (pathLocale) {
         const segments = pathname.split("/").filter(Boolean);
@@ -103,9 +91,9 @@ export function StudioLocaleProvider({
         router.replace(`/${segments.join("/")}`);
         return;
       }
-      router.replace(studioPathForLocale(next));
+      router.replace(studioEntryPath(next));
     },
-    [pathname, router, studioPathForLocale]
+    [pathname, router]
   );
 
   const value = useMemo(

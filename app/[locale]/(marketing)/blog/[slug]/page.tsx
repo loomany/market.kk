@@ -15,6 +15,7 @@ import {
   supportedLocaleCodes,
   type Locale,
 } from "@/lib/i18n/localeConfig";
+import { isStudioEntryHref, resolvePublicHref } from "@/lib/i18n/siteLocalePreference";
 import { createSeoMetadata } from "@/lib/seo/metadata";
 import { articleJsonLd, breadcrumbJsonLd, faqJsonLd } from "@/lib/seo/jsonLd";
 
@@ -159,8 +160,8 @@ export default async function BlogArticlePage({ params }: PageProps) {
             {article.internalLinks.map((link) => (
               <Link
                 key={link.href}
-                href={link.href}
-                prefetch={link.href === "/studio" ? false : undefined}
+                href={resolvePublicHref(link.href, locale)}
+                prefetch={isStudioEntryHref(link.href) ? false : undefined}
                 className="text-sm font-semibold text-teal-700 hover:text-teal-900"
               >
                 {link.label} →

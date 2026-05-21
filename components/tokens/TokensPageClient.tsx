@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { IndexableLocale } from "@/lib/i18n/localeConfig";
+import { studioEntryPath } from "@/lib/i18n/siteLocalePreference";
 import { formatTokenBalanceDisplay } from "@/lib/tokens/formatTokens";
 import { Button } from "@/components/ui/Button";
 import { trackTelegramEvent } from "@/lib/telegram/clientEvents";
@@ -172,7 +173,7 @@ export function TokensPageClient({ locale }: { locale: IndexableLocale }) {
 
       <div className="mt-8 flex flex-wrap gap-3">
         <Link
-          href="/studio"
+          href={studioEntryPath(locale)}
           prefetch={false}
           className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white"
         >

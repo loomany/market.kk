@@ -1,27 +1,24 @@
 import { botPathGroup, detectBot } from "@/lib/telegram/botDetector";
 import {
-  paidTrafficSourceChanged,
   shouldAllowImmediate,
-  shouldAllowSessionSummary,
+  wasSessionEntryNotified,
 } from "@/lib/telegram/eventDeduper";
 import { classifyTraffic } from "@/lib/telegram/trafficClassifier";
 import { getTelegramConfig, isInSilentHours } from "@/lib/telegram/telegramConfig";
 import { sendTelegramHtml } from "@/lib/telegram/telegramClient";
 import {
-  formatBotVisit,
   formatImportantAction,
-  formatLoginSuccess,
-  formatNewHumanVisit,
-  formatPaidTrafficVisit,
-  formatSessionSummary,
+  formatSessionEntryAlert,
   formatSignupSuccess,
 } from "@/lib/telegram/telegramFormatter";
 import type { ProcessSiteEventResult, SiteEvent } from "@/lib/telegram/types";
+import { buildVisitorAdminUrl } from "@/lib/telegram/visitorAdminUrl";
 import {
   getOrCreateVisitorProfile,
   markNotificationSent,
   touchVisitorPageView,
 } from "@/lib/telegram/visitorMemory";
+import { persistVisitorEvent } from "@/lib/telegram/visitorStore";
 
 function siteHostFromEnv(): string | undefined {
   const url = process.env.NEXT_PUBLIC_SITE_URL?.trim();
@@ -41,16 +38,22 @@ function mapPathToDerivedEvent(path: string): SiteEvent["eventType"] | null {
   return null;
 }
 
+function parseNotifyConversions(): boolean {
+  const v = process.env.TELEGRAM_NOTIFY_CONVERSIONS?.trim().toLowerCase();
+  return v === "true" || v === "1" || v === "yes";
+}
+
 async function sendAndMark(
   text: string,
   profile: ReturnType<typeof getOrCreateVisitorProfile>,
-  notificationKey: string
+  notificationKey: string,
+  inlineButtons?: { text: string; url: string }[]
 ): Promise<boolean> {
   const config = getTelegramConfig();
   if (!config.enabled || isInSilentHours(config)) {
     return false;
   }
-  const result = await sendTelegramHtml(text, config);
+  const result = await sendTelegramHtml(text, config, { inlineButtons });
   if (result.ok) {
     markNotificationSent(profile, notificationKey);
     return true;
@@ -70,7 +73,6 @@ export async function processSiteEvent(
   const bot = detectBot(event.userAgent);
   const traffic = classifyTraffic(event, siteHostFromEnv());
   const profile = getOrCreateVisitorProfile(event, traffic, bot, opts?.country);
-  const now = Date.parse(event.timestamp) || Date.now();
   const pathGroup = botPathGroup(event.path);
 
   const derived = mapPathToDerivedEvent(event.path);
@@ -79,186 +81,91 @@ export async function processSiteEvent(
 
   const effectiveEvent: SiteEvent = { ...event, eventType: effectiveType };
 
+  if (!bot.isBot && effectiveType !== "page_view") {
+    await persistVisitorEvent(effectiveEvent, traffic, {
+      isBot: false,
+      country: opts?.country,
+    });
+  } else if (config.debug && bot.isBot && effectiveType !== "page_view") {
+    await persistVisitorEvent(effectiveEvent, traffic, {
+      isBot: true,
+      botName: bot.botName,
+      country: opts?.country,
+    });
+  }
+
   if (bot.isBot) {
     if (bot.tier === "noise" && !config.debug) {
       return { sent: false, suppressed: "noise_bot" };
     }
-    if (effectiveType === "page_view" || effectiveType === "first_visit") {
-      const decision = shouldAllowImmediate(effectiveEvent, profile, traffic, {
-        botName: bot.botName,
-        pathGroup,
-      });
-      if (!decision.allow) {
-        return { sent: false, suppressed: decision.reason };
-      }
-      const sent = await sendAndMark(
-        formatBotVisit(effectiveEvent, traffic, bot.botName ?? "Bot"),
-        profile,
-        decision.notificationKey
-      );
-      return { sent, notificationType: "bot_visit" };
-    }
-    return { sent: false, suppressed: "bot_non_page" };
-  }
-
-  const alwaysImmediate = new Set<SiteEvent["eventType"]>([
-    "signup_start",
-    "signup_success",
-    "login_success",
-    "checkout_click",
-    "payment_success",
-    "cta_click",
-    "lead_action",
-    "pricing_view",
-    "tokens_view",
-    "studio_open",
-    "first_visit",
-    "return_visit",
-  ]);
-
-  if (alwaysImmediate.has(effectiveType)) {
-    const decision = shouldAllowImmediate(effectiveEvent, profile, traffic, {
-      botName: bot.botName,
-      pathGroup,
-    });
-
-    let allow = decision.allow;
-    if (
-      !allow &&
-      traffic.isPaid &&
-      (effectiveType === "first_visit" || paidTrafficSourceChanged(profile, traffic))
-    ) {
-      allow = true;
-    }
-
-    if (!allow && effectiveType !== "page_view") {
-      return { sent: false, suppressed: decision.reason };
-    }
-
-    if (allow || traffic.isPaid) {
-      let text: string;
-      let key = decision.notificationKey;
-
-      switch (effectiveType) {
-        case "first_visit":
-          text = formatNewHumanVisit(effectiveEvent, traffic, "new");
-          break;
-        case "return_visit":
-          text = formatNewHumanVisit(effectiveEvent, traffic, "returning");
-          break;
-        case "signup_success":
-          text = formatSignupSuccess(effectiveEvent, profile, traffic);
-          key = "signup_success";
-          break;
-        case "login_success":
-          text = formatLoginSuccess(effectiveEvent, traffic);
-          break;
-        case "checkout_click":
-          text = formatImportantAction(
-            "Переход к оплате",
-            "💳",
-            effectiveEvent,
-            traffic
-          );
-          break;
-        case "payment_success":
-          text = formatImportantAction(
-            "Оплата принята",
-            "✅",
-            effectiveEvent,
-            traffic,
-            "Страница успешного возврата с оплаты"
-          );
-          key = "payment_success";
-          break;
-        case "signup_start":
-          text = formatImportantAction(
-            "Начата регистрация",
-            "📝",
-            effectiveEvent,
-            traffic
-          );
-          break;
-        case "pricing_view":
-          text = formatImportantAction("Просмотр тарифов", "💰", effectiveEvent, traffic);
-          break;
-        case "tokens_view":
-          text = formatImportantAction("Просмотр токенов", "🪙", effectiveEvent, traffic);
-          break;
-        case "studio_open":
-          text = formatImportantAction("Открыта студия", "🎨", effectiveEvent, traffic);
-          break;
-        case "cta_click":
-          text = formatImportantAction(
-            "Клик по CTA",
-            "👆",
-            effectiveEvent,
-            traffic,
-            effectiveEvent.label
-          );
-          break;
-        case "lead_action":
-          text = formatImportantAction("Важное действие", "⭐", effectiveEvent, traffic);
-          break;
-        default:
-          if (traffic.isPaid) {
-            text = formatPaidTrafficVisit(
-              effectiveEvent,
-              traffic,
-              profile.pageCount <= 1 ? "новый" : `#${effectiveEvent.visitorId.slice(0, 6)}`
-            );
-            key = `paid_traffic:${effectiveEvent.visitorId}:${traffic.label}`;
-          } else {
-            return { sent: false, suppressed: decision.reason };
-          }
-      }
-
-      const sent = await sendAndMark(text, profile, key);
-      return { sent, notificationType: effectiveType };
-    }
+    return { sent: false, suppressed: "bot_logged_only" };
   }
 
   if (effectiveType === "page_view") {
     touchVisitorPageView(profile, event.path);
-
-    if (derived) {
-      const derivedEvent: SiteEvent = { ...event, eventType: derived };
-      const derivedDecision = shouldAllowImmediate(derivedEvent, profile, traffic, {
-        botName: bot.botName,
-        pathGroup,
-      });
-      if (derivedDecision.allow) {
-        const titles: Record<string, { title: string; emoji: string }> = {
-          pricing_view: { title: "Просмотр тарифов", emoji: "💰" },
-          tokens_view: { title: "Просмотр токенов", emoji: "🪙" },
-          studio_open: { title: "Открыта студия", emoji: "🎨" },
-        };
-        const meta = titles[derived] ?? { title: derived, emoji: "📄" };
-        const sent = await sendAndMark(
-          formatImportantAction(meta.title, meta.emoji, derivedEvent, traffic),
-          profile,
-          derivedDecision.notificationKey
-        );
-        return { sent, notificationType: derived };
-      }
-    }
-
-    const summaryDecision = shouldAllowSessionSummary(profile, event.sessionId, now);
-    const hadVisitAlert =
-      typeof profile.lastNotificationAtByType[`first_visit:${event.visitorId}`] ===
-        "number" ||
-      typeof profile.lastNotificationAtByType[`return_visit:${event.visitorId}`] ===
-        "number";
-
-    if (summaryDecision.allow && hadVisitAlert) {
-      const sessionMinutes = (now - profile.sessionStartedAt) / 60_000;
-      const text = formatSessionSummary(profile, traffic, sessionMinutes);
-      const sent = await sendAndMark(text, profile, summaryDecision.notificationKey);
-      return { sent, notificationType: "session_summary" };
-    }
-
-    return { sent: false, suppressed: "page_view_only" };
+    const toStore = derived
+      ? { ...effectiveEvent, eventType: derived }
+      : effectiveEvent;
+    await persistVisitorEvent(toStore, traffic, {
+      isBot: false,
+      country: opts?.country,
+    });
+    return { sent: false, suppressed: "logged_only" };
   }
 
-  return { sent: false, suppressed: "unhandled" };
+  const sessionEntryTypes = new Set<SiteEvent["eventType"]>([
+    "first_visit",
+    "return_visit",
+  ]);
+
+  if (sessionEntryTypes.has(effectiveType)) {
+    const now = Date.parse(event.timestamp) || Date.now();
+    const sessionKey = `session_entry:${event.sessionId}`;
+    if (wasSessionEntryNotified(profile, event.sessionId, now)) {
+      return { sent: false, suppressed: "session_entry_deduped" };
+    }
+
+    const visitorType =
+      effectiveType === "return_visit" ? "returning" : "new";
+    const text = formatSessionEntryAlert(effectiveEvent, traffic, visitorType);
+    const adminUrl = buildVisitorAdminUrl(event.visitorId);
+    const buttons = adminUrl
+      ? [{ text: "Открыть пользователя", url: adminUrl }]
+      : undefined;
+
+    const sent = await sendAndMark(text, profile, sessionKey, buttons);
+    return { sent, notificationType: "session_entry" };
+  }
+
+  if (
+    parseNotifyConversions() &&
+    (effectiveType === "signup_success" || effectiveType === "payment_success")
+  ) {
+    const decision = shouldAllowImmediate(effectiveEvent, profile, traffic, {
+      botName: bot.botName,
+      pathGroup,
+    });
+    if (decision.allow) {
+      const text =
+        effectiveType === "signup_success"
+          ? formatSignupSuccess(effectiveEvent, profile, traffic)
+          : formatImportantAction(
+              "Оплата принята",
+              "✅",
+              effectiveEvent,
+              traffic,
+              "Страница успешного возврата с оплаты"
+            );
+      const adminUrl = buildVisitorAdminUrl(event.visitorId);
+      const sent = await sendAndMark(
+        text,
+        profile,
+        decision.notificationKey,
+        adminUrl ? [{ text: "Открыть пользователя", url: adminUrl }] : undefined
+      );
+      return { sent, notificationType: effectiveType };
+    }
+  }
+
+  return { sent: false, suppressed: "logged_only" };
 }

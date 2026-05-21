@@ -9,6 +9,7 @@ import {
   supportedLocaleCodes,
   type Locale,
 } from "@/lib/i18n/localeConfig";
+import { studioEntryPath } from "@/lib/i18n/siteLocalePreference";
 import { createSeoMetadata } from "@/lib/seo/metadata";
 import { blogJsonLd, breadcrumbJsonLd } from "@/lib/seo/jsonLd";
 
@@ -79,7 +80,7 @@ export default async function BlogPage({ params }: PageProps) {
       </p>
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">
         <Link
-          href="/studio"
+          href={studioEntryPath(locale)}
           className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-teal-800"
         >
           {isRu ? "Открыть студию" : "Open studio"}

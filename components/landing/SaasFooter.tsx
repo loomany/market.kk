@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import type { Locale } from "@/lib/i18n/localeConfig";
+import { studioEntryPath } from "@/lib/i18n/siteLocalePreference";
 import type { getLandingCopy } from "@/lib/i18n/translations";
 
 type LandingCopy = ReturnType<typeof getLandingCopy>;
@@ -83,7 +84,7 @@ export function SaasFooter({
                 : "AI product photo and video studio for marketplaces. An independent tool to prepare and review visuals."}
             </p>
             <Link
-              href="/studio"
+              href={studioEntryPath(locale)}
               prefetch={false}
               className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-white shadow-lg shadow-teal-900/10 transition-colors hover:bg-teal-800"
             >

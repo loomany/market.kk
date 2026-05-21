@@ -15,6 +15,7 @@ import {
   type Locale,
 } from "@/lib/i18n/localeConfig";
 import { shouldIndexPage } from "@/lib/seo/qualityGate";
+import { resolvePublicHref, studioEntryPath } from "@/lib/i18n/siteLocalePreference";
 import { createSeoMetadata } from "@/lib/seo/metadata";
 import { breadcrumbJsonLd, faqJsonLd, serviceJsonLd, webPageJsonLd } from "@/lib/seo/jsonLd";
 
@@ -158,7 +159,7 @@ export default async function StaticSeoPage({ params }: PageProps) {
           <ul className="mt-4 grid gap-2 text-sm font-semibold text-teal-700">
             {content.relatedLinks.map((link) => (
               <li key={link.href}>
-                <Link href={link.href}>{link.label}</Link>
+                <Link href={resolvePublicHref(link.href, locale)}>{link.label}</Link>
               </li>
             ))}
           </ul>
@@ -179,7 +180,7 @@ export default async function StaticSeoPage({ params }: PageProps) {
           </Link>
         ) : null}
         <Link
-          href="/studio"
+          href={studioEntryPath(locale)}
           prefetch={false}
           className={
             page.kind === "pricing"
