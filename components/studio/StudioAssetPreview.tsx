@@ -97,14 +97,14 @@ export function StudioAssetPreview({
           ) : null}
         </div>
       ) : errored ? (
-        <div className="flex h-full flex-col items-center justify-center gap-2 px-3 text-center text-red-700">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-3 text-center text-red-700">
           <AlertCircle className="h-8 w-8" aria-hidden />
           <p className="text-xs font-medium">{s.failed}</p>
         </div>
       ) : isVideo && asset.url ? (
         <video
           src={asset.url}
-          className={cn("h-full w-full", imgFit)}
+          className={cn("absolute inset-0 h-full w-full", imgFit)}
           muted
           playsInline
           preload="metadata"
@@ -115,14 +115,14 @@ export function StudioAssetPreview({
         <img
           src={previewUrl}
           alt=""
-          className={cn("h-full w-full", imgFit)}
+          className={cn("absolute inset-0 h-full w-full", imgFit)}
         />
       ) : (
-        <div className="flex h-full items-center justify-center text-slate-400">
+        <div className="absolute inset-0 flex items-center justify-center text-slate-400">
           {isVideoAsset(asset) ? (
-            <Film className="h-10 w-10" />
+            <Film className="h-10 w-10" aria-hidden />
           ) : (
-            <ImageIcon className="h-10 w-10" />
+            <ImageIcon className="h-10 w-10" aria-hidden />
           )}
         </div>
       )}

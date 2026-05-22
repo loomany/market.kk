@@ -10,6 +10,7 @@ export type GenerationOperationType =
   | "mask-refine"
   | "preservation-analyze"
   | "angles-analyze"
+  | "text-to-image"
   | "default";
 
 export const GENERATION_COST_BY_OPERATION: Record<
@@ -27,6 +28,7 @@ export const GENERATION_COST_BY_OPERATION: Record<
   "mask-refine": 1,
   "preservation-analyze": 1,
   "angles-analyze": 1,
+  "text-to-image": 1,
   default: 1,
 };
 

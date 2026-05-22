@@ -50,6 +50,8 @@ export type StudioAssetMediaVariant = "thumb" | "gallery" | "hero";
 type StudioAssetMediaViewProps = {
   asset: StudioSessionAsset;
   variant?: StudioAssetMediaVariant;
+  /** Fill parent card edge-to-edge (post-processing desktop editor). */
+  fillParent?: boolean;
   className?: string;
   circle?: boolean;
   /** Show prev/next when multiple frames (controlled by parent). */
@@ -62,6 +64,7 @@ type StudioAssetMediaViewProps = {
 export function StudioAssetMediaView({
   asset,
   variant = "thumb",
+  fillParent = false,
   className,
   circle = false,
   carouselIndex,
@@ -82,20 +85,30 @@ export function StudioAssetMediaView({
   const sizeClass = circle
     ? ""
     : variant === "hero"
-      ? "min-h-[min(58vh,640px)]"
+      ? fillParent
+        ? "h-full min-h-0 flex-1"
+        : "h-full min-h-[min(48vh,520px)]"
       : variant === "gallery"
-        ? "aspect-[9/16] w-full"
+        ? fillParent
+          ? "h-full min-h-0 w-full flex-1"
+          : "aspect-[9/16] w-full"
         : "h-36";
+
+  const chromeClass = circle
+    ? "rounded-full"
+    : variant === "gallery"
+      ? fillParent
+        ? "h-full min-h-0 rounded-[16px] border border-slate-200/90"
+        : "rounded-2xl border border-slate-200/90"
+      : variant === "hero" && fillParent
+        ? "rounded-none border-0 shadow-none"
+        : "rounded-[20px] border border-border shadow-sm";
 
   return (
     <div
       className={cn(
-        "relative flex w-full flex-col overflow-hidden bg-slate-50",
-        circle
-          ? "rounded-full"
-          : variant === "gallery"
-            ? "rounded-2xl border border-slate-200/90"
-            : "rounded-[20px] border border-border shadow-sm",
+        "relative w-full overflow-hidden bg-slate-50",
+        chromeClass,
         sizeClass,
         className
       )}
@@ -136,58 +149,56 @@ export function StudioAssetMediaView({
         </>
       ) : null}
 
-      <div className="relative min-h-0 flex-1">
-        {processing ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gradient-to-b from-slate-50 to-teal-50/80 px-3 text-center">
-            <div
-              className="absolute inset-0 animate-pulse bg-slate-200/40"
-              aria-hidden
-            />
-            <p className="relative z-10 text-xs font-medium text-slate-700">
-              {s.processing}
-            </p>
-            {asset.startedAt ? (
-              <div className="relative z-10">
-                <CompactCountdown
-                  startedAt={asset.startedAt}
-                  totalSeconds={POST_PROCESSING_COUNTDOWN_SEC}
-                />
-              </div>
-            ) : null}
-          </div>
-        ) : errored ? (
-          <div className="flex h-full min-h-[inherit] flex-col items-center justify-center gap-2 px-3 text-center text-red-700">
-            <AlertCircle className="h-8 w-8" aria-hidden />
-            <p className="text-xs font-medium">{s.failed}</p>
-          </div>
-        ) : isVideo && asset.url ? (
-          <video
-            src={asset.url}
-            className={cn("h-full w-full", imgFit)}
-            controls
-            controlsList="nodownload noplaybackrate"
-            disablePictureInPicture
-            playsInline
-            preload="metadata"
-            poster={asset.sourceImageUrl}
+      {processing ? (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gradient-to-b from-slate-50 to-teal-50/80 px-3 text-center">
+          <div
+            className="absolute inset-0 animate-pulse bg-slate-200/40"
+            aria-hidden
           />
-        ) : previewUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={previewUrl}
-            alt=""
-            className={cn("h-full w-full", imgFit)}
-          />
-        ) : (
-          <div className="flex min-h-[inherit] items-center justify-center text-slate-400">
-            {isVideoAsset(asset) ? (
-              <Film className="h-10 w-10" />
-            ) : (
-              <ImageIcon className="h-10 w-10" />
-            )}
-          </div>
-        )}
-      </div>
+          <p className="relative z-10 text-xs font-medium text-slate-700">
+            {s.processing}
+          </p>
+          {asset.startedAt ? (
+            <div className="relative z-10">
+              <CompactCountdown
+                startedAt={asset.startedAt}
+                totalSeconds={POST_PROCESSING_COUNTDOWN_SEC}
+              />
+            </div>
+          ) : null}
+        </div>
+      ) : errored ? (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-3 text-center text-red-700">
+          <AlertCircle className="h-8 w-8" aria-hidden />
+          <p className="text-xs font-medium">{s.failed}</p>
+        </div>
+      ) : isVideo && asset.url ? (
+        <video
+          src={asset.url}
+          className={cn("absolute inset-0 h-full w-full", imgFit)}
+          controls
+          controlsList="nodownload noplaybackrate"
+          disablePictureInPicture
+          playsInline
+          preload="metadata"
+          poster={asset.sourceImageUrl}
+        />
+      ) : previewUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={previewUrl}
+          alt=""
+          className={cn("absolute inset-0 h-full w-full", imgFit)}
+        />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center text-slate-400">
+          {isVideoAsset(asset) ? (
+            <Film className="h-10 w-10" aria-hidden />
+          ) : (
+            <ImageIcon className="h-10 w-10" aria-hidden />
+          )}
+        </div>
+      )}
     </div>
   );
 }

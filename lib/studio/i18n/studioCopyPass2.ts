@@ -80,6 +80,7 @@ export const pass2Ru = {
     emptyTitle: "Здесь появятся ваши файлы",
     emptyHint: "Сначала создайте фото на модели или карточку — затем улучшите или сделайте видео.",
     whatToDo: "Что сделать с фото?",
+    whatToDoVideo: "Что сделать с видео?",
     promptPlaceholder: "Например: мягкий студийный свет, дорогой интерьер, фон у окна, пляжный кадр, реалистичная кожа, убрать пластиковость.",
     promptNoEnhance: "Мы используем ваш промт без повторного усиления — добавим только обязательные правила сохранения товара и качества.",
     videoPromptAiNotice:
@@ -91,6 +92,14 @@ export const pass2Ru = {
     enhancedPhoto: "Улучшенное фото",
     selectFileFirst: "Сначала выберите файл и что создать.",
     needPromptAndEditor: "Напишите, что сделать с фото, и выберите доступный редактор.",
+    needPromptTextOnly: "Опишите, что создать — минимум несколько слов в промпте.",
+    textOnlyWorkflowHint:
+      "Опишите промпт и нажмите кнопку создания.",
+    textOnlyImageBanner:
+      "Опишите промпт и нажмите кнопку создания.",
+    textOnlyVideoBanner:
+      "Опишите промпт и нажмите кнопку создания.",
+    textOnlyVideoProgress: "Создаём стартовый кадр по промпту…",
     fileFailed: "Не удалось создать файл. Попробуйте ещё раз.",
     unavailable: "Создание пока недоступно. Попробуйте позже или включите demo-режим.",
     falKeyMissing: "Ключ AI-провайдера не настроен. Обратитесь к администратору.",
@@ -253,6 +262,7 @@ export const pass2En = {
     emptyTitle: "Your files will appear here",
     emptyHint: "Create an on-model photo or card first — then enhance or make video.",
     whatToDo: "What to do with the photo?",
+    whatToDoVideo: "What to do with the video?",
     promptPlaceholder: "e.g. soft studio light, premium interior, window background, beach shot, realistic skin, less plastic look.",
     promptNoEnhance: "We use your prompt as-is — only mandatory product preservation and quality rules are added.",
     videoPromptAiNotice:
@@ -264,6 +274,14 @@ export const pass2En = {
     enhancedPhoto: "Enhanced photo",
     selectFileFirst: "Select a file and output type first.",
     needPromptAndEditor: "Describe what to do and pick an available editor.",
+    needPromptTextOnly: "Describe what to create — at least a few words in the prompt.",
+    textOnlyWorkflowHint:
+      "Describe your prompt and tap create.",
+    textOnlyImageBanner:
+      "Describe your prompt and tap create.",
+    textOnlyVideoBanner:
+      "Describe your prompt and tap create.",
+    textOnlyVideoProgress: "Creating start frame from prompt…",
     fileFailed: "Could not create file. Try again.",
     unavailable: "Creation unavailable. Try later or enable demo mode.",
     falKeyMissing: "AI provider key not configured. Contact admin.",
@@ -423,6 +441,7 @@ export const pass2Kk = {
     emptyTitle: "Файлдар осында пайда болады",
     emptyHint: "Алдымен модельде фото немесе карточка жасаңыз — кейін жақсартыңыз немесе видео.",
     whatToDo: "Фотомен не істеу керек?",
+    whatToDoVideo: "Бейнемен не істеу керек?",
     promptPlaceholder: "Мысалы: жұмсақ студия жарығы, премиум интерьер, терезе фоны, пляж кадры",
     promptNoEnhance: "Сіздің промптіңізді өзгертпейміз — тек тауарды сақтау ережелері қосылады.",
     videoPromptAiNotice:
@@ -434,6 +453,14 @@ export const pass2Kk = {
     enhancedPhoto: "Жақсартылған фото",
     selectFileFirst: "Алдымен файл мен түрді таңдаңыз.",
     needPromptAndEditor: "Не істеу керектігін жазыңыз және редакторды таңдаңыз.",
+    needPromptTextOnly: "Не жасау керектігін сипаттаңыз — промптте бірнеше сөз.",
+    textOnlyWorkflowHint:
+      "Промпт жазыңыз да, жасау түймесін басыңыз.",
+    textOnlyImageBanner:
+      "Промпт жазыңыз да, жасау түймесін басыңыз.",
+    textOnlyVideoBanner:
+      "Промпт жазыңыз да, жасау түймесін басыңыз.",
+    textOnlyVideoProgress: "Промпт бойынша кадр жасалуда…",
     fileFailed: "Файл жасалмады. Қайта көріңіз.",
     unavailable: "Қазір қолжетімсіз. Кейінірек немесе demo режим.",
     falKeyMissing: "AI кілті бапталмаған. Әкімшіге хабарласыңыз.",

@@ -137,6 +137,40 @@ export function estimatePostProcessImageCost(input: {
   return buildEstimate(lines, optional);
 }
 
+/** Text-to-image in post-processing (no reference file). */
+export function estimatePostProcessTextToImageCost(input: {
+  runOpenAiPromptPackage?: boolean;
+  mockMode?: boolean;
+}): StudioCostEstimate {
+  if (input.mockMode) {
+    return buildEstimate([]);
+  }
+
+  const lines: CostLine[] = [];
+  if (input.runOpenAiPromptPackage !== false) {
+    lines.push({
+      id: "openai_image_prompt",
+      usd: OPENAI_COST.imagePromptPackage,
+      includedInTotal: true,
+    });
+  }
+  lines.push({
+    id: "fal_model_generation",
+    usd: FAL_IMAGE_COST.nanoBananaProT2i,
+    includedInTotal: true,
+  });
+
+  const optional: CostLine[] = [
+    {
+      id: "fal_image_retry",
+      usd: FAL_IMAGE_COST.nanoBananaProEdit,
+      includedInTotal: false,
+    },
+  ];
+
+  return buildEstimate(lines, optional);
+}
+
 export function estimatePostProcessVideoCost(input: {
   variantId: VideoVariantId;
   durationSeconds: number;

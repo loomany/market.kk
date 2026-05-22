@@ -290,6 +290,13 @@ export const pass2RemainderRu = {
       "Для видео используется Kling Motion Control: первый кадр — внешность, движение — из вашего ролика.",
     previewPhoto: "Загруженное фото",
     previewVideo: "Загруженное видео",
+    orWithoutFile: "Или без файла",
+    orWithoutFileHint:
+      "Сгенерируйте кадр или ролик только по тексту — без загрузки фото или видео.",
+    createImageFromText: "Создать изображение",
+    createVideoFromText: "Создать видео",
+    textOnlyImageDraftLabel: "Новое изображение (промпт)",
+    textOnlyVideoDraftLabel: "Новое видео (промпт)",
   },
   postProcessingDesktop: {
     backToFiles: "Назад к файлам",
@@ -631,6 +638,13 @@ export const pass2RemainderEn = {
       "Videos use Kling Motion Control: first frame sets appearance, motion comes from your clip.",
     previewPhoto: "Uploaded photo",
     previewVideo: "Uploaded video",
+    orWithoutFile: "Or without a file",
+    orWithoutFileHint:
+      "Generate a frame or clip from text only — no photo or video upload.",
+    createImageFromText: "Create image",
+    createVideoFromText: "Create video",
+    textOnlyImageDraftLabel: "New image (prompt)",
+    textOnlyVideoDraftLabel: "New video (prompt)",
   },
   postProcessingDesktop: {
     backToFiles: "Back to files",
@@ -972,6 +986,13 @@ export const pass2RemainderKk = {
       "Бейне үшін Kling Motion Control: бірінші кадр — сыртқы түр, қозғалыс — сіздің роликтен.",
     previewPhoto: "Жүктелген фото",
     previewVideo: "Жүктелген бейне",
+    orWithoutFile: "Немесе файлсыз",
+    orWithoutFileHint:
+      "Кадрды немесе роликті тек мәтінмен жасаңыз — фото/бейне жүктеу қажет емес.",
+    createImageFromText: "Сурет жасау",
+    createVideoFromText: "Бейне жасау",
+    textOnlyImageDraftLabel: "Жаңа сурет (промпт)",
+    textOnlyVideoDraftLabel: "Жаңа бейне (промпт)",
   },
   postProcessingDesktop: {
     backToFiles: "Файлдарға қайту",

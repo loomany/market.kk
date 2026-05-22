@@ -37,6 +37,8 @@ type ImageSettingsFormProps = {
   aspectRatio: ImageAspectRatio;
   quality: SaasQualityTier;
   preserveProduct: boolean;
+  /** Hide «Сохранять товар» for text-to-image (no reference product). */
+  showPreserveProduct?: boolean;
   useNegativePrompt: boolean;
   negativePrompt: string;
   onOutputFormatChange: (format: ImageOutputFormat) => void;
@@ -54,6 +56,7 @@ export function ImageSettingsForm({
   aspectRatio,
   quality,
   preserveProduct,
+  showPreserveProduct = true,
   useNegativePrompt,
   negativePrompt,
   onOutputFormatChange,
@@ -137,6 +140,7 @@ export function ImageSettingsForm({
         />
       ) : null}
 
+      {showPreserveProduct ? (
       <div className="flex items-center gap-3 rounded-[18px] border border-border bg-white p-3">
         <button
           type="button"
@@ -165,6 +169,7 @@ export function ImageSettingsForm({
           </p>
         </div>
       </div>
+      ) : null}
     </div>
   );
 }

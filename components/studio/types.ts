@@ -280,6 +280,8 @@ export type StudioSessionAsset = {
   parentAssetId?: string;
   errorMessage?: string;
   startedAt?: string;
+  /** Post-processing: upload vs text-only generation (no reference file). */
+  postProcessOrigin?: "upload" | "text-only-image" | "text-only-video";
   /**
    * Optional, session-only Vision preservation snapshot used by «Проработка».
    * Not persisted to DB / not transferred to try-on pipeline. Cached per

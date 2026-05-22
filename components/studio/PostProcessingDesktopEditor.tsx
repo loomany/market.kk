@@ -40,26 +40,28 @@ export function PostProcessingDesktopEditor({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="relative min-h-11 w-full">
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-2 rounded-full border border-border bg-white px-4 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-teal-300 hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
+          className="absolute left-0 top-1/2 z-10 inline-flex max-w-[min(100%,14rem)] -translate-y-1/2 items-center gap-2 rounded-full border border-border bg-white px-4 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-teal-300 hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 sm:max-w-none"
         >
-          <ArrowLeft className="h-4 w-4" />
-          {d.backToFiles}
+          <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
+          <span className="truncate">{d.backToFiles}</span>
         </button>
-        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-950">
+        <p className="pointer-events-none absolute left-1/2 top-1/2 z-0 w-full max-w-[calc(100%-11rem)] -translate-x-1/2 -translate-y-1/2 truncate px-2 text-center text-sm font-semibold text-slate-950 sm:max-w-[calc(100%-15rem)]">
           {title}
         </p>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-        <Card className="overflow-hidden border-teal-100/80 shadow-md shadow-slate-200/40">
-          <CardContent className="p-4">
+      <div className="grid gap-6 xl:grid-cols-2 xl:items-stretch">
+        <Card className="flex min-h-[min(48vh,520px)] flex-col overflow-hidden border-teal-100/80 shadow-md shadow-slate-200/40 xl:min-h-0 xl:h-full">
+          <CardContent className="flex min-h-0 flex-1 flex-col p-4">
             <StudioAssetMediaView
               asset={displayAsset}
-              variant="hero"
+              variant="gallery"
+              fillParent
+              className="min-h-0 w-full flex-1"
               carouselIndex={safeIndex}
               carouselTotal={group.length}
               onCarouselPrev={group.length > 1 ? () => cycle(-1) : undefined}
@@ -68,7 +70,7 @@ export function PostProcessingDesktopEditor({
           </CardContent>
         </Card>
 
-        <Card className="h-fit xl:sticky xl:top-4">
+        <Card className="h-fit min-w-0 xl:sticky xl:top-4">
           <CardContent className="space-y-6 p-5">{settings}</CardContent>
         </Card>
       </div>

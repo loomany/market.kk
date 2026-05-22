@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Clapperboard } from "lucide-react";
+import { Clapperboard, ImageIcon } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import type { PostProcessingUploadedSource } from "@/lib/studio/postProcessingUpload";
 import {
@@ -35,6 +36,8 @@ type PostProcessingUploadSectionProps = {
   onUploadingChange: (uploading: boolean) => void;
   onSourceChange: (source: PostProcessingUploadedSource | null) => void;
   onSave: () => void;
+  onStartTextOnlyImage: () => void;
+  onStartTextOnlyVideo: () => void;
   disabled?: boolean;
 };
 
@@ -54,6 +57,8 @@ export function PostProcessingUploadSection({
   onUploadingChange,
   onSourceChange,
   onSave,
+  onStartTextOnlyImage,
+  onStartTextOnlyVideo,
   disabled,
 }: PostProcessingUploadSectionProps) {
   const { copy } = useStudioCopy();
@@ -150,18 +155,56 @@ export function PostProcessingUploadSection({
         ) : null}
 
         {!source ? (
-          <StudioFileUploadDropzone
-            label={u.dropAction}
-            hint={u.dropHint}
-            loadingLabel={u.uploading}
-            uploading={uploading}
-            disabled={disabled}
-            accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,.mp4,.mov"
-            onFiles={(fileList) => {
-              const file = fileList?.[0];
-              if (file) void ingestFile(file);
-            }}
-          />
+          <>
+            <StudioFileUploadDropzone
+              label={u.dropAction}
+              hint={u.dropHint}
+              loadingLabel={u.uploading}
+              uploading={uploading}
+              disabled={disabled}
+              accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,.mp4,.mov"
+              onFiles={(fileList) => {
+                const file = fileList?.[0];
+                if (file) void ingestFile(file);
+              }}
+            />
+
+            <div className="relative flex items-center gap-3 py-1">
+              <div className="h-px flex-1 bg-border/80" aria-hidden />
+              <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                {u.orWithoutFile}
+              </span>
+              <div className="h-px flex-1 bg-border/80" aria-hidden />
+            </div>
+
+            <p className="text-center text-xs leading-5 text-slate-500">
+              {u.orWithoutFileHint}
+            </p>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                className="h-auto min-h-12 w-full gap-2 rounded-[18px] border-violet-200/90 bg-gradient-to-b from-white to-violet-50/80 px-4 py-3 text-sm font-semibold text-violet-800 shadow-sm hover:border-violet-300 hover:bg-violet-50"
+                disabled={disabled || uploading}
+                onClick={onStartTextOnlyImage}
+              >
+                <ImageIcon className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                {u.createImageFromText}
+              </Button>
+              <Button
+                type="button"
+                size="lg"
+                className="h-auto min-h-12 w-full gap-2 rounded-[18px] px-4 py-3 text-sm font-semibold"
+                disabled={disabled || uploading}
+                onClick={onStartTextOnlyVideo}
+              >
+                <Clapperboard className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                {u.createVideoFromText}
+              </Button>
+            </div>
+          </>
         ) : (
           <article
             className={cn(

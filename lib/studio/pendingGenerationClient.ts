@@ -1,4 +1,5 @@
 import type { ImageEnhanceRequest } from "@/lib/ai/imageEnhanceSchemas";
+import type { TextToImageGenerateRequest } from "@/lib/ai/textToImageSchemas";
 import type { VideoGenerateRequest } from "@/lib/ai/videoSchemas";
 
 const PENDING_KEY = "vitrina-pending-generations-v1";
@@ -21,9 +22,35 @@ export type PendingImageGenerationJob = {
   body: ImageEnhanceRequest & { clientAssetId: string };
 };
 
+/** Post-processing text-to-image (no reference file). */
+export type PendingTextToImageGenerationJob = {
+  kind: "text-to-image";
+  clientAssetId: string;
+  parentAssetId: string;
+  startedAt: string;
+  body: TextToImageGenerateRequest & { clientAssetId: string };
+  /** UI output format for `applyImageSuccess`. */
+  outputFormatUi: "png" | "jpeg";
+};
+
+/** Text-to-video: frame (T2I) then video; single gallery asset id = video. */
+export type PendingTextOnlyVideoGenerationJob = {
+  kind: "text-only-video";
+  clientAssetId: string;
+  parentAssetId: string;
+  startedAt: string;
+  frameClientAssetId: string;
+  frameBody: TextToImageGenerateRequest & { clientAssetId: string };
+  videoBody: VideoGenerateRequest & { clientAssetId: string };
+  userPrompt: string;
+  frameImageUrl?: string;
+};
+
 export type PendingGenerationJob =
   | PendingVideoGenerationJob
-  | PendingImageGenerationJob;
+  | PendingImageGenerationJob
+  | PendingTextToImageGenerationJob
+  | PendingTextOnlyVideoGenerationJob;
 
 function loadAll(): PendingGenerationJob[] {
   if (typeof window === "undefined") return [];
@@ -49,6 +76,17 @@ function saveAll(jobs: PendingGenerationJob[]): void {
 export function savePendingGenerationJob(job: PendingGenerationJob): void {
   const rest = loadAll().filter((j) => j.clientAssetId !== job.clientAssetId);
   saveAll([job, ...rest]);
+}
+
+export function patchPendingGenerationJob(
+  clientAssetId: string,
+  patch: (job: PendingGenerationJob) => PendingGenerationJob
+): void {
+  const jobs = loadAll();
+  const idx = jobs.findIndex((j) => j.clientAssetId === clientAssetId);
+  if (idx < 0) return;
+  jobs[idx] = patch(jobs[idx]);
+  saveAll(jobs);
 }
 
 export function removePendingGenerationJob(clientAssetId: string): void {

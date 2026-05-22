@@ -4,6 +4,7 @@ import {
   estimateClothingPhotoOnModelCost,
   estimateModelGenerationCost,
   estimatePostProcessImageCost,
+  estimatePostProcessTextToImageCost,
   estimatePostProcessVideoCost,
   estimateProductCardCost,
 } from "@/lib/ai/studioGenerationCostEstimate";
@@ -155,6 +156,26 @@ export async function resolveAnglesAnalyzeBillingCost(): Promise<number> {
   return normalizeTokenAmount(usdToTokenAmount(OPENAI_COST.visionSmall));
 }
 
+export async function resolveTextToImageBillingCost(
+  request: Request
+): Promise<number> {
+  try {
+    const body = (await request.clone().json()) as Record<string, unknown>;
+    const runOpenAiPromptPackage = body.skipPromptPackage !== true;
+    const estimate = estimatePostProcessTextToImageCost({
+      runOpenAiPromptPackage,
+      mockMode: isMockMode(),
+    });
+    return normalizeTokenAmount(preflightTokensFromEstimate(estimate));
+  } catch {
+    return normalizeTokenAmount(
+      usdToTokenAmount(
+        OPENAI_COST.imagePromptPackage + FAL_IMAGE_COST.nanoBananaProT2i
+      )
+    );
+  }
+}
+
 export function resolveOperationBillingCost(
   operationType: GenerationOperationType
 ): (request: Request) => Promise<number> {
@@ -177,6 +198,8 @@ export function resolveOperationBillingCost(
       return resolveBackgroundRemoveBillingCost;
     case "angles-analyze":
       return resolveAnglesAnalyzeBillingCost;
+    case "text-to-image":
+      return resolveTextToImageBillingCost;
     default:
       return async () => normalizeTokenAmount(getGenerationCost(operationType));
   }

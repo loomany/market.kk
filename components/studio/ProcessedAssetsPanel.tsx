@@ -13,6 +13,7 @@ import {
   type VideoVariantId,
 } from "@/lib/ai/videoCatalog";
 import type { VideoGenerateResponse } from "@/lib/ai/videoSchemas";
+import type { TextToImageGenerateSuccessResponse } from "@/lib/ai/textToImageSchemas";
 import {
   IMAGE_EDITOR_CAPABILITIES,
   type ImageEditorId,
@@ -68,10 +69,14 @@ import {
 } from "./ImageSettingsForm";
 import {
   estimatePostProcessImageCost,
+  estimatePostProcessTextToImageCost,
   estimatePostProcessVideoCost,
 } from "@/lib/ai/studioGenerationCostEstimate";
 import { preflightTokenGeneration } from "@/lib/tokens/clientGenerationPreflight";
-import { preflightTokensFromEstimate } from "@/lib/ai/studioCostEstimateUtils";
+import {
+  preflightTokensFromEstimate,
+  sumStudioCostEstimates,
+} from "@/lib/ai/studioCostEstimateUtils";
 import { tryApplyTokenBillingError } from "@/lib/tokens/billingErrorPayload";
 import { TokenChargeHint } from "./TokenChargeHint";
 import type { TokenBillingErrorPayload } from "@/lib/tokens/billingErrorPayload";
@@ -79,12 +84,25 @@ import { isStuckProcessingAsset } from "@/lib/studio/postProcessingGalleryAssets
 import {
   getPendingGenerationJob,
   isPendingGenerationStale,
+  patchPendingGenerationJob,
   removePendingGenerationJob,
   savePendingGenerationJob,
+  type PendingTextOnlyVideoGenerationJob,
+  type PendingTextToImageGenerationJob,
 } from "@/lib/studio/pendingGenerationClient";
+import {
+  clearPostProcessingTextOnlyDraft,
+  loadPostProcessingTextOnlyDraft,
+  savePostProcessingTextOnlyDraft,
+} from "@/lib/studio/postProcessingTextOnlyDraft";
+import {
+  createTextOnlyDraftAsset,
+  isTextOnlyPostProcessAsset,
+} from "@/lib/studio/postProcessingTextOnly";
 import {
   resumePendingGeneration,
   runImageGenerationRequest,
+  runTextToImageGenerationRequest,
   runVideoGenerationRequest,
 } from "@/lib/studio/postProcessingGenerationClient";
 
@@ -192,6 +210,9 @@ export function ProcessedAssetsPanel({
   const [referenceVideoDurationSec, setReferenceVideoDurationSec] = useState<
     number | undefined
   >();
+  /** Editor session without uploaded reference (text-to-image / text-to-video). */
+  const [textOnlyEditorAsset, setTextOnlyEditorAsset] =
+    useState<StudioSessionAsset | null>(null);
 
   /**
    * In-memory cache for product preservation analyses, keyed by asset id.
@@ -279,22 +300,37 @@ export function ProcessedAssetsPanel({
     selectableAssets[0] ??
     assets[0];
 
-  const gallerySourceImageUrl = selectedAsset
-    ? assetProcessingSourceUrl(selectedAsset)
+  const editorAsset = textOnlyEditorAsset ?? selectedAsset;
+
+  const gallerySourceImageUrl = editorAsset
+    ? assetProcessingSourceUrl(editorAsset)
     : null;
 
   const effectiveSourceImageUrl = gallerySourceImageUrl;
 
-  const motionVideoUpload = Boolean(selectedAsset?.referenceVideoUrl?.trim());
+  const isTextOnlySession = isTextOnlyPostProcessAsset(editorAsset);
+
+  const postProcessEditorTitle =
+    processingMode === "video"
+      ? isTextOnlySession
+        ? copy.postProcessingUpload.createVideoFromText
+        : pa.createVideo
+      : isTextOnlySession
+        ? copy.postProcessingUpload.createImageFromText
+        : pa.createImage;
+
+  const motionVideoUpload =
+    !isTextOnlySession && Boolean(editorAsset?.referenceVideoUrl?.trim());
 
   /** Active analysis for the currently selected asset (dev debug). */
-  const activePreservation = selectedAsset
-    ? (preservationCacheRef.current.get(selectedAsset.id) ??
-        selectedAsset.productPreservation ??
-        null)
-    : null;
+  const activePreservation =
+    !isTextOnlySession && editorAsset
+      ? (preservationCacheRef.current.get(editorAsset.id) ??
+          editorAsset.productPreservation ??
+          null)
+      : null;
 
-  const canProcessSource = Boolean(effectiveSourceImageUrl);
+  const canProcessSource = Boolean(effectiveSourceImageUrl) || isTextOnlySession;
 
   const activeImageEditor = imageEditors.find((e) => e.id === imageEditorId);
   const imageEditorReady =
@@ -349,13 +385,23 @@ export function ProcessedAssetsPanel({
     processingMode === "video" &&
     resolvedVideoIntent.trim().length >= minVideoPromptLength;
 
-  const workflowReady = Boolean(selectedAsset && processingMode);
+  const workflowReady = Boolean(editorAsset && processingMode);
+
+  const textOnlyImageReady =
+    isTextOnlySession &&
+    processingMode === "image" &&
+    promptNormalization.normalizedUserIntent.trim().length >= 8 &&
+    imageEditorReady;
 
   const canGenerate = Boolean(
     workflowReady &&
-      effectiveSourceImageUrl &&
       !generationLoading &&
-      (processingMode === "video" ? videoGenerationReady : imageEditorReady)
+      (isTextOnlySession
+        ? processingMode === "video"
+          ? videoGenerationReady
+          : textOnlyImageReady
+        : effectiveSourceImageUrl &&
+          (processingMode === "video" ? videoGenerationReady : imageEditorReady))
   );
 
   const applyVideoVariant = (nextVariantId: VideoVariantId) => {
@@ -386,10 +432,10 @@ export function ProcessedAssetsPanel({
     setVideoProvider("kling-motion");
     applyVideoVariant("kling-v2.6-motion-control");
     setCharacterOrientation("video");
-  }, [selectedAsset?.id, selectedAsset?.referenceVideoUrl]);
+  }, [editorAsset?.id, editorAsset?.referenceVideoUrl, isTextOnlySession]);
 
   useEffect(() => {
-    const url = selectedAsset?.referenceVideoUrl?.trim();
+    const url = editorAsset?.referenceVideoUrl?.trim();
     if (!url) {
       setReferenceVideoDurationSec(undefined);
       return;
@@ -407,7 +453,7 @@ export function ProcessedAssetsPanel({
       video.removeEventListener("loadedmetadata", onMeta);
       video.src = "";
     };
-  }, [selectedAsset?.referenceVideoUrl]);
+  }, [editorAsset?.referenceVideoUrl]);
 
   const generationCostEstimate = useMemo(() => {
     if (!processingMode || !workflowReady) return null;
@@ -416,12 +462,26 @@ export function ProcessedAssetsPanel({
       const audioOn =
         videoGenerateAudio &&
         activeVideoVariant.capabilities.supportsNativeAudio;
-      return estimatePostProcessVideoCost({
+      const videoEst = estimatePostProcessVideoCost({
         variantId: videoVariantId,
         durationSeconds,
         quality: apiQuality,
         generateAudio: audioOn,
         referenceVideoDurationSeconds: referenceVideoDurationSec,
+        mockMode,
+      });
+      if (isTextOnlySession) {
+        const frameEst = estimatePostProcessTextToImageCost({
+          runOpenAiPromptPackage: promptNormalization.shouldRunEnhancer,
+          mockMode,
+        });
+        return sumStudioCostEstimates(frameEst, videoEst);
+      }
+      return videoEst;
+    }
+    if (isTextOnlySession) {
+      return estimatePostProcessTextToImageCost({
+        runOpenAiPromptPackage: promptNormalization.shouldRunEnhancer,
         mockMode,
       });
     }
@@ -453,6 +513,7 @@ export function ProcessedAssetsPanel({
     preserveProduct,
     activePreservation,
     promptNormalization.shouldRunEnhancer,
+    isTextOnlySession,
   ]);
 
   const handleVideoProviderChange = (provider: VideoProviderId) => {
@@ -466,9 +527,43 @@ export function ProcessedAssetsPanel({
     applyVideoVariant(nextVariantId);
   };
 
+  const startTextOnlyWorkflow = (mode: PostProcessingMode) => {
+    const u = copy.postProcessingUpload;
+    const draft = createTextOnlyDraftAsset({
+      mode,
+      label:
+        mode === "video"
+          ? u.textOnlyVideoDraftLabel
+          : u.textOnlyImageDraftLabel,
+    });
+    setTextOnlyEditorAsset(draft);
+    savePostProcessingTextOnlyDraft({ mode, draftAsset: draft });
+    setProcessingMode(mode);
+    setError(null);
+    setEditorSwitchHint(null);
+    setPrompt("");
+    setPreserveProduct(false);
+    if (mode === "image") {
+      setImageEditorId("nano-banana-pro");
+    }
+    if (mode === "video") {
+      setVideoProvider("kling");
+      applyVideoVariant(DEFAULT_VARIANT_BY_PROVIDER.kling);
+    }
+    if (isMobileLayout) {
+      setMobileSheetOpen(true);
+    } else {
+      setDesktopEditorOpen(true);
+    }
+  };
+
   const handleGenerate = async () => {
-    const parentId = selectedAsset?.id;
-    if (!parentId || !effectiveSourceImageUrl || !processingMode) {
+    const parentId = editorAsset?.id;
+    if (!parentId || !processingMode) {
+      setError(pa.selectFileFirst);
+      return;
+    }
+    if (!isTextOnlySession && !effectiveSourceImageUrl) {
       setError(pa.selectFileFirst);
       return;
     }
@@ -476,7 +571,9 @@ export function ProcessedAssetsPanel({
       return;
     }
     if (!canGenerate) {
-      setError(pa.needPromptAndEditor);
+      setError(
+        isTextOnlySession ? pa.needPromptTextOnly : pa.needPromptAndEditor
+      );
       return;
     }
 
@@ -503,13 +600,18 @@ export function ProcessedAssetsPanel({
       id: pendingId,
       type: isVideo ? "video" : "scene",
       url: "",
-      sourceImageUrl: effectiveSourceImageUrl,
-      parentAssetId: parentId,
+      sourceImageUrl: effectiveSourceImageUrl ?? undefined,
+      parentAssetId: isTextOnlySession ? undefined : parentId,
       mode: isVideo ? "video" : "scene",
       createdAt: startedAt,
       startedAt,
       status: "processing",
       label: isVideo ? pa.modeVideo : pa.modeImage,
+      postProcessOrigin: isTextOnlySession
+        ? isVideo
+          ? "text-only-video"
+          : "text-only-image"
+        : undefined,
     });
 
     setGenerationLoading(true);
@@ -523,16 +625,20 @@ export function ProcessedAssetsPanel({
     try {
       if (isVideo) {
         const apiQuality = mapSaasQualityToVideoApi(videoVariantId, saasQuality);
+        let sourceImageUrlForVideo = effectiveSourceImageUrl ?? "";
+
         const videoBody = {
           clientAssetId: pendingId,
-          sourceImageUrl: effectiveSourceImageUrl,
+          sourceImageUrl: sourceImageUrlForVideo,
           prompt: userIntent,
           variantId: videoVariantId,
           quality: apiQuality,
           durationSeconds,
           aspectRatio: videoAspectRatio,
           motionPreset,
-          referenceVideoUrl: selectedAsset?.referenceVideoUrl,
+          referenceVideoUrl: isTextOnlySession
+            ? undefined
+            : selectedAsset?.referenceVideoUrl,
           characterOrientation: motionVideoUpload
             ? characterOrientation
             : undefined,
@@ -548,16 +654,121 @@ export function ProcessedAssetsPanel({
           referenceVideoDurationSeconds:
             referenceVideoDurationSec ?? undefined,
         };
-        savePendingGenerationJob({
-          kind: "video",
-          clientAssetId: pendingId,
-          parentAssetId: parentId,
-          startedAt,
-          body: videoBody,
-        });
+
+        if (isTextOnlySession) {
+          const frameBody = {
+            clientAssetId: `${pendingId}-frame`,
+            userPrompt: userIntent,
+            aspectRatio: videoAspectRatio,
+            outputFormat: "png" as const,
+            quality: saasQuality === "ultra" ? "high" : saasQuality,
+            locale: promptLocale,
+            skipPromptPackage: !promptNormalization.shouldRunEnhancer,
+            useNegativePrompt: imageUseNegativePrompt,
+            negativePrompt: imageNegativePrompt.trim() || undefined,
+          };
+          const textOnlyVideoJob: PendingTextOnlyVideoGenerationJob = {
+            kind: "text-only-video",
+            clientAssetId: pendingId,
+            parentAssetId: parentId,
+            startedAt,
+            frameClientAssetId: `${pendingId}-frame`,
+            frameBody,
+            videoBody: { ...videoBody, sourceImageUrl: "" },
+            userPrompt: userIntent,
+          };
+          savePendingGenerationJob(textOnlyVideoJob);
+
+          const frameOutcome = await runTextToImageGenerationRequest(frameBody);
+          if (frameOutcome.kind === "success") {
+            sourceImageUrlForVideo = frameOutcome.data.imageUrl;
+            patchPendingGenerationJob(pendingId, (j) => {
+              if (j.kind !== "text-only-video") return j;
+              return {
+                ...j,
+                frameImageUrl: sourceImageUrlForVideo,
+                videoBody: {
+                  ...j.videoBody,
+                  sourceImageUrl: sourceImageUrlForVideo,
+                },
+              };
+            });
+          } else if (frameOutcome.kind === "error") {
+            if (
+              frameOutcome.billing &&
+              handleGenerationBillingBlock(
+                frameOutcome.billingResponse ?? frameOutcome,
+                pendingId
+              )
+            ) {
+              return;
+            }
+            const msg = friendlyPostProcessError(frameOutcome.message, pa);
+            failPendingAsset(pendingId, msg);
+            setError(msg);
+            return;
+          } else if (frameOutcome.kind === "in_progress") {
+            const framePolled = await resumePendingGeneration({
+              kind: "text-to-image",
+              clientAssetId: `${pendingId}-frame`,
+              parentAssetId: parentId,
+              startedAt,
+              body: frameBody,
+              outputFormatUi: "png",
+            });
+            if (
+              framePolled.kind === "success" &&
+              framePolled.data.ok &&
+              "imageUrl" in framePolled.data
+            ) {
+              sourceImageUrlForVideo = (
+                framePolled.data as TextToImageGenerateSuccessResponse
+              ).imageUrl;
+              patchPendingGenerationJob(pendingId, (j) => {
+                if (j.kind !== "text-only-video") return j;
+                return {
+                  ...j,
+                  frameImageUrl: sourceImageUrlForVideo,
+                  videoBody: {
+                    ...j.videoBody,
+                    sourceImageUrl: sourceImageUrlForVideo,
+                  },
+                };
+              });
+            } else if (framePolled.kind === "error") {
+              if (
+                framePolled.billing &&
+                handleGenerationBillingBlock(
+                  framePolled.billingResponse ?? framePolled,
+                  pendingId
+                )
+              ) {
+                return;
+              }
+              const msg = friendlyPostProcessError(framePolled.message, pa);
+              failPendingAsset(pendingId, msg);
+              setError(msg);
+              return;
+            } else {
+              return;
+            }
+          }
+          videoBody.sourceImageUrl = sourceImageUrlForVideo;
+        } else {
+          savePendingGenerationJob({
+            kind: "video",
+            clientAssetId: pendingId,
+            parentAssetId: parentId,
+            startedAt,
+            body: videoBody,
+          });
+        }
+
         const outcome = await runVideoGenerationRequest(videoBody);
         if (outcome.kind === "success") {
           applyVideoSuccess(pendingId, outcome.data, userIntent);
+          clearPostProcessingTextOnlyDraft();
+          setTextOnlyEditorAsset(null);
           return;
         }
         if (outcome.kind === "error") {
@@ -572,15 +783,76 @@ export function ProcessedAssetsPanel({
           setError(msg);
           return;
         }
-        const polled = await resumePendingGeneration({
-          kind: "video",
+        const resumeJob = getPendingGenerationJob(pendingId);
+        if (!resumeJob) return;
+        const polled = await resumePendingGeneration(resumeJob);
+        if (polled.kind === "success" && polled.data.ok && "video" in polled.data) {
+          applyVideoSuccess(pendingId, polled.data as VideoGenerateResponse, userIntent);
+          clearPostProcessingTextOnlyDraft();
+          setTextOnlyEditorAsset(null);
+        } else if (polled.kind === "error") {
+          failPendingAsset(pendingId, friendlyPostProcessError(polled.message, pa));
+          setError(friendlyPostProcessError(polled.message, pa));
+        }
+        return;
+      }
+
+      if (isTextOnlySession) {
+        const apiOutputFormat: ImageEnhanceRequest["outputFormat"] =
+          outputFormat === "jpeg" ? "jpg" : outputFormat;
+        const textBody = {
+          clientAssetId: pendingId,
+          userPrompt: userIntent,
+          aspectRatio: imageAspectRatio,
+          outputFormat: apiOutputFormat,
+          quality: saasQuality === "ultra" ? "high" : saasQuality,
+          locale: promptLocale,
+          skipPromptPackage: !promptNormalization.shouldRunEnhancer,
+          useNegativePrompt: imageUseNegativePrompt,
+          negativePrompt: imageNegativePrompt.trim() || undefined,
+        };
+        const textOnlyImageJob: PendingTextToImageGenerationJob = {
+          kind: "text-to-image",
           clientAssetId: pendingId,
           parentAssetId: parentId,
           startedAt,
-          body: videoBody,
-        });
-        if (polled.kind === "success" && polled.data.ok && "video" in polled.data) {
-          applyVideoSuccess(pendingId, polled.data as VideoGenerateResponse, userIntent);
+          body: textBody,
+          outputFormatUi: outputFormat,
+        };
+        savePendingGenerationJob(textOnlyImageJob);
+
+        const outcome = await runTextToImageGenerationRequest(textBody);
+        if (outcome.kind === "success") {
+          applyTextToImageSuccess(pendingId, outcome.data, outputFormat);
+          clearPostProcessingTextOnlyDraft();
+          setTextOnlyEditorAsset(null);
+          return;
+        }
+        if (outcome.kind === "error") {
+          if (
+            outcome.billing &&
+            handleGenerationBillingBlock(outcome.billingResponse ?? outcome, pendingId)
+          ) {
+            return;
+          }
+          const msg = friendlyPostProcessError(outcome.message, pa);
+          failPendingAsset(pendingId, msg);
+          setError(msg);
+          return;
+        }
+        const polled = await resumePendingGeneration(textOnlyImageJob);
+        if (
+          polled.kind === "success" &&
+          polled.data.ok &&
+          "imageUrl" in polled.data
+        ) {
+          applyTextToImageSuccess(
+            pendingId,
+            polled.data as TextToImageGenerateSuccessResponse,
+            outputFormat
+          );
+          clearPostProcessingTextOnlyDraft();
+          setTextOnlyEditorAsset(null);
         } else if (polled.kind === "error") {
           failPendingAsset(pendingId, friendlyPostProcessError(polled.message, pa));
           setError(friendlyPostProcessError(polled.message, pa));
@@ -589,11 +861,10 @@ export function ProcessedAssetsPanel({
       }
 
       // Vision-based product preservation snapshot (cached per asset).
-      // Only requested when the user keeps "Сохранять товар точно" on.
-      const preservation = preserveProduct && selectedAsset
+      const preservation = preserveProduct && editorAsset
         ? await resolveProductPreservation(
-            selectedAsset,
-            effectiveSourceImageUrl,
+            editorAsset,
+            effectiveSourceImageUrl!,
             userIntent
           )
         : null;
@@ -603,7 +874,7 @@ export function ProcessedAssetsPanel({
 
       const enhanceRequest: ImageEnhanceRequest & { clientAssetId: string } = {
         clientAssetId: pendingId,
-        sourceImageUrl: effectiveSourceImageUrl,
+        sourceImageUrl: effectiveSourceImageUrl!,
         userPrompt: userIntent,
         preserveProduct,
         aspectRatio: imageAspectRatio,
@@ -686,6 +957,8 @@ export function ProcessedAssetsPanel({
   const closeDesktopEditor = () => {
     setDesktopEditorOpen(false);
     setProcessingMode(null);
+    setTextOnlyEditorAsset(null);
+    clearPostProcessingTextOnlyDraft();
     setEditorSwitchHint(null);
     setError(null);
   };
@@ -693,6 +966,8 @@ export function ProcessedAssetsPanel({
   const closeMobileSheet = () => {
     setMobileSheetOpen(false);
     setProcessingMode(null);
+    setTextOnlyEditorAsset(null);
+    clearPostProcessingTextOnlyDraft();
     setEditorSwitchHint(null);
     setError(null);
   };
@@ -714,6 +989,23 @@ export function ProcessedAssetsPanel({
     if (!draft) return;
     uploadDraftRestoredRef.current = true;
     setUploadedSource(draftToUploadedSource(draft));
+  }, []);
+
+  const textOnlyDraftRestoredRef = useRef(false);
+  useEffect(() => {
+    if (textOnlyDraftRestoredRef.current) return;
+    const draft = loadPostProcessingTextOnlyDraft();
+    if (!draft) return;
+    textOnlyDraftRestoredRef.current = true;
+    setTextOnlyEditorAsset(draft.draftAsset);
+    setProcessingMode(draft.mode);
+    if (draft.mode === "image") {
+      setImageEditorId("nano-banana-pro");
+    }
+    if (draft.mode === "video") {
+      setVideoProvider("kling");
+      setVideoVariantId(DEFAULT_VARIANT_BY_PROVIDER.kling);
+    }
   }, []);
 
   const resumeInFlightRef = useRef<Set<string>>(new Set());
@@ -739,6 +1031,33 @@ export function ProcessedAssetsPanel({
       prompt: userIntent,
     });
     removePendingGenerationJob(pendingId);
+  };
+
+  const applyTextToImageSuccess = (
+    pendingId: string,
+    data: TextToImageGenerateSuccessResponse,
+    outputFormat: ImageOutputFormat
+  ) => {
+    applyImageSuccess(
+      pendingId,
+      {
+        ok: true,
+        imageUrl: data.imageUrl,
+        provider: data.provider,
+        model: data.model,
+        editor: "nano-banana-pro",
+        promptUsed: data.promptUsed,
+        requestId: data.requestId,
+        estimatedCostUsd: data.estimatedCostUsd,
+        meta: {
+          aspectRatio: imageAspectRatio,
+          outputFormat: outputFormat === "jpeg" ? "jpg" : outputFormat,
+          quality: saasQuality === "ultra" ? "high" : saasQuality,
+          preserveProduct: false,
+        },
+      },
+      outputFormat
+    );
   };
 
   const applyImageSuccess = (
@@ -813,12 +1132,32 @@ export function ProcessedAssetsPanel({
           const outcome = await resumePendingGeneration(job);
           if (outcome.kind === "success") {
             const payload = outcome.data;
-            if (job.kind === "video" && payload.ok && "video" in payload) {
+            if (job.kind === "text-only-video" && payload.ok && "video" in payload) {
+              applyVideoSuccess(
+                asset.id,
+                payload as VideoGenerateResponse,
+                job.userPrompt
+              );
+              clearPostProcessingTextOnlyDraft();
+              setTextOnlyEditorAsset(null);
+            } else if (job.kind === "video" && payload.ok && "video" in payload) {
               applyVideoSuccess(
                 asset.id,
                 payload as VideoGenerateResponse,
                 job.body.prompt
               );
+            } else if (
+              job.kind === "text-to-image" &&
+              payload.ok &&
+              "imageUrl" in payload
+            ) {
+              applyTextToImageSuccess(
+                asset.id,
+                payload as TextToImageGenerateSuccessResponse,
+                job.outputFormatUi
+              );
+              clearPostProcessingTextOnlyDraft();
+              setTextOnlyEditorAsset(null);
             } else if (job.kind === "image" && payload.ok && "imageUrl" in payload) {
               const fmt =
                 job.body.outputFormat === "jpg" ? "jpeg" : job.body.outputFormat;
@@ -830,6 +1169,9 @@ export function ProcessedAssetsPanel({
             } else {
               failPendingAsset(asset.id, pa.fileFailed);
             }
+            return;
+          }
+          if (outcome.kind === "in_progress") {
             return;
           }
           if (outcome.kind === "error") {
@@ -880,19 +1222,16 @@ export function ProcessedAssetsPanel({
     void downloadImageFile(asset.url, filename);
   };
 
-  const editorAsset = selectedAsset;
-
   const showDesktopEditor =
     !isMobileLayout &&
     desktopEditorOpen &&
     Boolean(processingMode && editorAsset);
 
-  const mobileSheetTitle =
-    processingMode === "video" ? pa.createVideo : pa.createImage;
+  const mobileSheetTitle = processingMode ? postProcessEditorTitle : "";
 
   const settingsBody = (
     <>
-          {!canProcessSource && selectedAsset ? (
+          {!isTextOnlySession && !canProcessSource && editorAsset ? (
             <p className="rounded-[16px] border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
               {pa.selectFileFirst}
             </p>
@@ -907,7 +1246,7 @@ export function ProcessedAssetsPanel({
             />
           ) : null}
 
-          {processingMode === "image" ? (
+          {processingMode === "image" && !isTextOnlySession ? (
             <ImageEditorSelect
               editors={imageEditors}
               value={imageEditorId}
@@ -978,10 +1317,11 @@ export function ProcessedAssetsPanel({
                 outputFormat={outputFormat}
                 aspectRatio={imageAspectRatio}
                 quality={saasQuality}
-                preserveProduct={preserveProduct}
+                preserveProduct={isTextOnlySession ? false : preserveProduct}
                 onOutputFormatChange={setOutputFormat}
                 onAspectRatioChange={setImageAspectRatio}
                 onQualityChange={setSaasQuality}
+                showPreserveProduct={!isTextOnlySession}
                 onPreserveProductChange={setPreserveProduct}
                 useNegativePrompt={imageUseNegativePrompt}
                 negativePrompt={imageNegativePrompt}
@@ -989,11 +1329,11 @@ export function ProcessedAssetsPanel({
                 onNegativePromptChange={setImageNegativePrompt}
                 disabled={generationLoading}
               />
-              {mockMode ? (
+              {!isTextOnlySession && mockMode ? (
                 <p className="rounded-[14px] border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
                   {ppe.nanoBanana.descriptionDemo} {ppe.nanoBanana.limitationsDemo}
                 </p>
-              ) : !paidAiRunsAllowed ? (
+              ) : !isTextOnlySession && !paidAiRunsAllowed ? (
                 <p className="rounded-[14px] border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
                   {ppe.nanoBanana.disabled}
                 </p>
@@ -1036,8 +1376,13 @@ export function ProcessedAssetsPanel({
           {processingMode ? (
             <section className="space-y-2">
               <label className="text-sm font-semibold text-slate-950">
-                {pa.whatToDo}
+                {processingMode === "video" ? pa.whatToDoVideo : pa.whatToDo}
               </label>
+              {isTextOnlySession ? (
+                <p className="text-sm leading-6 text-slate-600">
+                  {pa.textOnlyWorkflowHint}
+                </p>
+              ) : null}
               <textarea
                 value={prompt}
                 onChange={(event) => setPrompt(event.target.value)}
@@ -1388,9 +1733,7 @@ export function ProcessedAssetsPanel({
                 ) : (
                   <Sparkles className="h-5 w-5 shrink-0" />
                 )}
-                <span className="truncate">
-                  {processingMode === "video" ? pa.createVideo : pa.createImage}
-                </span>
+                <span className="truncate">{postProcessEditorTitle}</span>
               </Button>
               {generationCostEstimate &&
               preflightTokensFromEstimate(generationCostEstimate) > 0 ? (
@@ -1415,9 +1758,7 @@ export function ProcessedAssetsPanel({
         <PostProcessingDesktopEditor
           asset={editorAsset}
           allAssets={assets}
-          title={
-            processingMode === "video" ? pa.createVideo : pa.createImage
-          }
+          title={postProcessEditorTitle}
           onBack={closeDesktopEditor}
           settings={settingsBody}
         />
@@ -1429,6 +1770,8 @@ export function ProcessedAssetsPanel({
             onUploadingChange={setUploadBusy}
             onSourceChange={handleUploadSourceChange}
             onSave={handleSaveUploadedSource}
+            onStartTextOnlyImage={() => startTextOnlyWorkflow("image")}
+            onStartTextOnlyVideo={() => startTextOnlyWorkflow("video")}
             disabled={generationLoading}
           />
 
