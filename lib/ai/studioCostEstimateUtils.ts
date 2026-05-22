@@ -19,6 +19,24 @@ export function hasEstimateTokenRange(estimate: StudioCostEstimate): boolean {
   return max - min > 0.005;
 }
 
+export function sumStudioCostEstimates(
+  a: StudioCostEstimate,
+  b: StudioCostEstimate
+): StudioCostEstimate {
+  const minA = minTokensFromEstimate(a);
+  const maxA = maxTokensFromEstimate(a);
+  const minB = minTokensFromEstimate(b);
+  const maxB = maxTokensFromEstimate(b);
+  return {
+    totalUsd: Number((a.totalUsd + b.totalUsd).toFixed(4)),
+    tokens: Number((maxA + maxB).toFixed(2)),
+    tokensMin: Number((minA + minB).toFixed(2)),
+    tokensMax: Number((maxA + maxB).toFixed(2)),
+    lines: [...a.lines, ...b.lines],
+    optionalLines: [...a.optionalLines, ...b.optionalLines],
+  };
+}
+
 export function multiplyStudioCostEstimate(
   estimate: StudioCostEstimate,
   multiplier: number
