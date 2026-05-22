@@ -65,13 +65,12 @@ import {
   type ImageOutputFormat,
   type SaasQualityTier,
 } from "./ImageSettingsForm";
-import { StudioGenerationCostFooter } from "./StudioGenerationCostFooter";
 import {
   estimatePostProcessImageCost,
   estimatePostProcessVideoCost,
 } from "@/lib/ai/studioGenerationCostEstimate";
-import { generationCostUiCopy } from "@/lib/studio/i18n/generationCostI18n";
 import { tryApplyTokenBillingError } from "@/lib/tokens/billingErrorPayload";
+import { TokenChargeHint } from "./TokenChargeHint";
 import type { TokenBillingErrorPayload } from "@/lib/tokens/billingErrorPayload";
 import {
   getPendingGenerationJob,
@@ -433,21 +432,6 @@ export function ProcessedAssetsPanel({
     preserveProduct,
     activePreservation,
     promptNormalization.shouldRunEnhancer,
-  ]);
-
-  const videoCostContextNote = useMemo(() => {
-    if (processingMode !== "video" || !generationCostEstimate) return undefined;
-    const ui = generationCostUiCopy(locale);
-    const audioOn =
-      videoGenerateAudio &&
-      activeVideoVariant.capabilities.supportsNativeAudio;
-    return audioOn ? ui.audioOn : ui.audioOff;
-  }, [
-    processingMode,
-    generationCostEstimate,
-    locale,
-    videoGenerateAudio,
-    activeVideoVariant.capabilities.supportsNativeAudio,
   ]);
 
   const handleVideoProviderChange = (provider: VideoProviderId) => {
@@ -1327,14 +1311,14 @@ export function ProcessedAssetsPanel({
           ) : null}
 
           {processingMode ? (
-            <Button
-              className="w-full justify-between gap-2 px-4 sm:gap-3 sm:px-5"
-              size="lg"
-              loading={generationLoading}
-              disabled={!canGenerate}
-              onClick={handleGenerate}
-            >
-              <span className="flex min-w-0 items-center gap-2">
+            <div className="flex w-full items-stretch gap-2 sm:gap-3">
+              <Button
+                className="min-w-0 flex-1 gap-2 px-4 sm:gap-3 sm:px-5"
+                size="lg"
+                loading={generationLoading}
+                disabled={!canGenerate}
+                onClick={handleGenerate}
+              >
                 {processingMode === "video" ? (
                   <Clapperboard className="h-5 w-5 shrink-0" />
                 ) : (
@@ -1343,19 +1327,18 @@ export function ProcessedAssetsPanel({
                 <span className="truncate">
                   {processingMode === "video" ? pa.createVideo : pa.createImage}
                 </span>
-              </span>
-              {generationCostEstimate ? (
-                <StudioGenerationCostFooter estimate={generationCostEstimate} inline />
+              </Button>
+              {generationCostEstimate && generationCostEstimate.tokens > 0 ? (
+                <TokenChargeHint
+                  tokens={generationCostEstimate.tokens}
+                  variant="total"
+                  size="lg"
+                  className="shrink-0 self-stretch"
+                />
               ) : null}
-            </Button>
+            </div>
           ) : null}
 
-          {processingMode && generationCostEstimate ? (
-            <StudioGenerationCostFooter
-              estimate={generationCostEstimate}
-              contextNote={videoCostContextNote}
-            />
-          ) : null}
     </>
   );
 

@@ -53,24 +53,30 @@ export function tokenUsdRateForDisplay(): number {
   return Number.isFinite(value) && value > 0 ? value : 1;
 }
 
+/** Exact tokens for UI (1 token = $1 by default, no rounding up). */
 export function usdToDisplayTokens(usd: number): number {
   if (!Number.isFinite(usd) || usd <= 0) return 0;
   const rate = tokenUsdRateForDisplay();
-  return Math.max(1, Math.ceil(usd / rate));
+  return Number((usd / rate).toFixed(2));
 }
 
 function buildEstimate(
   lines: CostLine[],
-  optionalLines: CostLine[] = []
+  optionalLines: CostLine[] = [],
+  options?: { includeOptionalInTotal?: boolean }
 ): StudioCostEstimate {
-  const totalUsd = lines
+  const baseUsd = lines
     .filter((l) => l.includedInTotal)
     .reduce((sum, l) => sum + l.usd, 0);
+  const optionalUsd = options?.includeOptionalInTotal
+    ? optionalLines.reduce((sum, l) => sum + l.usd, 0)
+    : 0;
+  const totalUsd = baseUsd + optionalUsd;
   return {
     totalUsd: Number(totalUsd.toFixed(4)),
     tokens: usdToDisplayTokens(totalUsd),
     lines,
-    optionalLines,
+    optionalLines: options?.includeOptionalInTotal ? [] : optionalLines,
   };
 }
 
@@ -119,7 +125,7 @@ export function estimatePostProcessImageCost(input: {
     });
   }
 
-  return buildEstimate(lines, optional);
+  return buildEstimate(lines, optional, { includeOptionalInTotal: true });
 }
 
 export function estimatePostProcessVideoCost(input: {
@@ -233,7 +239,7 @@ export function estimateClothingPhotoOnModelCost(input: {
     includedInTotal: false,
   });
 
-  return buildEstimate(lines, optional);
+  return buildEstimate(lines, optional, { includeOptionalInTotal: true });
 }
 
 export function estimateProductCardCost(input: {

@@ -68,7 +68,6 @@ import {
   estimateClothingPhotoOnModelCost,
   estimateProductCardCost,
 } from "@/lib/ai/studioGenerationCostEstimate";
-import { StudioGenerationCostFooter } from "./StudioGenerationCostFooter";
 import { mapSourceModelToGenerationSettings } from "@/lib/studio/mapSourceModelToGenerationSettings";
 import { isSourceModelPopulated } from "@/lib/ai/sourceModelPostProcess";
 import {
@@ -2225,6 +2224,7 @@ function StudioShellInner({
       mockMode,
     });
   }, [isProductShotMode, selectedProductFile, mockMode]);
+
   const hasProductInput = productPhotos.length > 0;
   const primaryBlocker = (() => {
     if (!hasProductInput) return copy.status.uploadProductFirst;
@@ -2602,7 +2602,7 @@ function StudioShellInner({
                               </label>
                             ) : null}
                             <Button
-                              className="w-full justify-between gap-2 px-4 sm:gap-3 sm:px-5"
+                              className="w-full gap-2 px-4 sm:gap-3 sm:px-5"
                               size="lg"
                               loading={loading || modelGenerating}
                               disabled={!canRunPrimary}
@@ -2613,24 +2613,9 @@ function StudioShellInner({
                               }
                               onClick={handlePrimaryAction}
                             >
-                              <span className="flex min-w-0 items-center gap-2">
-                                <PrimaryIcon className="h-5 w-5 shrink-0" />
-                                <span className="truncate">{primaryButtonLabel}</span>
-                              </span>
-                              {!loading && !modelGenerating && clothingCostEstimate ? (
-                                <StudioGenerationCostFooter
-                                  estimate={clothingCostEstimate}
-                                  inline
-                                />
-                              ) : null}
+                              <PrimaryIcon className="h-5 w-5 shrink-0" />
+                              <span className="truncate">{primaryButtonLabel}</span>
                             </Button>
-                            {clothingCostEstimate &&
-                            !loading &&
-                            !modelGenerating ? (
-                              <StudioGenerationCostFooter
-                                estimate={clothingCostEstimate}
-                              />
-                            ) : null}
                             {primaryStatusMessage ? (
                               <div
                                 id="studio-primary-status"
@@ -2739,7 +2724,7 @@ function StudioShellInner({
                       >
                         <div className="space-y-3">
                           <Button
-                            className="w-full justify-between gap-2 px-4 sm:gap-3 sm:px-5"
+                            className="w-full gap-2 px-4 sm:gap-3 sm:px-5"
                             size="lg"
                             loading={productCardPrimaryBusy}
                             disabled={!canRunPrimary}
@@ -2751,24 +2736,11 @@ function StudioShellInner({
                             }
                             onClick={handlePrimaryAction}
                           >
-                            <span className="flex min-w-0 items-center gap-2">
-                              {!productCardPrimaryBusy ? (
-                                <PrimaryIcon className="h-5 w-5 shrink-0" />
-                              ) : null}
-                              <span className="truncate">{primaryButtonLabel}</span>
-                            </span>
-                            {!productCardPrimaryBusy && productCardCostEstimate ? (
-                              <StudioGenerationCostFooter
-                                estimate={productCardCostEstimate}
-                                inline
-                              />
+                            {!productCardPrimaryBusy ? (
+                              <PrimaryIcon className="h-5 w-5 shrink-0" />
                             ) : null}
+                            <span className="truncate">{primaryButtonLabel}</span>
                           </Button>
-                          {productCardCostEstimate && !productCardPrimaryBusy ? (
-                            <StudioGenerationCostFooter
-                              estimate={productCardCostEstimate}
-                            />
-                          ) : null}
                           {primaryStatusMessage ? (
                             <div
                               id="studio-primary-status-product"

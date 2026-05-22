@@ -86,6 +86,7 @@ export function StudioWorkflowStep({
                 <TokenChargeHint
                   operation={tokenOperation}
                   tokens={tokenCharge}
+                  variant={tokenCharge !== undefined ? "total" : "charge"}
                 />
               ) : null}
             </div>
