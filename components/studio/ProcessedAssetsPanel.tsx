@@ -595,34 +595,56 @@ export function ProcessedAssetsPanel({
     const pendingId = newAssetId();
     const startedAt = new Date().toISOString();
     const isVideo = processingMode === "video";
-
-    onAssetCreated({
-      id: pendingId,
-      type: isVideo ? "video" : "scene",
-      url: "",
-      sourceImageUrl: effectiveSourceImageUrl ?? undefined,
-      parentAssetId: isTextOnlySession ? undefined : parentId,
-      mode: isVideo ? "video" : "scene",
-      createdAt: startedAt,
-      startedAt,
-      status: "processing",
-      label: isVideo ? pa.modeVideo : pa.modeImage,
-      postProcessOrigin: isTextOnlySession
-        ? isVideo
-          ? "text-only-video"
-          : "text-only-image"
-        : undefined,
-    });
-
-    setGenerationLoading(true);
-    setError(null);
-
     const userIntent =
       processingMode === "video"
         ? resolvedVideoIntent
         : promptNormalization.normalizedUserIntent;
 
+    setGenerationLoading(true);
+    setError(null);
+
     try {
+      if (isTextOnlySession && processingMode === "image") {
+        const apiOutputFormatEarly: ImageEnhanceRequest["outputFormat"] =
+          outputFormat === "jpeg" ? "jpg" : outputFormat;
+        const textBodyEarly = {
+          clientAssetId: pendingId,
+          userPrompt: userIntent,
+          aspectRatio: imageAspectRatio,
+          outputFormat: apiOutputFormatEarly,
+          quality: saasQuality === "ultra" ? "high" : saasQuality,
+          locale: promptLocale,
+          skipPromptPackage: !promptNormalization.shouldRunEnhancer,
+          useNegativePrompt: imageUseNegativePrompt,
+          negativePrompt: imageNegativePrompt.trim() || undefined,
+        };
+        savePendingGenerationJob({
+          kind: "text-to-image",
+          clientAssetId: pendingId,
+          parentAssetId: parentId,
+          startedAt,
+          body: textBodyEarly,
+          outputFormatUi: outputFormat,
+        });
+      }
+
+      onAssetCreated({
+        id: pendingId,
+        type: isVideo ? "video" : "scene",
+        url: "",
+        sourceImageUrl: effectiveSourceImageUrl ?? undefined,
+        parentAssetId: isTextOnlySession ? undefined : parentId,
+        mode: isVideo ? "video" : "scene",
+        createdAt: startedAt,
+        startedAt,
+        status: "processing",
+        label: isVideo ? pa.modeVideo : pa.modeImage,
+        postProcessOrigin: isTextOnlySession
+          ? isVideo
+            ? "text-only-video"
+            : "text-only-image"
+          : undefined,
+      });
       if (isVideo) {
         const apiQuality = mapSaasQualityToVideoApi(videoVariantId, saasQuality);
         let sourceImageUrlForVideo = effectiveSourceImageUrl ?? "";
@@ -656,8 +678,9 @@ export function ProcessedAssetsPanel({
         };
 
         if (isTextOnlySession) {
+          const frameClientAssetId = newAssetId();
           const frameBody = {
-            clientAssetId: `${pendingId}-frame`,
+            clientAssetId: frameClientAssetId,
             userPrompt: userIntent,
             aspectRatio: videoAspectRatio,
             outputFormat: "png" as const,
@@ -672,7 +695,7 @@ export function ProcessedAssetsPanel({
             clientAssetId: pendingId,
             parentAssetId: parentId,
             startedAt,
-            frameClientAssetId: `${pendingId}-frame`,
+            frameClientAssetId,
             frameBody,
             videoBody: { ...videoBody, sourceImageUrl: "" },
             userPrompt: userIntent,
@@ -710,7 +733,7 @@ export function ProcessedAssetsPanel({
           } else if (frameOutcome.kind === "in_progress") {
             const framePolled = await resumePendingGeneration({
               kind: "text-to-image",
-              clientAssetId: `${pendingId}-frame`,
+              clientAssetId: frameClientAssetId,
               parentAssetId: parentId,
               startedAt,
               body: frameBody,
@@ -819,7 +842,6 @@ export function ProcessedAssetsPanel({
           body: textBody,
           outputFormatUi: outputFormat,
         };
-        savePendingGenerationJob(textOnlyImageJob);
 
         const outcome = await runTextToImageGenerationRequest(textBody);
         if (outcome.kind === "success") {
