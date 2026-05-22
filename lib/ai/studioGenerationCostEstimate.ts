@@ -42,9 +42,14 @@ export type CostLine = {
 
 export type StudioCostEstimate = {
   totalUsd: number;
+  /** Legacy single value (= tokensMax when range). */
   tokens: number;
+  /** Minimum charge when optional provider steps are skipped. */
+  tokensMin?: number;
+  /** Maximum charge (preflight + pipeline billing). */
+  tokensMax?: number;
   lines: CostLine[];
-  /** Optional steps (retry, repair) — shown but not summed */
+  /** Optional steps (retry, repair) — shown as upper bound */
   optionalLines: CostLine[];
 };
 
@@ -71,12 +76,16 @@ function buildEstimate(
   const optionalUsd = options?.includeOptionalInTotal
     ? optionalLines.reduce((sum, l) => sum + l.usd, 0)
     : 0;
-  const totalUsd = baseUsd + optionalUsd;
+  const maxUsd = baseUsd + optionalUsd;
+  const minUsd = baseUsd;
+  const includeOptional = Boolean(options?.includeOptionalInTotal);
   return {
-    totalUsd: Number(totalUsd.toFixed(4)),
-    tokens: usdToDisplayTokens(totalUsd),
+    totalUsd: Number(maxUsd.toFixed(4)),
+    tokens: usdToDisplayTokens(maxUsd),
+    tokensMin: usdToDisplayTokens(minUsd),
+    tokensMax: usdToDisplayTokens(maxUsd),
     lines,
-    optionalLines: options?.includeOptionalInTotal ? [] : optionalLines,
+    optionalLines: includeOptional ? [] : optionalLines,
   };
 }
 
@@ -125,7 +134,7 @@ export function estimatePostProcessImageCost(input: {
     });
   }
 
-  return buildEstimate(lines, optional, { includeOptionalInTotal: true });
+  return buildEstimate(lines, optional);
 }
 
 export function estimatePostProcessVideoCost(input: {
@@ -172,7 +181,7 @@ export function estimatePostProcessVideoCost(input: {
 }
 
 export function estimateClothingPhotoOnModelCost(input: {
-  needsProductAnalyze: boolean;
+  needsProductAnalyze?: boolean;
   needsModelGeneration: boolean;
   useModelIdentityVision?: boolean;
   tryOnMaxExperimental: boolean;
@@ -184,14 +193,6 @@ export function estimateClothingPhotoOnModelCost(input: {
 
   const lines: CostLine[] = [];
   const optional: CostLine[] = [];
-
-  if (input.needsProductAnalyze) {
-    lines.push({
-      id: "openai_product_analyze",
-      usd: OPENAI_COST.visionProductDescription,
-      includedInTotal: true,
-    });
-  }
 
   if (input.needsModelGeneration) {
     lines.push({
@@ -239,7 +240,7 @@ export function estimateClothingPhotoOnModelCost(input: {
     includedInTotal: false,
   });
 
-  return buildEstimate(lines, optional, { includeOptionalInTotal: true });
+  return buildEstimate(lines, optional);
 }
 
 export function estimateModelGenerationCost(input: {

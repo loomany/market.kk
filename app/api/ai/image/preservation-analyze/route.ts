@@ -18,6 +18,7 @@ import {
   isPaidAiGuardError,
 } from "@/lib/ai/paidAiGuard";
 import { wrapAiPost } from "@/lib/tokens/wrapAiPost";
+import { resolvePreservationAnalyzeBillingCost } from "@/lib/tokens/resolveRouteBillingCost";
 
 export const runtime = "nodejs";
 
@@ -40,7 +41,8 @@ export async function POST(request: Request) {
     request,
     "preservation-analyze",
     ROUTE_ID,
-    handlePreservationAnalyzePost
+    handlePreservationAnalyzePost,
+    { resolveCost: resolvePreservationAnalyzeBillingCost }
   );
 }
 

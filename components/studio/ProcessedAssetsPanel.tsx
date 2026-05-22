@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Clapperboard, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -45,6 +45,7 @@ import { formatStudioString } from "@/lib/studio/i18n";
 import { useStudioCopy } from "./StudioLocaleContext";
 import type { StudioCopyFull } from "@/lib/studio/i18n/studioCopyTypes";
 import { normalizePostProcessPrompt } from "@/lib/studio/postProcessPromptNormalizer";
+import { resolveVideoGenerationIntent } from "@/lib/studio/videoMotionIntentFallback";
 import { PostProcessingMobileSheet } from "./PostProcessingMobileSheet";
 import { useStudioMobileLayout } from "./useStudioMobileLayout";
 import { PostProcessingMobileGallery } from "./PostProcessingMobileGallery";
@@ -69,9 +70,12 @@ import {
   estimatePostProcessImageCost,
   estimatePostProcessVideoCost,
 } from "@/lib/ai/studioGenerationCostEstimate";
+import { preflightTokenGeneration } from "@/lib/tokens/clientGenerationPreflight";
+import { preflightTokensFromEstimate } from "@/lib/ai/studioCostEstimateUtils";
 import { tryApplyTokenBillingError } from "@/lib/tokens/billingErrorPayload";
 import { TokenChargeHint } from "./TokenChargeHint";
 import type { TokenBillingErrorPayload } from "@/lib/tokens/billingErrorPayload";
+import { isStuckProcessingAsset } from "@/lib/studio/postProcessingGalleryAssets";
 import {
   getPendingGenerationJob,
   isPendingGenerationStale,
@@ -325,8 +329,25 @@ export function ProcessedAssetsPanel({
   }, [activeVideoVariant.provider, videoProvider]);
 
   const minVideoPromptLength = motionVideoUpload ? 4 : 8;
+  const resolvedVideoIntent = useMemo(
+    () =>
+      processingMode === "video"
+        ? resolveVideoGenerationIntent(
+            promptNormalization.normalizedUserIntent,
+            motionPreset,
+            minVideoPromptLength
+          )
+        : promptNormalization.normalizedUserIntent,
+    [
+      processingMode,
+      promptNormalization.normalizedUserIntent,
+      motionPreset,
+      minVideoPromptLength,
+    ]
+  );
   const videoGenerationReady =
-    promptNormalization.normalizedUserIntent.length >= minVideoPromptLength;
+    processingMode === "video" &&
+    resolvedVideoIntent.trim().length >= minVideoPromptLength;
 
   const workflowReady = Boolean(selectedAsset && processingMode);
 
@@ -459,6 +480,21 @@ export function ProcessedAssetsPanel({
       return;
     }
 
+    const requiredTokens = generationCostEstimate
+      ? preflightTokensFromEstimate(generationCostEstimate)
+      : 0;
+    const billingBlocked = await preflightTokenGeneration({
+      requiredTokens,
+      locale,
+      mockMode,
+      copy: copy.tokenBilling,
+    });
+    if (billingBlocked) {
+      setError(null);
+      onTokenBillingError?.(billingBlocked);
+      return;
+    }
+
     const pendingId = newAssetId();
     const startedAt = new Date().toISOString();
     const isVideo = processingMode === "video";
@@ -479,7 +515,10 @@ export function ProcessedAssetsPanel({
     setGenerationLoading(true);
     setError(null);
 
-    const userIntent = promptNormalization.normalizedUserIntent;
+    const userIntent =
+      processingMode === "video"
+        ? resolvedVideoIntent
+        : promptNormalization.normalizedUserIntent;
 
     try {
       if (isVideo) {
@@ -506,6 +545,8 @@ export function ProcessedAssetsPanel({
           useNegativePrompt: videoUseNegativePrompt,
           negativePrompt: videoNegativePrompt.trim() || undefined,
           keepReferenceSound: videoKeepReferenceSound,
+          referenceVideoDurationSeconds:
+            referenceVideoDurationSec ?? undefined,
         };
         savePendingGenerationJob({
           kind: "video",
@@ -520,11 +561,11 @@ export function ProcessedAssetsPanel({
           return;
         }
         if (outcome.kind === "error") {
-          if (outcome.billing && onTokenBillingError) {
-            tryApplyTokenBillingError(
-              { ok: false, errorCode: "INSUFFICIENT_TOKENS", message: outcome.message },
-              onTokenBillingError
-            );
+          if (
+            outcome.billing &&
+            handleGenerationBillingBlock(outcome.billingResponse ?? outcome, pendingId)
+          ) {
+            return;
           }
           const msg = friendlyPostProcessError(outcome.message, pa);
           failPendingAsset(pendingId, msg);
@@ -576,6 +617,7 @@ export function ProcessedAssetsPanel({
         useNegativePrompt: imageUseNegativePrompt,
         negativePrompt: imageNegativePrompt.trim() || undefined,
         skipPromptPackage: !promptNormalization.shouldRunEnhancer,
+        hasPreservationCached: Boolean(preservation),
       };
 
       savePendingGenerationJob({
@@ -592,11 +634,11 @@ export function ProcessedAssetsPanel({
         return;
       }
       if (outcome.kind === "error") {
-        if (outcome.billing && onTokenBillingError) {
-          tryApplyTokenBillingError(
-            { ok: false, errorCode: "INSUFFICIENT_TOKENS", message: outcome.message },
-            onTokenBillingError
-          );
+        if (
+          outcome.billing &&
+          handleGenerationBillingBlock(outcome.billingResponse ?? outcome, pendingId)
+        ) {
+          return;
         }
         const msg = friendlyPostProcessError(outcome.message, pa);
         failPendingAsset(pendingId, msg);
@@ -730,16 +772,38 @@ export function ProcessedAssetsPanel({
     removePendingGenerationJob(pendingId);
   };
 
+  const handleGenerationBillingBlock = useCallback(
+    (billingResponse: unknown, pendingId: string): boolean => {
+      if (!onTokenBillingError) return false;
+      if (!tryApplyTokenBillingError(billingResponse, onTokenBillingError)) {
+        return false;
+      }
+      removePendingGenerationJob(pendingId);
+      onDeleteAsset(pendingId);
+      setError(null);
+      return true;
+    },
+    [onTokenBillingError, onDeleteAsset]
+  );
+
   useEffect(() => {
     for (const asset of assets) {
       if (asset.status !== "processing") continue;
+
+      if (isStuckProcessingAsset(asset)) {
+        removePendingGenerationJob(asset.id);
+        onDeleteAsset(asset.id);
+        continue;
+      }
+
       if (resumeInFlightRef.current.has(asset.id)) continue;
 
       const job = getPendingGenerationJob(asset.id);
       if (!job) continue;
 
       if (isPendingGenerationStale(job.startedAt)) {
-        failPendingAsset(asset.id, pa.fileFailed);
+        removePendingGenerationJob(asset.id);
+        onDeleteAsset(asset.id);
         continue;
       }
 
@@ -769,11 +833,11 @@ export function ProcessedAssetsPanel({
             return;
           }
           if (outcome.kind === "error") {
-            if (outcome.billing && onTokenBillingError) {
-              tryApplyTokenBillingError(
-                { ok: false, errorCode: "INSUFFICIENT_TOKENS", message: outcome.message },
-                onTokenBillingError
-              );
+            if (
+              outcome.billing &&
+              handleGenerationBillingBlock(outcome.billingResponse ?? outcome, asset.id)
+            ) {
+              return;
             }
             failPendingAsset(asset.id, friendlyPostProcessError(outcome.message, pa));
             setError(friendlyPostProcessError(outcome.message, pa));
@@ -786,7 +850,7 @@ export function ProcessedAssetsPanel({
         }
       })();
     }
-  }, [assets, pa, onTokenBillingError, onUpdateAsset]);
+  }, [assets, handleGenerationBillingBlock, onDeleteAsset, onUpdateAsset]);
 
   const handleSaveUploadedSource = () => {
     if (!uploadedSource) return;
@@ -1328,9 +1392,10 @@ export function ProcessedAssetsPanel({
                   {processingMode === "video" ? pa.createVideo : pa.createImage}
                 </span>
               </Button>
-              {generationCostEstimate && generationCostEstimate.tokens > 0 ? (
+              {generationCostEstimate &&
+              preflightTokensFromEstimate(generationCostEstimate) > 0 ? (
                 <TokenChargeHint
-                  tokens={generationCostEstimate.tokens}
+                  estimate={generationCostEstimate}
                   variant="total"
                   size="lg"
                   className="shrink-0 self-stretch"

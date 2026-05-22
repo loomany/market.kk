@@ -38,6 +38,7 @@ import {
   buildClothingPipelineHints,
   clothingPipelineBillingHeadersFromHints,
 } from "@/lib/studio/clothingBillingClient";
+import { preflightTokenGeneration } from "@/lib/tokens/clientGenerationPreflight";
 import { isStudioAiDebugEnabled } from "@/lib/studio/studioAiDebug";
 import { isTryOnMaxToggleEnabled } from "@/lib/studio/tryOnMaxToggle";
 import {
@@ -72,6 +73,10 @@ import {
   estimateClothingPhotoOnModelCost,
   estimateProductCardCost,
 } from "@/lib/ai/studioGenerationCostEstimate";
+import {
+  multiplyStudioCostEstimate,
+  preflightTokensFromEstimate,
+} from "@/lib/ai/studioCostEstimateUtils";
 import { mapSourceModelToGenerationSettings } from "@/lib/studio/mapSourceModelToGenerationSettings";
 import { isSourceModelPopulated } from "@/lib/ai/sourceModelPostProcess";
 import {
@@ -122,6 +127,7 @@ import { Badge } from "@/components/ui/Badge";
 import { ProductPhotosUploader } from "./ProductPhotosUploader";
 import {
   createStudioProductPhoto,
+  isProductSetMode,
   MAX_CLOTHING_PRODUCT_SET,
   MAX_PRODUCT_PHOTOS,
   revokeStudioProductPhoto,
@@ -482,6 +488,23 @@ function StudioShellInner({
     setSignupGateOpen(true);
     return false;
   }, [isAuthenticated, flushStudioDraftBeforeLogin]);
+
+  const ensureTokenBalanceForGeneration = useCallback(
+    async (requiredTokens: number): Promise<boolean> => {
+      const blocked = await preflightTokenGeneration({
+        requiredTokens,
+        locale: promptLocale,
+        mockMode,
+        copy: copy.tokenBilling,
+      });
+      if (blocked) {
+        setTokenBilling(blocked);
+        return false;
+      }
+      return true;
+    },
+    [promptLocale, mockMode, copy.tokenBilling]
+  );
 
   const handleStudioModeChange = useCallback(
     async (next: StudioMode) => {
@@ -1713,6 +1736,8 @@ function StudioShellInner({
     /** SaaS orchestrator — model may be created in the same run */
     modelImageUrlOverride?: string | null;
     requireExistingModel?: boolean;
+    /** Full pipeline charge on try-on (create-photo flow). */
+    billingHints?: ReturnType<typeof buildClothingPipelineHints>;
   }) => {
     const useSeed = options?.seedOverride ?? generationSeed;
 
@@ -1777,13 +1802,16 @@ function StudioShellInner({
       const analysisForTryOn =
         options?.analysisOverride ?? productAnalysis;
 
-      const clothingBillingHints = buildClothingPipelineHints({
-        productAnalysis: analysisForTryOn,
-        needsModelGeneration: false,
-        categoryContext: modelSettings.categoryContext,
-        modelInputMode,
-        tryOnMaxExperimental,
-      });
+      const clothingBillingHints =
+        options?.billingHints ??
+        buildClothingPipelineHints({
+          productAnalysis: analysisForTryOn,
+          needsProductAnalyze: false,
+          needsModelGeneration: false,
+          categoryContext: modelSettings.categoryContext,
+          modelInputMode,
+          tryOnMaxExperimental,
+        });
 
       const formData = new FormData();
       appendStudioTryOnFields(formData, {
@@ -2196,17 +2224,20 @@ function StudioShellInner({
         skipLoadingState: true,
         modelImageUrlOverride: modelUrlForTryOn,
         requireExistingModel: false,
+        billingHints: buildClothingPipelineHints({
+          productAnalysis: analysis,
+          needsProductAnalyze: false,
+          needsModelGeneration:
+            modelInputMode === "create" && !hasUserUploadedModel(),
+          categoryContext: modelSettingsForGeneration.categoryContext,
+          modelInputMode,
+          tryOnMaxExperimental,
+        }),
       });
     } finally {
       endClothingPipelineLoading();
       setTryOnProgress(null);
     }
-  };
-
-  const handlePrimaryAction = () => {
-    if (!requireAuthForGeneration()) return;
-    if (studioMode === "clothing-tryon") return void handleCreatePhotoOnModel();
-    return handleProductShot();
   };
 
   const isClothingMode = studioMode === "clothing-tryon";
@@ -2218,8 +2249,7 @@ function StudioShellInner({
     const needsModelGeneration =
       modelInputMode === "create" &&
       (!generatedModelUrl || !isRemoteImageUrl(generatedModelUrl));
-    return estimateClothingPhotoOnModelCost({
-      needsProductAnalyze: !productAnalysis,
+    const single = estimateClothingPhotoOnModelCost({
       needsModelGeneration,
       useModelIdentityVision:
         modelSettingsForGeneration.categoryContext === "lingerie" &&
@@ -2227,14 +2257,18 @@ function StudioShellInner({
       tryOnMaxExperimental,
       mockMode,
     });
+    const slotCount = isProductSetMode(productPhotos.length)
+      ? productPhotos.length
+      : 1;
+    return multiplyStudioCostEstimate(single, slotCount);
   }, [
     isClothingMode,
     modelInputMode,
     generatedModelUrl,
-    productAnalysis,
     modelSettingsForGeneration.categoryContext,
     tryOnMaxExperimental,
     mockMode,
+    productPhotos.length,
   ]);
 
   const productCardCostEstimate = useMemo(() => {
@@ -2244,6 +2278,26 @@ function StudioShellInner({
       mockMode,
     });
   }, [isProductShotMode, selectedProductFile, mockMode]);
+
+  const handlePrimaryAction = async () => {
+    if (!requireAuthForGeneration()) return;
+
+    if (studioMode === "clothing-tryon") {
+      const required = clothingCostEstimate
+        ? preflightTokensFromEstimate(clothingCostEstimate)
+        : 0;
+      if (!(await ensureTokenBalanceForGeneration(required))) return;
+      return void handleCreatePhotoOnModel();
+    }
+
+    if (studioMode === "product-shot") {
+      const required = productCardCostEstimate
+        ? preflightTokensFromEstimate(productCardCostEstimate)
+        : 0;
+      if (!(await ensureTokenBalanceForGeneration(required))) return;
+      return handleProductShot();
+    }
+  };
 
   const hasProductInput = productPhotos.length > 0;
   const primaryBlocker = (() => {
@@ -2601,7 +2655,7 @@ function StudioShellInner({
                         <StudioWorkflowStep
                           step={3}
                           label={copy.workflow.createPhoto}
-                          tokenCharge={clothingCostEstimate?.tokens}
+                          tokenEstimate={clothingCostEstimate}
                           isLast
                         >
                           <div className="space-y-3">
@@ -2739,7 +2793,7 @@ function StudioShellInner({
                       <StudioWorkflowStep
                         step={4}
                         label={copy.workflow.done}
-                        tokenCharge={productCardCostEstimate?.tokens}
+                        tokenEstimate={productCardCostEstimate}
                         isLast
                       >
                         <div className="space-y-3">

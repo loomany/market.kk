@@ -12,7 +12,13 @@ const POLL_MAX_MS = 45 * 60 * 1000;
 export type GenerationFetchResult<T> =
   | { kind: "success"; data: T }
   | { kind: "in_progress" }
-  | { kind: "error"; message: string; billing?: boolean };
+  | {
+      kind: "error";
+      message: string;
+      billing?: boolean;
+      /** Full API JSON for `parseTokenBillingError` (402 / token gate). */
+      billingResponse?: unknown;
+    };
 
 export async function pollGenerationJobResult(
   clientAssetId: string
@@ -72,10 +78,12 @@ export async function runVideoGenerationRequest(
   ) {
     return { kind: "in_progress" };
   }
+  const billing = tryBillingFlag(data);
   return {
     kind: "error",
     message: data.message ?? "Не удалось создать видео.",
-    billing: tryBillingFlag(data),
+    billing,
+    billingResponse: billing ? data : undefined,
   };
 }
 
@@ -96,10 +104,12 @@ export async function runImageGenerationRequest(
   if (data.ok) {
     return { kind: "success", data };
   }
+  const billing = tryBillingFlag(data);
   return {
     kind: "error",
     message: data.error ?? "Не удалось улучшить фото.",
-    billing: tryBillingFlag(data),
+    billing,
+    billingResponse: billing ? data : undefined,
   };
 }
 

@@ -12,6 +12,7 @@ import {
   paidAiGuardResponse,
 } from "@/lib/ai/paidAiGuard";
 import { wrapAiPost } from "@/lib/tokens/wrapAiPost";
+import { resolveMaskRefineBillingCost } from "@/lib/tokens/resolveRouteBillingCost";
 
 export const runtime = "nodejs";
 
@@ -35,7 +36,9 @@ function mockRefinement(): RefineProductMaskSuccessResponse {
 }
 
 export async function POST(request: Request) {
-  return wrapAiPost(request, "mask-refine", ROUTE_ID, handleRefineProductMaskPost);
+  return wrapAiPost(request, "mask-refine", ROUTE_ID, handleRefineProductMaskPost, {
+    resolveCost: resolveMaskRefineBillingCost,
+  });
 }
 
 async function handleRefineProductMaskPost(request: Request) {

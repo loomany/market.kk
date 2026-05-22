@@ -58,7 +58,7 @@ export function TokenBillingModal({
           : null;
       const message = required
         ? formatStudioString(tb.insufficientBody, { required })
-        : tb.insufficientBody;
+        : payload.message?.trim() || tb.insufficientBody;
       return { title: tb.insufficientTitle, message };
     }
     if (

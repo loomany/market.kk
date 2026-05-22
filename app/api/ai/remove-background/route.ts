@@ -16,6 +16,7 @@ import {
   type PaidAiGuardInput,
 } from "@/lib/ai/paidAiGuard";
 import { wrapAiPost } from "@/lib/tokens/wrapAiPost";
+import { resolveBackgroundRemoveBillingCost } from "@/lib/tokens/resolveRouteBillingCost";
 
 export const runtime = "nodejs";
 
@@ -140,7 +141,9 @@ async function runRemoveBackground(imageUrl: string, syncMode: boolean) {
 }
 
 export async function POST(request: Request) {
-  return wrapAiPost(request, "background", ROUTE_ID, handleRemoveBackgroundPost);
+  return wrapAiPost(request, "background", ROUTE_ID, handleRemoveBackgroundPost, {
+    resolveCost: resolveBackgroundRemoveBillingCost,
+  });
 }
 
 async function handleRemoveBackgroundPost(request: Request) {

@@ -48,7 +48,7 @@ export function clothingPipelineCostTokens(
     tryOnMaxExperimental: hints.tryOnMaxExperimental,
     mockMode,
   });
-  return normalizeTokenAmount(estimate.tokens);
+  return normalizeTokenAmount(estimate.tokensMax ?? estimate.tokens);
 }
 
 function isMockMode(): boolean {

@@ -37,6 +37,8 @@ export const videoGenerateRequestSchema = z
       ])
       .default("subtle-motion"),
     referenceVideoUrl: z.string().url().optional(),
+    /** Client-measured ref clip length (motion control billing). */
+    referenceVideoDurationSeconds: z.number().positive().max(120).optional(),
     characterOrientation: z.enum(["image", "video"]).optional(),
     promptLocale: promptLocaleSchema.optional(),
     generateAudio: z.boolean().optional().default(false),

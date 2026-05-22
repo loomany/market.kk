@@ -86,9 +86,21 @@ export async function generateProductSetModels(input: {
       userEditedProductDescription: input.userEditedProductDescription,
     });
 
+    const modelBillingHints = buildClothingPipelineHints({
+      productAnalysis: slot.analysis,
+      needsProductAnalyze: false,
+      needsModelGeneration: true,
+      categoryContext: input.settings.categoryContext,
+      modelInputMode: "create",
+      tryOnMaxExperimental: false,
+    });
+
     const res = await fetch("/api/ai/generate-model", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...clothingPipelineBillingHeadersFromHints(modelBillingHints),
+      },
       body: JSON.stringify(
         buildGenerateModelRequestBody({
           settings: {
@@ -191,7 +203,8 @@ export async function runProductSetTryOn(input: {
 
   const billingHints = buildClothingPipelineHints({
     productAnalysis: input.slot.analysis,
-    needsModelGeneration: false,
+    needsProductAnalyze: false,
+    needsModelGeneration: true,
     categoryContext: input.settings.categoryContext,
     modelInputMode: "create",
     tryOnMaxExperimental: Boolean(input.tryOnMaxExperimental),

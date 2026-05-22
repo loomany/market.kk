@@ -7,6 +7,9 @@ import {
   estimatePostProcessVideoCost,
   estimateProductCardCost,
 } from "@/lib/ai/studioGenerationCostEstimate";
+import { preflightTokensFromEstimate } from "@/lib/ai/studioCostEstimateUtils";
+import { OPENAI_COST, FAL_IMAGE_COST } from "@/lib/ai/generationCostPricing";
+import { usdToTokenAmount } from "@/lib/tokens/tokenAmount";
 import { mapSaasQualityToVideoApi } from "@/lib/ai/videoCatalog";
 import type { ImageEnhanceQualityTier } from "@/lib/ai/imageEnhanceSchemas";
 import {
@@ -84,9 +87,10 @@ export async function resolveVideoGenerateBillingCost(
       durationSeconds: parsed.data.durationSeconds,
       quality: apiQuality,
       generateAudio: audioOn,
+      referenceVideoDurationSeconds: parsed.data.referenceVideoDurationSeconds,
       mockMode: isMockMode(),
     });
-    return normalizeTokenAmount(estimate.tokens);
+    return normalizeTokenAmount(preflightTokensFromEstimate(estimate));
   } catch {
     return normalizeTokenAmount(getGenerationCost("video"));
   }
@@ -97,20 +101,23 @@ export async function resolveImageEnhanceBillingCost(
 ): Promise<number> {
   try {
     const body = (await request.clone().json()) as Record<string, unknown>;
-    const editor = (body.editor as string) ?? "nano-banana-pro";
+    const editorRaw =
+      (body.selectedEditor as string | undefined) ??
+      (body.editor as string | undefined) ??
+      "nano-banana-pro";
     const quality = (body.quality as ImageEnhanceQualityTier) ?? "high";
     const preserveProduct = Boolean(body.preserveProduct);
     const hasPreservationCached = Boolean(body.hasPreservationCached);
-    const runOpenAiPromptPackage = body.runOpenAiPromptPackage !== false;
+    const runOpenAiPromptPackage = body.skipPromptPackage !== true;
     const estimate = estimatePostProcessImageCost({
-      editor: editor as "nano-banana-pro",
+      editor: editorRaw as "nano-banana-pro",
       quality,
       preserveProduct,
       hasPreservationCached,
       runOpenAiPromptPackage,
       mockMode: isMockMode(),
     });
-    return normalizeTokenAmount(estimate.tokens);
+    return normalizeTokenAmount(preflightTokensFromEstimate(estimate));
   } catch {
     return normalizeTokenAmount(getGenerationCost("enhance"));
   }
@@ -132,6 +139,22 @@ export async function resolveProductShotBillingCost(
   return normalizeTokenAmount(estimate.tokens);
 }
 
+export async function resolvePreservationAnalyzeBillingCost(): Promise<number> {
+  return normalizeTokenAmount(usdToTokenAmount(OPENAI_COST.productPreservationAnalyze));
+}
+
+export async function resolveMaskRefineBillingCost(): Promise<number> {
+  return normalizeTokenAmount(usdToTokenAmount(OPENAI_COST.garmentMaskRefine));
+}
+
+export async function resolveBackgroundRemoveBillingCost(): Promise<number> {
+  return normalizeTokenAmount(usdToTokenAmount(FAL_IMAGE_COST.briaBackgroundRemove));
+}
+
+export async function resolveAnglesAnalyzeBillingCost(): Promise<number> {
+  return normalizeTokenAmount(usdToTokenAmount(OPENAI_COST.visionSmall));
+}
+
 export function resolveOperationBillingCost(
   operationType: GenerationOperationType
 ): (request: Request) => Promise<number> {
@@ -146,6 +169,14 @@ export function resolveOperationBillingCost(
       return resolveImageEnhanceBillingCost;
     case "product-shot":
       return resolveProductShotBillingCost;
+    case "preservation-analyze":
+      return resolvePreservationAnalyzeBillingCost;
+    case "mask-refine":
+      return resolveMaskRefineBillingCost;
+    case "background":
+      return resolveBackgroundRemoveBillingCost;
+    case "angles-analyze":
+      return resolveAnglesAnalyzeBillingCost;
     default:
       return async () => normalizeTokenAmount(getGenerationCost(operationType));
   }

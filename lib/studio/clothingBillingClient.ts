@@ -7,13 +7,16 @@ import {
 
 export function buildClothingPipelineHints(input: {
   productAnalysis: ProductDescriptionAnalysis | null;
+  /** Override auto-detect from analysis presence. */
+  needsProductAnalyze?: boolean;
   needsModelGeneration: boolean;
   categoryContext: ModelCategoryContext;
   modelInputMode: "create" | "upload";
   tryOnMaxExperimental: boolean;
 }): ClothingPipelineBillingHints {
   return {
-    needsProductAnalyze: !input.productAnalysis,
+    needsProductAnalyze:
+      input.needsProductAnalyze ?? !input.productAnalysis,
     needsModelGeneration: input.needsModelGeneration,
     useModelIdentityVision:
       input.categoryContext === "lingerie" && input.modelInputMode === "create",

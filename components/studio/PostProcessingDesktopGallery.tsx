@@ -6,6 +6,7 @@ import type { StudioSessionAsset } from "./types";
 import { PostProcessingGalleryCard } from "./PostProcessingGalleryCard";
 import { StudioFilesPagination } from "./StudioFilesPagination";
 import { StudioFilesSectionHeader } from "./StudioFilesSectionHeader";
+import { listPostProcessingGalleryAssets } from "@/lib/studio/postProcessingGalleryAssets";
 import { postProcessingSectionCardClass } from "./StudioSaaSPreviewChrome";
 import { useStudioCopy } from "./StudioLocaleContext";
 const PAGE_SIZE = 4;
@@ -30,7 +31,7 @@ export function PostProcessingDesktopGallery({
   const [page, setPage] = useState(1);
 
   const galleryAssets = useMemo(
-    () => assets.filter((a) => !a.parentAssetId || a.status === "processing"),
+    () => listPostProcessingGalleryAssets(assets),
     [assets]
   );
   const totalPages = Math.max(1, Math.ceil(galleryAssets.length / PAGE_SIZE));

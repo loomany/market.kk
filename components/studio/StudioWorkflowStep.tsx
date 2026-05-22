@@ -7,6 +7,7 @@ import {
 } from "@/components/studio/PreviewCard";
 import { formatStudioString } from "@/lib/studio/i18n";
 import { cn } from "@/lib/utils";
+import type { StudioCostEstimate } from "@/lib/ai/studioGenerationCostEstimate";
 import type { GenerationOperationType } from "@/lib/tokens/generationCostConfig";
 import { TokenChargeHint } from "./TokenChargeHint";
 import { useStudioCopy } from "./StudioLocaleContext";
@@ -20,6 +21,7 @@ type StudioWorkflowStepProps = {
   /** Shown on the right of the step title (violet SaaS pill). */
   tokenOperation?: GenerationOperationType;
   tokenCharge?: number;
+  tokenEstimate?: StudioCostEstimate | null;
   children: ReactNode;
   className?: string;
 };
@@ -40,6 +42,7 @@ export function StudioWorkflowStep({
   softCorner,
   tokenOperation,
   tokenCharge,
+  tokenEstimate,
   children,
   className,
 }: StudioWorkflowStepProps) {
@@ -82,11 +85,14 @@ export function StudioWorkflowStep({
                   </span>
                 ) : null}
               </div>
-              {tokenOperation || tokenCharge !== undefined ? (
+              {tokenEstimate || tokenOperation || tokenCharge !== undefined ? (
                 <TokenChargeHint
+                  estimate={tokenEstimate ?? undefined}
                   operation={tokenOperation}
                   tokens={tokenCharge}
-                  variant={tokenCharge !== undefined ? "total" : "charge"}
+                  variant={
+                    tokenEstimate || tokenCharge !== undefined ? "total" : "charge"
+                  }
                 />
               ) : null}
             </div>

@@ -2,6 +2,12 @@
 
 import { Coins } from "lucide-react";
 import { VitrinaTokenIcon } from "@/components/tokens/VitrinaTokenIcon";
+import type { StudioCostEstimate } from "@/lib/ai/studioGenerationCostEstimate";
+import {
+  hasEstimateTokenRange,
+  maxTokensFromEstimate,
+  minTokensFromEstimate,
+} from "@/lib/ai/studioCostEstimateUtils";
 import type { GenerationOperationType } from "@/lib/tokens/generationCostConfig";
 import { getClientGenerationCost } from "@/lib/tokens/generationCostConfig";
 import {
@@ -10,6 +16,7 @@ import {
 } from "@/lib/tokens/formatTokens";
 import {
   formatTokenChargeHint,
+  formatTokenChargeRangeHint,
   tokenChargePrefix,
 } from "@/lib/tokens/tokenChargeLabel";
 import { cn } from "@/lib/utils";
@@ -18,8 +25,12 @@ import { useStudioCopy } from "./StudioLocaleContext";
 type TokenChargeHintSize = "sm" | "lg";
 
 type TokenChargeHintProps = {
+  /** Full pipeline estimate (min–max when optional steps exist). */
+  estimate?: StudioCostEstimate;
   /** Explicit token count (overrides operation). */
   tokens?: number;
+  tokensMin?: number;
+  tokensMax?: number;
   /** Maps to configured per-operation cost. */
   operation?: GenerationOperationType;
   /** `total` — «Итоговое списание»; `charge` — legacy «К списанию». */
@@ -32,7 +43,10 @@ type TokenChargeHintProps = {
 };
 
 export function TokenChargeHint({
+  estimate,
   tokens,
+  tokensMin,
+  tokensMax,
   operation = "default",
   variant = "charge",
   size = "sm",
@@ -40,18 +54,41 @@ export function TokenChargeHint({
   className,
 }: TokenChargeHintProps) {
   const { locale } = useStudioCopy();
-  const count = tokens ?? getClientGenerationCost(operation);
+
+  const min =
+    tokensMin ??
+    (estimate ? minTokensFromEstimate(estimate) : undefined) ??
+    tokens ??
+    getClientGenerationCost(operation);
+  const max =
+    tokensMax ??
+    (estimate ? maxTokensFromEstimate(estimate) : undefined) ??
+    tokens ??
+    getClientGenerationCost(operation);
+  const showRange =
+    estimate != null
+      ? hasEstimateTokenRange(estimate)
+      : tokensMin !== undefined &&
+        tokensMax !== undefined &&
+        Math.abs(min - max) > 0.005;
+
   const isTotal = variant === "total";
-  const amount = formatTokenChargeNumber(count);
+  const amount = formatTokenChargeNumber(max);
   const compactTotal = inline && isTotal;
   const label = isTotal
     ? compactTotal
-      ? amount
-      : `${tokenChargePrefix(locale)} ${amount}`
-    : formatTokenChargeHint(count, locale);
-  const title = isTotal
-    ? formatExactTokenAmount(count, locale)
-    : label;
+      ? showRange
+        ? `${formatTokenChargeNumber(min)}–${amount}`
+        : amount
+      : showRange
+        ? `${tokenChargePrefix(locale)} ${formatTokenChargeNumber(min)}–${amount}`
+        : `${tokenChargePrefix(locale)} ${amount}`
+    : showRange
+      ? formatTokenChargeRangeHint(min, max, locale)
+      : formatTokenChargeHint(max, locale);
+  const title = showRange
+    ? `${formatExactTokenAmount(min, locale)} – ${formatExactTokenAmount(max, locale)}`
+    : formatExactTokenAmount(max, locale);
 
   const isLg = size === "lg";
 

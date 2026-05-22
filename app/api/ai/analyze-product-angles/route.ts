@@ -10,13 +10,16 @@ import {
 } from "@/lib/ai/paidAiGuard";
 import { MAX_CLOTHING_PRODUCT_SET } from "@/lib/studio/productPhotos";
 import { wrapAiPost } from "@/lib/tokens/wrapAiPost";
+import { resolveAnglesAnalyzeBillingCost } from "@/lib/tokens/resolveRouteBillingCost";
 
 export const runtime = "nodejs";
 
 const ROUTE_ID = "/api/ai/analyze-product-angles";
 
 export async function POST(request: Request) {
-  return wrapAiPost(request, "angles-analyze", ROUTE_ID, handleAnalyzeProductAnglesPost);
+  return wrapAiPost(request, "angles-analyze", ROUTE_ID, handleAnalyzeProductAnglesPost, {
+    resolveCost: resolveAnglesAnalyzeBillingCost,
+  });
 }
 
 async function handleAnalyzeProductAnglesPost(request: Request) {
