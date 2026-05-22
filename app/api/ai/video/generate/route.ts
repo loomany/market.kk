@@ -16,6 +16,7 @@ import {
 import { defaultLocale } from "@/lib/i18n/localeConfig";
 import { prepareVideoPromptPackage } from "@/lib/ai/videoPromptPackage";
 import { wrapAiPost } from "@/lib/tokens/wrapAiPost";
+import { resolveVideoGenerateBillingCost } from "@/lib/tokens/resolveRouteBillingCost";
 import { withGenerationIdempotency } from "@/lib/studio/withGenerationIdempotency";
 
 export const runtime = "nodejs";
@@ -27,7 +28,9 @@ function isMockMode() {
 }
 
 export async function POST(request: Request) {
-  return wrapAiPost(request, "video", ROUTE_ID, handleVideoGeneratePost);
+  return wrapAiPost(request, "video", ROUTE_ID, handleVideoGeneratePost, {
+    resolveCost: resolveVideoGenerateBillingCost,
+  });
 }
 
 async function handleVideoGeneratePost(request: Request) {

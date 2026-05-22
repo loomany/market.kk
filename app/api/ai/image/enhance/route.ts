@@ -54,6 +54,7 @@ import {
 import { prepareImagePromptPackage } from "@/lib/ai/imagePromptPackage";
 import { defaultLocale } from "@/lib/i18n/localeConfig";
 import { wrapAiPost } from "@/lib/tokens/wrapAiPost";
+import { resolveImageEnhanceBillingCost } from "@/lib/tokens/resolveRouteBillingCost";
 import { withGenerationIdempotency } from "@/lib/studio/withGenerationIdempotency";
 
 export const runtime = "nodejs";
@@ -118,7 +119,9 @@ function finalizeTrace(t: TraceBuilder): ImageEnhanceDebugTrace | undefined {
 }
 
 export async function POST(request: Request) {
-  return wrapAiPost(request, "enhance", ROUTE_ID, handleImageEnhancePost);
+  return wrapAiPost(request, "enhance", ROUTE_ID, handleImageEnhancePost, {
+    resolveCost: resolveImageEnhanceBillingCost,
+  });
 }
 
 async function handleImageEnhancePost(request: Request) {

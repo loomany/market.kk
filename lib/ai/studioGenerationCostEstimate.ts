@@ -13,6 +13,7 @@ import {
 import type { ImageEditorId, ImageEnhanceQualityTier } from "@/lib/ai/imageEnhanceSchemas";
 import type { VideoQuality, VideoVariantId } from "@/lib/ai/videoCatalog";
 import { getVideoVariant } from "@/lib/ai/videoCatalog";
+import { tokenUsdRate, usdToTokenAmount } from "@/lib/tokens/tokenAmount";
 
 export type CostLineId =
   | "openai_product_analyze"
@@ -47,17 +48,16 @@ export type StudioCostEstimate = {
   optionalLines: CostLine[];
 };
 
+/** @deprecated Use tokenUsdRate() from lib/tokens/tokenAmount */
 export function tokenUsdRateForDisplay(): number {
-  const raw = process.env.NEXT_PUBLIC_TOKEN_USD_RATE ?? "1";
-  const value = Number(raw);
-  return Number.isFinite(value) && value > 0 ? value : 1;
+  return tokenUsdRate();
 }
 
 /** Exact tokens for UI (1 token = $1 by default, no rounding up). */
 export function usdToDisplayTokens(usd: number): number {
-  if (!Number.isFinite(usd) || usd <= 0) return 0;
-  const rate = tokenUsdRateForDisplay();
-  return Number((usd / rate).toFixed(2));
+  const tokens = usdToTokenAmount(usd);
+  if (tokens <= 0) return 0;
+  return Number(tokens.toFixed(2));
 }
 
 function buildEstimate(
@@ -240,6 +240,38 @@ export function estimateClothingPhotoOnModelCost(input: {
   });
 
   return buildEstimate(lines, optional, { includeOptionalInTotal: true });
+}
+
+export function estimateModelGenerationCost(input: {
+  useModelIdentityVision?: boolean;
+  mockMode?: boolean;
+}): StudioCostEstimate {
+  if (input.mockMode) {
+    return buildEstimate([]);
+  }
+
+  const lines: CostLine[] = [
+    {
+      id: "openai_model_compose",
+      usd: OPENAI_COST.modelPromptCompose,
+      includedInTotal: true,
+    },
+    {
+      id: "fal_model_generation",
+      usd: FAL_IMAGE_COST.nanoBananaProT2i,
+      includedInTotal: true,
+    },
+  ];
+
+  if (input.useModelIdentityVision) {
+    lines.push({
+      id: "openai_model_identity",
+      usd: OPENAI_COST.modelIdentityVision,
+      includedInTotal: true,
+    });
+  }
+
+  return buildEstimate(lines);
 }
 
 export function estimateProductCardCost(input: {

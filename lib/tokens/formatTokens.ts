@@ -1,14 +1,15 @@
 import type { IndexableLocale } from "@/lib/i18n/localeConfig";
 
 export function formatTokenBalanceDisplay(count: number, locale: IndexableLocale): string {
-  const n = Math.max(0, Math.floor(count));
-  if (locale === "ru") {
-    return `${n} ${ruTokenWord(n)}`;
+  const n = Math.max(0, count);
+  const isWhole = Math.abs(n - Math.round(n)) < 0.005;
+  if (isWhole) {
+    const whole = Math.round(n);
+    if (locale === "ru") return `${whole} ${ruTokenWord(whole)}`;
+    if (locale === "kk") return `${whole} ${kkTokenWord(whole)}`;
+    return `${whole} ${enTokenWord(whole)}`;
   }
-  if (locale === "kk") {
-    return `${n} ${kkTokenWord(n)}`;
-  }
-  return `${n} ${enTokenWord(n)}`;
+  return formatExactTokenAmount(n, locale);
 }
 
 /** Numeric part for «К списанию 1.69» — always dot as decimal separator. */

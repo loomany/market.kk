@@ -34,6 +34,7 @@ import {
 } from "@/lib/ai/paidAiGuard";
 import { FAL_IMAGE_COST, OPENAI_COST } from "@/lib/ai/generationCostPricing";
 import { wrapAiPost } from "@/lib/tokens/wrapAiPost";
+import { resolveTryOnBillingCost } from "@/lib/tokens/resolveRouteBillingCost";
 
 export const runtime = "nodejs";
 /**
@@ -558,7 +559,9 @@ async function processFormPayload(payload: TryOnFormPayload) {
 }
 
 export async function POST(request: Request) {
-  return wrapAiPost(request, "try-on", ROUTE_ID, handleTryOnPost);
+  return wrapAiPost(request, "try-on", ROUTE_ID, handleTryOnPost, {
+    resolveCost: resolveTryOnBillingCost,
+  });
 }
 
 async function handleTryOnPost(request: Request) {

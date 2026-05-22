@@ -6,7 +6,10 @@ import { useRouter } from "next/navigation";
 import { Coins, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { formatStudioString } from "@/lib/studio/i18n";
-import { formatTokenBalanceDisplay } from "@/lib/tokens/formatTokens";
+import {
+  formatExactTokenAmount,
+  formatTokenBalanceDisplay,
+} from "@/lib/tokens/formatTokens";
 import type { TokenBillingErrorPayload } from "@/lib/tokens/billingErrorPayload";
 import {
   openVitrinaLoginModal,
@@ -49,7 +52,14 @@ export function TokenBillingModal({
   const display = useMemo(() => {
     if (!payload) return null;
     if (payload.errorCode === "INSUFFICIENT_TOKENS") {
-      return { title: tb.insufficientTitle, message: tb.insufficientBody };
+      const required =
+        payload.requiredTokens !== undefined
+          ? formatExactTokenAmount(payload.requiredTokens, locale)
+          : null;
+      const message = required
+        ? formatStudioString(tb.insufficientBody, { required })
+        : tb.insufficientBody;
+      return { title: tb.insufficientTitle, message };
     }
     if (
       payload.errorCode === "GUEST_GENERATION_LIMIT" ||
@@ -70,8 +80,8 @@ export function TokenBillingModal({
       return null;
     }
     return formatStudioString(tb.balanceHint, {
-      balance: formatTokenBalanceDisplay(payload.balanceTokens, locale),
-      required: formatTokenBalanceDisplay(payload.requiredTokens, locale),
+      balance: formatExactTokenAmount(payload.balanceTokens, locale),
+      required: formatExactTokenAmount(payload.requiredTokens, locale),
     });
   }, [payload, locale, tb.balanceHint]);
 

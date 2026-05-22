@@ -44,6 +44,7 @@ import {
 
 } from "@/lib/ai/paidAiGuard";
 import { wrapAiPost } from "@/lib/tokens/wrapAiPost";
+import { resolveModelGenerationBillingCost } from "@/lib/tokens/resolveRouteBillingCost";
 
 export const runtime = "nodejs";
 
@@ -64,7 +65,9 @@ function isMockMode() {
 
 
 export async function POST(request: Request) {
-  return wrapAiPost(request, "model-generation", ROUTE_ID, handleGenerateModelPost);
+  return wrapAiPost(request, "model-generation", ROUTE_ID, handleGenerateModelPost, {
+    resolveCost: resolveModelGenerationBillingCost,
+  });
 }
 
 async function handleGenerateModelPost(request: Request) {

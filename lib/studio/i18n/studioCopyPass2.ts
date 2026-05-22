@@ -153,7 +153,7 @@ export const pass2Ru = {
   tokenBilling: {
     insufficientTitle: "Недостаточно токенов",
     insufficientBody:
-      "Для этой AI-операции нужен 1 токен. Пополните баланс, чтобы продолжить.",
+      "Для этой AI-операции нужно {required}. Пополните баланс, чтобы продолжить.",
     balanceHint: "Баланс: {balance} · нужно: {required}",
     topUpBalance: "Пополнить баланс",
     close: "Закрыть",
@@ -323,7 +323,7 @@ export const pass2En = {
   tokenBilling: {
     insufficientTitle: "Not enough tokens",
     insufficientBody:
-      "This AI task requires 1 token. Top up your balance to continue.",
+      "This AI task requires {required}. Top up your balance to continue.",
     balanceHint: "Balance: {balance} · required: {required}",
     topUpBalance: "Top up balance",
     close: "Close",
@@ -493,7 +493,7 @@ export const pass2Kk = {
   tokenBilling: {
     insufficientTitle: "Токен жеткіліксіз",
     insufficientBody:
-      "Бұл AI әрекетіне 1 токен қажет. Жалғастыру үшін балансты толтырыңыз.",
+      "Бұл AI әрекетіне {required} қажет. Жалғастыру үшін балансты толтырыңыз.",
     balanceHint: "Баланс: {balance} · қажет: {required}",
     topUpBalance: "Балансты толтыру",
     close: "Жабу",

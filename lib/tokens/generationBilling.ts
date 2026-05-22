@@ -18,8 +18,16 @@ import { guestFreeGenerationLimit, isValidUserUuid } from "@/lib/tokens/config";
 import { getUserTokenBalance } from "@/lib/tokens/tokenLedger";
 import type { IndexableLocale } from "@/lib/i18n/localeConfig";
 import { assertLocale, indexableLocales } from "@/lib/i18n/localeConfig";
+import { formatTokenChargeNumber } from "@/lib/tokens/formatTokens";
+import { normalizeTokenAmount } from "@/lib/tokens/tokenAmount";
+import { isClothingPhotoPipelineRequest } from "@/lib/tokens/clothingPipelineBilling";
 
-export type GenerationBillingMode = "skip" | "guest_free" | "paid_token";
+export type GenerationBillingMode =
+  | "skip"
+  | "guest_free"
+  | "paid_token"
+  /** Balance checked; spend happens on the final pipeline step (e.g. try-on). */
+  | "pipeline_deferred";
 
 export type GenerationBillingContext = {
   mode: GenerationBillingMode;
@@ -35,7 +43,7 @@ const ERROR_COPY = {
   ru: {
     insufficientTitle: "Недостаточно токенов",
     insufficientBody:
-      "Для этой AI-операции нужен 1 токен. Пополните баланс, чтобы продолжить.",
+      "Для этой AI-операции нужно {required} токена. Пополните баланс, чтобы продолжить.",
     topUp: "Пополнить баланс",
     guestUsedTitle: "Нужна регистрация",
     guestUsedBody:
@@ -46,7 +54,7 @@ const ERROR_COPY = {
   en: {
     insufficientTitle: "Not enough tokens",
     insufficientBody:
-      "This AI operation requires 1 token. Top up your balance to continue.",
+      "This AI operation requires {required} tokens. Top up your balance to continue.",
     topUp: "Top up balance",
     guestUsedTitle: "Sign in required",
     guestUsedBody:
@@ -57,7 +65,7 @@ const ERROR_COPY = {
   kk: {
     insufficientTitle: "Токен жеткіліксіз",
     insufficientBody:
-      "Бұл AI операциясына 1 токен керек. Жалғастыру үшін балансты толтырыңыз.",
+      "Бұл AI операциясына {required} токен керек. Жалғастыру үшін балансты толтырыңыз.",
     topUp: "Балансты толтыру",
     guestUsedTitle: "Тіркелу қажет",
     guestUsedBody:
@@ -93,17 +101,65 @@ function billingCopy(locale: IndexableLocale) {
   return ERROR_COPY[locale];
 }
 
+function insufficientMessage(locale: IndexableLocale, requiredTokens: number): string {
+  const required = formatTokenChargeNumber(requiredTokens);
+  return billingCopy(locale).insufficientBody.replace("{required}", required);
+}
+
+function insufficientResponse(
+  locale: IndexableLocale,
+  balance: number,
+  costTokens: number
+): NextResponse {
+  const copy = billingCopy(locale);
+  return NextResponse.json(
+    {
+      ok: false,
+      errorCode: "INSUFFICIENT_TOKENS",
+      title: copy.insufficientTitle,
+      message: insufficientMessage(locale, costTokens),
+      cta: { label: copy.topUp, href: `/${locale}/tokens` },
+      balanceTokens: balance,
+      requiredTokens: costTokens,
+    },
+    { status: 402 }
+  );
+}
+
+async function resolveOperationCostTokens(
+  request: Request,
+  operationType: GenerationOperationType,
+  resolveCost?: (request: Request) => number | Promise<number>
+): Promise<number> {
+  if (resolveCost) {
+    const raw = await resolveCost(request);
+    const normalized = normalizeTokenAmount(raw);
+    if (normalized > 0) return normalized;
+  }
+  return normalizeTokenAmount(getGenerationCost(operationType));
+}
+
+function shouldDeferPipelineSpend(request: Request): boolean {
+  return isClothingPhotoPipelineRequest(request);
+}
+
 export async function beginGenerationBilling(params: {
   request: Request;
   operationType: GenerationOperationType;
   route: string;
+  resolveCost?: (request: Request) => number | Promise<number>;
 }): Promise<
   | { ok: true; ctx: GenerationBillingContext }
   | { ok: false; response: NextResponse }
 > {
   const locale = resolveLocale(params.request);
   const copy = billingCopy(locale);
-  const costTokens = getGenerationCost(params.operationType);
+  const costTokens = await resolveOperationCostTokens(
+    params.request,
+    params.operationType,
+    params.resolveCost
+  );
+  const deferSpend = shouldDeferPipelineSpend(params.request);
 
   if (isMockMode()) {
     return {
@@ -123,28 +179,18 @@ export async function beginGenerationBilling(params: {
 
   if (session?.userId && isValidUserUuid(session.userId)) {
     const balance = await getUserTokenBalance(session.userId);
-    if (balance < costTokens) {
-      return {
-        ok: false,
-        response: NextResponse.json(
-          {
-            ok: false,
-            errorCode: "INSUFFICIENT_TOKENS",
-            title: copy.insufficientTitle,
-            message: copy.insufficientBody,
-            cta: { label: copy.topUp, href: `/${locale}/tokens` },
-            balanceTokens: balance,
-            requiredTokens: costTokens,
-          },
-          { status: 402 }
-        ),
-      };
+    if (costTokens > 0 && balance + 1e-6 < costTokens) {
+      return { ok: false, response: insufficientResponse(locale, balance, costTokens) };
     }
+
+    const mode: GenerationBillingMode = deferSpend
+      ? "pipeline_deferred"
+      : "paid_token";
 
     return {
       ok: true,
       ctx: {
-        mode: "paid_token",
+        mode,
         userId: session.userId,
         operationType: params.operationType,
         route: params.route,
@@ -250,7 +296,11 @@ export async function finalizeGenerationBilling(
     return rest;
   }
 
-  if (ctx.mode === "skip" || !responseBody.ok) {
+  if (
+    ctx.mode === "skip" ||
+    ctx.mode === "pipeline_deferred" ||
+    !responseBody.ok
+  ) {
     return responseBody;
   }
 
@@ -261,6 +311,9 @@ export async function finalizeGenerationBilling(
   }
 
   if (ctx.mode === "paid_token" && ctx.userId && !ctx.spendCommitted) {
+    if (ctx.costTokens <= 0) {
+      return responseBody;
+    }
     const result = await spendUserTokens({
       userId: ctx.userId,
       tokens: ctx.costTokens,
@@ -270,8 +323,9 @@ export async function finalizeGenerationBilling(
       return {
         ok: false,
         errorCode: "INSUFFICIENT_TOKENS",
-        message: billingCopy(ctx.locale).insufficientBody,
+        message: insufficientMessage(ctx.locale, ctx.costTokens),
         cta: { label: billingCopy(ctx.locale).topUp, href: `/${ctx.locale}/tokens` },
+        requiredTokens: ctx.costTokens,
       };
     }
     ctx.spendCommitted = true;
@@ -280,14 +334,13 @@ export async function finalizeGenerationBilling(
   return responseBody;
 }
 
-export async function withGenerationBilling(
-  params: {
-    request: Request;
-    operationType: GenerationOperationType;
-    route: string;
-    run: () => Promise<NextResponse>;
-  }
-): Promise<NextResponse> {
+export async function withGenerationBilling(params: {
+  request: Request;
+  operationType: GenerationOperationType;
+  route: string;
+  run: () => Promise<NextResponse>;
+  resolveCost?: (request: Request) => number | Promise<number>;
+}): Promise<NextResponse> {
   const access = await beginGenerationBilling(params);
   if (!access.ok) return access.response;
 

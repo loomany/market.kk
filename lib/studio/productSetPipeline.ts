@@ -8,6 +8,10 @@ import type { ModelOutputSizeSelection } from "@/lib/ai/modelOutputSizes";
 import type { ModelGenerationSettings } from "@/components/studio/types";
 import { buildGenerateModelRequestBody } from "@/lib/studio/buildGenerateModelRequest";
 import { appendStudioTryOnFields } from "@/lib/studio/buildTryOnFormData";
+import {
+  buildClothingPipelineHints,
+  clothingPipelineBillingHeadersFromHints,
+} from "@/lib/studio/clothingBillingClient";
 import type { StudioProductPhoto } from "@/lib/studio/productPhotos";
 import type { ProductSetSlotPhase } from "@/lib/studio/productSetProgress";
 
@@ -185,8 +189,17 @@ export async function runProductSetTryOn(input: {
     tryOnMaxExperimental: input.tryOnMaxExperimental,
   });
 
+  const billingHints = buildClothingPipelineHints({
+    productAnalysis: input.slot.analysis,
+    needsModelGeneration: false,
+    categoryContext: input.settings.categoryContext,
+    modelInputMode: "create",
+    tryOnMaxExperimental: Boolean(input.tryOnMaxExperimental),
+  });
+
   const res = await fetch("/api/ai/tryon", {
     method: "POST",
+    headers: clothingPipelineBillingHeadersFromHints(billingHints),
     body: formData,
     signal: input.signal,
   });

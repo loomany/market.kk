@@ -34,6 +34,10 @@ import {
 import { appendStudioTryOnFields } from "@/lib/studio/buildTryOnFormData";
 import { cn } from "@/lib/utils";
 import { fetchGenerateSingleStudioModel } from "@/lib/studio/generateSingleStudioModel";
+import {
+  buildClothingPipelineHints,
+  clothingPipelineBillingHeadersFromHints,
+} from "@/lib/studio/clothingBillingClient";
 import { isStudioAiDebugEnabled } from "@/lib/studio/studioAiDebug";
 import { isTryOnMaxToggleEnabled } from "@/lib/studio/tryOnMaxToggle";
 import {
@@ -1773,6 +1777,14 @@ function StudioShellInner({
       const analysisForTryOn =
         options?.analysisOverride ?? productAnalysis;
 
+      const clothingBillingHints = buildClothingPipelineHints({
+        productAnalysis: analysisForTryOn,
+        needsModelGeneration: false,
+        categoryContext: modelSettings.categoryContext,
+        modelInputMode,
+        tryOnMaxExperimental,
+      });
+
       const formData = new FormData();
       appendStudioTryOnFields(formData, {
         productFile,
@@ -1803,6 +1815,7 @@ function StudioShellInner({
       try {
         res = await fetch("/api/ai/tryon", {
           method: "POST",
+          headers: clothingPipelineBillingHeadersFromHints(clothingBillingHints),
           body: formData,
         });
       } finally {
@@ -2135,6 +2148,13 @@ function StudioShellInner({
               useProductSampleAngles,
               cameraAnglePromptOverride: mapped.cameraAnglePrompt,
               signal: controller.signal,
+              clothingPipelineBilling: buildClothingPipelineHints({
+                productAnalysis: analysis,
+                needsModelGeneration: true,
+                categoryContext: genSettings.categoryContext,
+                modelInputMode,
+                tryOnMaxExperimental,
+              }),
             });
             modelUrlForTryOn = url;
             setGeneratedModelUrl(url);

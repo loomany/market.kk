@@ -8,6 +8,8 @@ import { productPoseDescriptionForGeneration } from "@/lib/ai/productPoseSummary
 import type { ModelGenerationSettings } from "@/components/studio/types";
 import { buildGenerateModelRequestBody } from "@/lib/studio/buildGenerateModelRequest";
 import { throwIfTokenBillingError } from "@/lib/tokens/billingErrorPayload";
+import type { ClothingPipelineBillingHints } from "@/lib/tokens/clothingPipelineBilling";
+import { buildClothingPipelineBillingHeaders } from "@/lib/tokens/clothingPipelineBilling";
 
 export async function fetchGenerateSingleStudioModel(input: {
   settings: ModelGenerationSettings;
@@ -22,6 +24,7 @@ export async function fetchGenerateSingleStudioModel(input: {
   useProductSampleAngles: boolean;
   cameraAnglePromptOverride?: string;
   signal?: AbortSignal;
+  clothingPipelineBilling?: ClothingPipelineBillingHints;
 }): Promise<{ url: string; response: GenerateModelResponse }> {
   const fields = buildStudioModelGenerationFields({
     analysis: input.productAnalysis,
@@ -31,9 +34,13 @@ export async function fetchGenerateSingleStudioModel(input: {
     userEditedProductDescription: input.userEditedProductDescription,
   });
 
+  const billingHeaders = input.clothingPipelineBilling
+    ? buildClothingPipelineBillingHeaders(input.clothingPipelineBilling)
+    : {};
+
   const res = await fetch("/api/ai/generate-model", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...billingHeaders },
     body: JSON.stringify(
       buildGenerateModelRequestBody({
         settings: {
