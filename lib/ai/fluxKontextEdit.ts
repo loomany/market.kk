@@ -14,6 +14,7 @@ import type {
   ImageEnhanceOutputFormat,
 } from "@/lib/ai/imageEnhanceSchemas";
 import type { PaidAiGuardInput } from "@/lib/ai/paidAiGuard";
+import { FAL_IMAGE_COST } from "@/lib/ai/generationCostPricing";
 
 /**
  * Optional diagnostic sink — injected by /api/ai/image/enhance when its
@@ -41,9 +42,9 @@ export const FLUX_KONTEXT_GUIDANCE_DEFAULT = 3.5;
 export const FLUX_KONTEXT_GUIDANCE_PRESERVE = 3.7;
 export const FLUX_KONTEXT_GUIDANCE_RETRY_DARK = 3.3;
 
-/** FLUX Kontext Pro is billed per image (~$0.04). */
+/** FLUX Kontext Pro — Fal list price per image. */
 export function estimateFluxKontextEditCostUsd(): number {
-  return 0.04;
+  return FAL_IMAGE_COST.fluxKontext;
 }
 
 /** Maps SaaS jpg to Fal's `jpeg` enum. Kontext does NOT accept webp. */

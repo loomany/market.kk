@@ -16,6 +16,7 @@ import type {
 } from "@/lib/ai/imageEnhanceSchemas";
 import type { PaidAiGuardInput } from "@/lib/ai/paidAiGuard";
 import type { FalDebugSink } from "@/lib/ai/fluxKontextEdit";
+import { FAL_IMAGE_COST } from "@/lib/ai/generationCostPricing";
 
 const EDIT_TIMEOUT_MS = 120_000;
 
@@ -48,12 +49,11 @@ export function mapEnhanceOutputFormat(
   return format;
 }
 
-/** USD cost estimate for budget guard — pricing must be verified with Fal pricing API before paid runs. */
+/** USD cost estimate for budget guard — Fal nano-banana-pro/edit list price. */
 export function estimateNanoBananaEnhanceCostUsd(
-  quality: ImageEnhanceQualityTier
+  _quality: ImageEnhanceQualityTier
 ): number {
-  if (quality === "fast") return 0.04;
-  return 0.06;
+  return FAL_IMAGE_COST.nanoBananaProEdit;
 }
 
 export type ImageEnhanceFalResult =

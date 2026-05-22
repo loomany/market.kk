@@ -32,6 +32,7 @@ import {
   paidAiGuardResponse,
   type PaidAiGuardInput,
 } from "@/lib/ai/paidAiGuard";
+import { FAL_IMAGE_COST, OPENAI_COST } from "@/lib/ai/generationCostPricing";
 import { wrapAiPost } from "@/lib/tokens/wrapAiPost";
 
 export const runtime = "nodejs";
@@ -50,8 +51,11 @@ function estimateTryOnCostUsd(
   numSamples: number,
   tryOnMaxExperimental?: boolean
 ) {
-  const unit = tryOnMaxExperimental ? 0.16 : 0.08;
-  return Number((unit * Math.max(1, numSamples)).toFixed(2));
+  const unit = tryOnMaxExperimental
+    ? FAL_IMAGE_COST.fashnTryOnMax
+    : FAL_IMAGE_COST.fashnTryOnV16;
+  const fal = Number((unit * Math.max(1, numSamples)).toFixed(4));
+  return Number((fal + OPENAI_COST.tryOnJudge).toFixed(4));
 }
 
 function isMockMode() {

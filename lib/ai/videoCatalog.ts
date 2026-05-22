@@ -1,4 +1,5 @@
 import type { VideoGenerateRequest } from "@/lib/ai/videoSchemas";
+import { videoFalCostUsd } from "@/lib/ai/generationCostPricing";
 
 export const VIDEO_PROVIDERS = [
   "kling",
@@ -571,15 +572,31 @@ export function mapSaasQualityToVideoApi(
 
 export function estimateVideoCostUsd(
   variantId: VideoVariantId,
-  durationSeconds: number
+  durationSeconds: number,
+  options?: {
+    quality?: VideoQuality;
+    generateAudio?: boolean;
+    referenceVideoDurationSeconds?: number;
+  }
 ) {
   const v = getVideoVariant(variantId);
-  if (!v.pricePerSecondUsd) return undefined;
-  const seconds =
-    v.capabilities.supportsDuration && durationSeconds > 0
-      ? durationSeconds
-      : v.durationOptions[0] ?? 6;
-  return Number((v.pricePerSecondUsd * seconds).toFixed(4));
+  const quality = options?.quality ?? "balanced";
+  const generateAudio = Boolean(options?.generateAudio);
+  let seconds = durationSeconds;
+  if (v.capabilities.supportsDuration && durationSeconds > 0) {
+    seconds = durationSeconds;
+  } else if (v.durationOptions.length > 0) {
+    seconds = v.durationOptions[0] ?? 6;
+  } else {
+    seconds = options?.referenceVideoDurationSeconds ?? 5;
+  }
+  return videoFalCostUsd({
+    variantId,
+    durationSeconds: seconds,
+    quality,
+    generateAudio,
+    referenceVideoDurationSeconds: options?.referenceVideoDurationSeconds,
+  });
 }
 
 /** Legacy alias */

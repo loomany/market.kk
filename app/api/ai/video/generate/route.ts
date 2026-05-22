@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { fal } from "@fal-ai/client";
 import { getFalClientOrThrow } from "@/lib/ai/falClient";
+import { OPENAI_COST } from "@/lib/ai/generationCostPricing";
 import { estimateVideoOrThrow } from "@/lib/ai/pricing";
 import {
   assertPaidAiAllowed,
@@ -123,7 +124,11 @@ async function handleVideoGeneratePost(request: Request) {
     );
   }
 
-  const estimatedCost = estimateVideoOrThrow(variantId, data.durationSeconds);
+  const estimatedCost =
+    estimateVideoOrThrow(variantId, data.durationSeconds, {
+      quality: data.quality,
+      generateAudio: data.generateAudio,
+    }) + OPENAI_COST.videoPromptPackage;
   const { capabilities } = variant;
 
   return withGenerationIdempotency(

@@ -65,7 +65,12 @@ import {
   type ImageOutputFormat,
   type SaasQualityTier,
 } from "./ImageSettingsForm";
-import { TokenChargeHint } from "./TokenChargeHint";
+import { StudioGenerationCostFooter } from "./StudioGenerationCostFooter";
+import {
+  estimatePostProcessImageCost,
+  estimatePostProcessVideoCost,
+} from "@/lib/ai/studioGenerationCostEstimate";
+import { generationCostUiCopy } from "@/lib/studio/i18n/generationCostI18n";
 import { tryApplyTokenBillingError } from "@/lib/tokens/billingErrorPayload";
 import type { TokenBillingErrorPayload } from "@/lib/tokens/billingErrorPayload";
 import {
@@ -181,6 +186,9 @@ export function ProcessedAssetsPanel({
   const [videoKeepReferenceSound, setVideoKeepReferenceSound] = useState(false);
   const [imageUseNegativePrompt, setImageUseNegativePrompt] = useState(false);
   const [imageNegativePrompt, setImageNegativePrompt] = useState("");
+  const [referenceVideoDurationSec, setReferenceVideoDurationSec] = useState<
+    number | undefined
+  >();
 
   /**
    * In-memory cache for product preservation analyses, keyed by asset id.
@@ -359,6 +367,88 @@ export function ProcessedAssetsPanel({
     applyVideoVariant("kling-v2.6-motion-control");
     setCharacterOrientation("video");
   }, [selectedAsset?.id, selectedAsset?.referenceVideoUrl]);
+
+  useEffect(() => {
+    const url = selectedAsset?.referenceVideoUrl?.trim();
+    if (!url) {
+      setReferenceVideoDurationSec(undefined);
+      return;
+    }
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    const onMeta = () => {
+      if (Number.isFinite(video.duration) && video.duration > 0) {
+        setReferenceVideoDurationSec(Math.min(30, Math.ceil(video.duration)));
+      }
+    };
+    video.addEventListener("loadedmetadata", onMeta);
+    video.src = url;
+    return () => {
+      video.removeEventListener("loadedmetadata", onMeta);
+      video.src = "";
+    };
+  }, [selectedAsset?.referenceVideoUrl]);
+
+  const generationCostEstimate = useMemo(() => {
+    if (!processingMode || !workflowReady) return null;
+    if (processingMode === "video") {
+      const apiQuality = mapSaasQualityToVideoApi(videoVariantId, saasQuality);
+      const audioOn =
+        videoGenerateAudio &&
+        activeVideoVariant.capabilities.supportsNativeAudio;
+      return estimatePostProcessVideoCost({
+        variantId: videoVariantId,
+        durationSeconds,
+        quality: apiQuality,
+        generateAudio: audioOn,
+        referenceVideoDurationSeconds: referenceVideoDurationSec,
+        mockMode,
+      });
+    }
+    const enhanceQuality =
+      saasQuality === "ultra" || saasQuality === "fast" || saasQuality === "balanced"
+        ? saasQuality === "ultra"
+          ? "high"
+          : saasQuality
+        : "high";
+    return estimatePostProcessImageCost({
+      editor: imageEditorId,
+      quality: enhanceQuality,
+      preserveProduct,
+      hasPreservationCached: Boolean(activePreservation),
+      runOpenAiPromptPackage: promptNormalization.shouldRunEnhancer,
+      mockMode,
+    });
+  }, [
+    processingMode,
+    workflowReady,
+    videoVariantId,
+    saasQuality,
+    durationSeconds,
+    videoGenerateAudio,
+    activeVideoVariant.capabilities.supportsNativeAudio,
+    referenceVideoDurationSec,
+    mockMode,
+    imageEditorId,
+    preserveProduct,
+    activePreservation,
+    promptNormalization.shouldRunEnhancer,
+  ]);
+
+  const videoCostContextNote = useMemo(() => {
+    if (processingMode !== "video" || !generationCostEstimate) return undefined;
+    const ui = generationCostUiCopy(locale);
+    const audioOn =
+      videoGenerateAudio &&
+      activeVideoVariant.capabilities.supportsNativeAudio;
+    return audioOn ? ui.audioOn : ui.audioOff;
+  }, [
+    processingMode,
+    generationCostEstimate,
+    locale,
+    videoGenerateAudio,
+    activeVideoVariant.capabilities.supportsNativeAudio,
+  ]);
 
   const handleVideoProviderChange = (provider: VideoProviderId) => {
     if (motionVideoUpload && provider !== "kling-motion") return;
@@ -1254,13 +1344,17 @@ export function ProcessedAssetsPanel({
                   {processingMode === "video" ? pa.createVideo : pa.createImage}
                 </span>
               </span>
-              {!generationLoading ? (
-                <TokenChargeHint
-                  inline
-                  operation={processingMode === "video" ? "video" : "enhance"}
-                />
+              {generationCostEstimate ? (
+                <StudioGenerationCostFooter estimate={generationCostEstimate} inline />
               ) : null}
             </Button>
+          ) : null}
+
+          {processingMode && generationCostEstimate ? (
+            <StudioGenerationCostFooter
+              estimate={generationCostEstimate}
+              contextNote={videoCostContextNote}
+            />
           ) : null}
     </>
   );

@@ -4,6 +4,7 @@ import {
 } from "@/lib/ai/paidAiGuard";
 import {
   estimateVideoCostUsd,
+  type VideoQuality,
   type VideoVariantId,
 } from "@/lib/ai/videoCatalog";
 
@@ -15,9 +16,14 @@ export function estimateSceneCostUsd(mode: "exact-background" | "creative-scene"
 
 export function estimateVideoOrThrow(
   variantId: VideoVariantId,
-  durationSeconds: number
+  durationSeconds: number,
+  options?: {
+    quality?: VideoQuality;
+    generateAudio?: boolean;
+    referenceVideoDurationSeconds?: number;
+  }
 ) {
-  return estimateVideoCostUsd(variantId, durationSeconds);
+  return estimateVideoCostUsd(variantId, durationSeconds, options);
 }
 
 export function canSpendEstimated(cost?: number) {

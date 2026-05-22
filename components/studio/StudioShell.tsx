@@ -64,6 +64,11 @@ import {
   estimateTryOnOnlyCostUsd,
   STUDIO_PRODUCT_CARD_RESULT_COUNTDOWN_SEC,
 } from "@/lib/studio/clothingTryOnEstimates";
+import {
+  estimateClothingPhotoOnModelCost,
+  estimateProductCardCost,
+} from "@/lib/ai/studioGenerationCostEstimate";
+import { StudioGenerationCostFooter } from "./StudioGenerationCostFooter";
 import { mapSourceModelToGenerationSettings } from "@/lib/studio/mapSourceModelToGenerationSettings";
 import { isSourceModelPopulated } from "@/lib/ai/sourceModelPostProcess";
 import {
@@ -2188,6 +2193,38 @@ function StudioShellInner({
   const isClothingMode = studioMode === "clothing-tryon";
   const isProductShotMode = studioMode === "product-shot";
   const isPostProcessingMode = studioMode === "post-processing";
+
+  const clothingCostEstimate = useMemo(() => {
+    if (!isClothingMode) return null;
+    const needsModelGeneration =
+      modelInputMode === "create" &&
+      (!generatedModelUrl || !isRemoteImageUrl(generatedModelUrl));
+    return estimateClothingPhotoOnModelCost({
+      needsProductAnalyze: !productAnalysis,
+      needsModelGeneration,
+      useModelIdentityVision:
+        modelSettingsForGeneration.categoryContext === "lingerie" &&
+        modelInputMode === "create",
+      tryOnMaxExperimental,
+      mockMode,
+    });
+  }, [
+    isClothingMode,
+    modelInputMode,
+    generatedModelUrl,
+    productAnalysis,
+    modelSettingsForGeneration.categoryContext,
+    tryOnMaxExperimental,
+    mockMode,
+  ]);
+
+  const productCardCostEstimate = useMemo(() => {
+    if (!isProductShotMode) return null;
+    return estimateProductCardCost({
+      useVisionGarmentRefine: Boolean(selectedProductFile),
+      mockMode,
+    });
+  }, [isProductShotMode, selectedProductFile, mockMode]);
   const hasProductInput = productPhotos.length > 0;
   const primaryBlocker = (() => {
     if (!hasProductInput) return copy.status.uploadProductFirst;
@@ -2544,7 +2581,7 @@ function StudioShellInner({
                         <StudioWorkflowStep
                           step={3}
                           label={copy.workflow.createPhoto}
-                          tokenOperation="try-on"
+                          tokenCharge={clothingCostEstimate?.tokens}
                           isLast
                         >
                           <div className="space-y-3">
@@ -2565,7 +2602,7 @@ function StudioShellInner({
                               </label>
                             ) : null}
                             <Button
-                              className="w-full"
+                              className="w-full justify-between gap-2 px-4 sm:gap-3 sm:px-5"
                               size="lg"
                               loading={loading || modelGenerating}
                               disabled={!canRunPrimary}
@@ -2576,9 +2613,24 @@ function StudioShellInner({
                               }
                               onClick={handlePrimaryAction}
                             >
-                              <PrimaryIcon className="h-5 w-5" />
-                              {primaryButtonLabel}
+                              <span className="flex min-w-0 items-center gap-2">
+                                <PrimaryIcon className="h-5 w-5 shrink-0" />
+                                <span className="truncate">{primaryButtonLabel}</span>
+                              </span>
+                              {!loading && !modelGenerating && clothingCostEstimate ? (
+                                <StudioGenerationCostFooter
+                                  estimate={clothingCostEstimate}
+                                  inline
+                                />
+                              ) : null}
                             </Button>
+                            {clothingCostEstimate &&
+                            !loading &&
+                            !modelGenerating ? (
+                              <StudioGenerationCostFooter
+                                estimate={clothingCostEstimate}
+                              />
+                            ) : null}
                             {primaryStatusMessage ? (
                               <div
                                 id="studio-primary-status"
@@ -2682,12 +2734,12 @@ function StudioShellInner({
                       <StudioWorkflowStep
                         step={4}
                         label={copy.workflow.done}
-                        tokenOperation="background"
+                        tokenCharge={productCardCostEstimate?.tokens}
                         isLast
                       >
                         <div className="space-y-3">
                           <Button
-                            className="w-full"
+                            className="w-full justify-between gap-2 px-4 sm:gap-3 sm:px-5"
                             size="lg"
                             loading={productCardPrimaryBusy}
                             disabled={!canRunPrimary}
@@ -2699,11 +2751,24 @@ function StudioShellInner({
                             }
                             onClick={handlePrimaryAction}
                           >
-                            {!productCardPrimaryBusy ? (
-                              <PrimaryIcon className="h-5 w-5" />
+                            <span className="flex min-w-0 items-center gap-2">
+                              {!productCardPrimaryBusy ? (
+                                <PrimaryIcon className="h-5 w-5 shrink-0" />
+                              ) : null}
+                              <span className="truncate">{primaryButtonLabel}</span>
+                            </span>
+                            {!productCardPrimaryBusy && productCardCostEstimate ? (
+                              <StudioGenerationCostFooter
+                                estimate={productCardCostEstimate}
+                                inline
+                              />
                             ) : null}
-                            {primaryButtonLabel}
                           </Button>
+                          {productCardCostEstimate && !productCardPrimaryBusy ? (
+                            <StudioGenerationCostFooter
+                              estimate={productCardCostEstimate}
+                            />
+                          ) : null}
                           {primaryStatusMessage ? (
                             <div
                               id="studio-primary-status-product"
