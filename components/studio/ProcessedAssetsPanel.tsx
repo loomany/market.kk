@@ -179,6 +179,7 @@ export function ProcessedAssetsPanel({
   );
 
   const firstSelectableId = selectableAssets[0]?.id ?? assets[0]?.id ?? "";
+  const pendingEditorSelectionRef = useRef<string | null>(null);
   const [selectedAssetId, setSelectedAssetId] = useState(firstSelectableId);
   const [processingMode, setProcessingMode] = useState<PostProcessingMode | null>(
     null
@@ -304,10 +305,30 @@ export function ProcessedAssetsPanel({
   const showDevDebug = process.env.NODE_ENV !== "production";
 
   useEffect(() => {
-    if (!assets.some((a) => a.id === selectedAssetId)) {
-      setSelectedAssetId(firstSelectableId);
+    const pending = pendingEditorSelectionRef.current;
+    if (pending) {
+      if (assets.some((a) => a.id === pending)) {
+        setSelectedAssetId(pending);
+        pendingEditorSelectionRef.current = null;
+      }
+      return;
     }
-  }, [assets, selectedAssetId, firstSelectableId]);
+    if (
+      (desktopEditorOpen || mobileSheetOpen) &&
+      assets.some((a) => a.id === selectedAssetId)
+    ) {
+      return;
+    }
+    if (!selectedAssetId || !assets.some((a) => a.id === selectedAssetId)) {
+      if (firstSelectableId) setSelectedAssetId(firstSelectableId);
+    }
+  }, [
+    assets,
+    selectedAssetId,
+    firstSelectableId,
+    desktopEditorOpen,
+    mobileSheetOpen,
+  ]);
 
   const selectedAsset =
     assets.find((asset) => asset.id === selectedAssetId) ??
@@ -542,6 +563,23 @@ export function ProcessedAssetsPanel({
     applyVideoVariant(nextVariantId);
   };
 
+  const persistOpenEditorDraft = (
+    assetId: string,
+    mode: PostProcessingMode,
+    surface: "desktop" | "mobile",
+    textOnly: boolean
+  ) => {
+    pendingEditorSelectionRef.current = assetId;
+    savePostProcessingEditorDraft({
+      open: true,
+      selectedAssetId: assetId,
+      processingMode: mode,
+      surface,
+      textOnly,
+      editorLivePreviewId: null,
+    });
+  };
+
   const startTextOnlyWorkflow = (mode: PostProcessingMode) => {
     setEditorLivePreview(null);
     const u = copy.postProcessingUpload;
@@ -567,8 +605,10 @@ export function ProcessedAssetsPanel({
       applyVideoVariant(DEFAULT_VARIANT_BY_PROVIDER.kling);
     }
     if (isMobileLayout) {
+      persistOpenEditorDraft(draft.id, mode, "mobile", true);
       setMobileSheetOpen(true);
     } else {
+      persistOpenEditorDraft(draft.id, mode, "desktop", true);
       setDesktopEditorOpen(true);
     }
   };
@@ -986,6 +1026,7 @@ export function ProcessedAssetsPanel({
     setProcessingMode(mode);
     setError(null);
     setEditorSwitchHint(null);
+    persistOpenEditorDraft(assetId, mode, "mobile", false);
     setMobileSheetOpen(true);
   };
 
@@ -993,9 +1034,10 @@ export function ProcessedAssetsPanel({
     setEditorLivePreview(null);
     setSelectedAssetId(assetId);
     setProcessingMode(mode);
-    setDesktopEditorOpen(true);
     setError(null);
     setEditorSwitchHint(null);
+    persistOpenEditorDraft(assetId, mode, "desktop", false);
+    setDesktopEditorOpen(true);
   };
 
   const closeDesktopEditor = () => {
@@ -1003,6 +1045,7 @@ export function ProcessedAssetsPanel({
     setProcessingMode(null);
     setTextOnlyEditorAsset(null);
     setEditorLivePreview(null);
+    pendingEditorSelectionRef.current = null;
     clearPostProcessingTextOnlyDraft();
     clearPostProcessingEditorDraft();
     setEditorSwitchHint(null);
@@ -1014,6 +1057,7 @@ export function ProcessedAssetsPanel({
     setProcessingMode(null);
     setTextOnlyEditorAsset(null);
     setEditorLivePreview(null);
+    pendingEditorSelectionRef.current = null;
     clearPostProcessingTextOnlyDraft();
     clearPostProcessingEditorDraft();
     setEditorSwitchHint(null);
@@ -1062,46 +1106,25 @@ export function ProcessedAssetsPanel({
       setVideoProvider("kling");
       setVideoVariantId(DEFAULT_VARIANT_BY_PROVIDER.kling);
     }
-    if (isMobileLayout) {
-      setMobileSheetOpen(true);
-    } else {
-      setDesktopEditorOpen(true);
-    }
-  }, [isMobileLayout]);
+  }, []);
 
   const editorUiRestoredRef = useRef(false);
   useEffect(() => {
     if (editorUiRestoredRef.current) return;
     const draft = loadPostProcessingEditorDraft();
-    if (!draft?.open) return;
-
-    const asset =
-      assets.find((a) => a.id === draft.selectedAssetId) ??
-      (draft.textOnly
-        ? loadPostProcessingTextOnlyDraft()?.draftAsset
-        : undefined);
-
-    if (!asset) {
-      if (assets.length === 0) return;
-      clearPostProcessingEditorDraft();
+    if (!draft?.open) {
       editorUiRestoredRef.current = true;
       return;
     }
 
     editorUiRestoredRef.current = true;
-    setSelectedAssetId(asset.id);
+    pendingEditorSelectionRef.current = draft.selectedAssetId;
+    setSelectedAssetId(draft.selectedAssetId);
     setProcessingMode(draft.processingMode);
 
-    if (draft.editorLivePreviewId) {
-      const preview = assets.find((a) => a.id === draft.editorLivePreviewId);
-      if (preview) setEditorLivePreview(preview);
-    } else {
-      const inFlight = assets.find(
-        (a) =>
-          a.status === "processing" &&
-          (a.parentAssetId === asset.id || a.id === asset.id)
-      );
-      if (inFlight) setEditorLivePreview(inFlight);
+    if (draft.textOnly) {
+      const textDraft = loadPostProcessingTextOnlyDraft();
+      if (textDraft) setTextOnlyEditorAsset(textDraft.draftAsset);
     }
 
     if (draft.surface === "mobile" || isMobileLayout) {
@@ -1111,14 +1134,37 @@ export function ProcessedAssetsPanel({
       setDesktopEditorOpen(true);
       setMobileSheetOpen(false);
     }
-  }, [assets, isMobileLayout]);
+  }, [isMobileLayout]);
+
+  useEffect(() => {
+    const draft = loadPostProcessingEditorDraft();
+    if (!draft?.open) return;
+
+    const asset =
+      assets.find((a) => a.id === draft.selectedAssetId) ??
+      (draft.textOnly
+        ? loadPostProcessingTextOnlyDraft()?.draftAsset
+        : undefined);
+
+    if (draft.editorLivePreviewId) {
+      const preview = assets.find((a) => a.id === draft.editorLivePreviewId);
+      if (preview) setEditorLivePreview(preview);
+      return;
+    }
+
+    if (!asset) return;
+
+    const inFlight = assets.find(
+      (a) =>
+        a.status === "processing" &&
+        (a.parentAssetId === asset.id || a.id === asset.id)
+    );
+    if (inFlight) setEditorLivePreview(inFlight);
+  }, [assets]);
 
   useEffect(() => {
     const editorOpen = desktopEditorOpen || mobileSheetOpen;
-    if (!editorOpen || !processingMode) {
-      clearPostProcessingEditorDraft();
-      return;
-    }
+    if (!editorOpen || !processingMode) return;
     const assetId = editorAsset?.id;
     if (!assetId) return;
     savePostProcessingEditorDraft({

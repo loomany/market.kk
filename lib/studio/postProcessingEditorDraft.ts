@@ -45,3 +45,30 @@ export function clearPostProcessingEditorDraft(): void {
   if (typeof window === "undefined") return;
   window.sessionStorage.removeItem(DRAFT_KEY);
 }
+
+/** Hydrate editor UI on first client render (before effects wipe sessionStorage). */
+export function readInitialPostProcessingEditorUi(): {
+  desktopEditorOpen: boolean;
+  mobileSheetOpen: boolean;
+  processingMode: PostProcessingMode | null;
+  selectedAssetId: string | null;
+  editorLivePreviewId: string | null;
+} {
+  const draft = loadPostProcessingEditorDraft();
+  if (!draft?.open) {
+    return {
+      desktopEditorOpen: false,
+      mobileSheetOpen: false,
+      processingMode: null,
+      selectedAssetId: null,
+      editorLivePreviewId: null,
+    };
+  }
+  return {
+    desktopEditorOpen: draft.surface === "desktop",
+    mobileSheetOpen: draft.surface === "mobile",
+    processingMode: draft.processingMode,
+    selectedAssetId: draft.selectedAssetId,
+    editorLivePreviewId: draft.editorLivePreviewId ?? null,
+  };
+}
