@@ -33,6 +33,9 @@ const assetSchema = z.object({
   reviewStatus: z.string().optional(),
   referenceVideoUrl: z.string().url().optional(),
   parentAssetId: z.string().optional(),
+  postProcessOrigin: z
+    .enum(["upload", "text-only-image", "text-only-video"])
+    .optional(),
   status: z.enum(["ready", "processing", "error"]).optional(),
 });
 
@@ -90,6 +93,15 @@ function serializeAsset(row: {
     parentAssetId:
       typeof row.settings?.parentAssetId === "string"
         ? row.settings.parentAssetId
+        : undefined,
+    postProcessOrigin:
+      row.settings?.postProcessOrigin === "upload" ||
+      row.settings?.postProcessOrigin === "text-only-image" ||
+      row.settings?.postProcessOrigin === "text-only-video"
+        ? (row.settings.postProcessOrigin as
+            | "upload"
+            | "text-only-image"
+            | "text-only-video")
         : undefined,
     status:
       row.settings?.status === "ready" ||
@@ -180,6 +192,9 @@ export async function POST(request: Request) {
   }
   if (asset.parentAssetId) {
     settings.parentAssetId = asset.parentAssetId;
+  }
+  if (asset.postProcessOrigin) {
+    settings.postProcessOrigin = asset.postProcessOrigin;
   }
   if (asset.status) {
     settings.status = asset.status;

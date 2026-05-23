@@ -4,11 +4,7 @@ import { isVideoAsset } from "@/lib/studio/assetDisplayLabels";
 const MAX_CAROUSEL = 5;
 
 function isCarouselCandidate(asset: StudioSessionAsset): boolean {
-  return (
-    asset.status !== "processing" &&
-    asset.status !== "error" &&
-    !isVideoAsset(asset)
-  );
+  return asset.status !== "processing" && asset.status !== "error";
 }
 
 /** Up to 5 related still frames: source + outputs from same parent. */
