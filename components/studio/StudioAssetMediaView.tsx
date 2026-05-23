@@ -20,9 +20,11 @@ function formatCountdown(seconds: number): string {
 function CompactCountdown({
   startedAt,
   totalSeconds,
+  large = false,
 }: {
   startedAt: string;
   totalSeconds: number;
+  large?: boolean;
 }) {
   const [remaining, setRemaining] = useState(totalSeconds);
 
@@ -39,7 +41,12 @@ function CompactCountdown({
   }, [startedAt, totalSeconds]);
 
   return (
-    <span className="font-mono text-lg font-semibold tabular-nums text-teal-800">
+    <span
+      className={cn(
+        "font-mono font-semibold tabular-nums text-teal-800",
+        large ? "text-5xl tracking-tight sm:text-6xl" : "text-lg"
+      )}
+    >
       {formatCountdown(remaining)}
     </span>
   );
@@ -150,19 +157,37 @@ export function StudioAssetMediaView({
       ) : null}
 
       {processing ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gradient-to-b from-slate-50 to-teal-50/80 px-3 text-center">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-b from-slate-50 to-teal-50/80 px-4 text-center">
           <div
             className="absolute inset-0 animate-pulse bg-slate-200/40"
             aria-hidden
           />
-          <p className="relative z-10 text-xs font-medium text-slate-700">
+          <p
+            className={cn(
+              "relative z-10 font-medium text-slate-700",
+              variant === "gallery" || variant === "hero"
+                ? "text-sm"
+                : "text-xs"
+            )}
+          >
             {s.processing}
           </p>
           {asset.startedAt ? (
-            <div className="relative z-10">
+            <div className="relative z-10 flex flex-col items-center gap-1">
+              <span
+                className={cn(
+                  "text-slate-500",
+                  variant === "gallery" || variant === "hero"
+                    ? "text-xs"
+                    : "text-[10px]"
+                )}
+              >
+                {s.countdownHint}
+              </span>
               <CompactCountdown
                 startedAt={asset.startedAt}
                 totalSeconds={POST_PROCESSING_COUNTDOWN_SEC}
+                large={variant === "gallery" || variant === "hero"}
               />
             </div>
           ) : null}

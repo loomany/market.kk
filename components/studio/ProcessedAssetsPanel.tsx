@@ -52,6 +52,7 @@ import { useStudioMobileLayout } from "./useStudioMobileLayout";
 import { PostProcessingMobileGallery } from "./PostProcessingMobileGallery";
 import { PostProcessingDesktopGallery } from "./PostProcessingDesktopGallery";
 import { PostProcessingDesktopEditor } from "./PostProcessingDesktopEditor";
+import { StudioAssetMediaView } from "./StudioAssetMediaView";
 import { postProcessingSectionCardClass } from "./StudioSaaSPreviewChrome";
 import { ImageEditorSelect } from "./ImageEditorSelect";
 import { VideoProviderSelect } from "./VideoProviderSelect";
@@ -192,6 +193,9 @@ export function ProcessedAssetsPanel({
   const [editorSwitchHint, setEditorSwitchHint] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
   const [generationLoading, setGenerationLoading] = useState(false);
+  /** Left editor preview: countdown while generating, then result (replaces source). */
+  const [editorLivePreview, setEditorLivePreview] =
+    useState<StudioSessionAsset | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [saasQuality, setSaasQuality] = useState<SaasQualityTier>("balanced");
@@ -306,6 +310,7 @@ export function ProcessedAssetsPanel({
     assets[0];
 
   const editorAsset = textOnlyEditorAsset ?? selectedAsset;
+  const editorDisplayAsset = editorLivePreview ?? editorAsset;
 
   const gallerySourceImageUrl = editorAsset
     ? assetProcessingSourceUrl(editorAsset)
@@ -533,6 +538,7 @@ export function ProcessedAssetsPanel({
   };
 
   const startTextOnlyWorkflow = (mode: PostProcessingMode) => {
+    setEditorLivePreview(null);
     const u = copy.postProcessingUpload;
     const draft = createTextOnlyDraftAsset({
       mode,
@@ -634,7 +640,7 @@ export function ProcessedAssetsPanel({
         });
       }
 
-      onAssetCreated({
+      const pendingGalleryAsset: StudioSessionAsset = {
         id: pendingId,
         type: isVideo ? "video" : "scene",
         url: "",
@@ -650,7 +656,9 @@ export function ProcessedAssetsPanel({
             ? "text-only-video"
             : "text-only-image"
           : undefined,
-      });
+      };
+      onAssetCreated(pendingGalleryAsset);
+      setEditorLivePreview(pendingGalleryAsset);
       if (isVideo) {
         const apiQuality = mapSaasQualityToVideoApi(videoVariantId, saasQuality);
         let sourceImageUrlForVideo = effectiveSourceImageUrl ?? "";
@@ -968,6 +976,7 @@ export function ProcessedAssetsPanel({
   };
 
   const openMobileWorkflow = (assetId: string, mode: PostProcessingMode) => {
+    setEditorLivePreview(null);
     setSelectedAssetId(assetId);
     setProcessingMode(mode);
     setError(null);
@@ -976,6 +985,7 @@ export function ProcessedAssetsPanel({
   };
 
   const openDesktopEditor = (assetId: string, mode: PostProcessingMode) => {
+    setEditorLivePreview(null);
     setSelectedAssetId(assetId);
     setProcessingMode(mode);
     setDesktopEditorOpen(true);
@@ -987,6 +997,7 @@ export function ProcessedAssetsPanel({
     setDesktopEditorOpen(false);
     setProcessingMode(null);
     setTextOnlyEditorAsset(null);
+    setEditorLivePreview(null);
     clearPostProcessingTextOnlyDraft();
     setEditorSwitchHint(null);
     setError(null);
@@ -996,6 +1007,7 @@ export function ProcessedAssetsPanel({
     setMobileSheetOpen(false);
     setProcessingMode(null);
     setTextOnlyEditorAsset(null);
+    setEditorLivePreview(null);
     clearPostProcessingTextOnlyDraft();
     setEditorSwitchHint(null);
     setError(null);
@@ -1010,6 +1022,14 @@ export function ProcessedAssetsPanel({
       setMobileSheetOpen(false);
     }
   };
+
+  useEffect(() => {
+    const previewId = editorLivePreview?.id;
+    if (!previewId) return;
+    const synced = assets.find((a) => a.id === previewId);
+    if (!synced) return;
+    setEditorLivePreview((prev) => (prev?.id === previewId ? synced : prev));
+  }, [assets, editorLivePreview?.id]);
 
   const uploadDraftRestoredRef = useRef(false);
   useEffect(() => {
@@ -1319,7 +1339,7 @@ export function ProcessedAssetsPanel({
   const showDesktopEditor =
     !isMobileLayout &&
     desktopEditorOpen &&
-    Boolean(processingMode && editorAsset);
+    Boolean(processingMode && editorDisplayAsset);
 
   const mobileSheetTitle = processingMode ? postProcessEditorTitle : "";
 
@@ -1848,9 +1868,9 @@ export function ProcessedAssetsPanel({
 
   return (
     <div className="space-y-4">
-      {showDesktopEditor && editorAsset && processingMode ? (
+      {showDesktopEditor && editorDisplayAsset && processingMode ? (
         <PostProcessingDesktopEditor
-          asset={editorAsset}
+          asset={editorDisplayAsset}
           allAssets={assets}
           title={postProcessEditorTitle}
           onBack={closeDesktopEditor}
@@ -1902,6 +1922,13 @@ export function ProcessedAssetsPanel({
                 onClose={closeMobileSheet}
               >
                 <div className="space-y-6 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                  {editorLivePreview ? (
+                    <StudioAssetMediaView
+                      asset={editorLivePreview}
+                      variant="gallery"
+                      className="aspect-[9/16] w-full"
+                    />
+                  ) : null}
                   {settingsBody}
                 </div>
               </PostProcessingMobileSheet>

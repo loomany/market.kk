@@ -326,7 +326,8 @@ export const pass2RemainderRu = {
     optionalBadge: "необязательно",
   },
   studioAssetPreview: {
-    processing: "AI обрабатывает файл",
+    processing: "AI создаёт файл",
+    countdownHint: "Осталось примерно",
     failed: "Не удалось создать",
   },
   postProcessingActions: {
@@ -674,7 +675,8 @@ export const pass2RemainderEn = {
     optionalBadge: "optional",
   },
   studioAssetPreview: {
-    processing: "AI is processing the file",
+    processing: "AI is creating your file",
+    countdownHint: "About",
     failed: "Could not create",
   },
   postProcessingActions: {
@@ -1022,7 +1024,8 @@ export const pass2RemainderKk = {
     optionalBadge: "міндетті емес",
   },
   studioAssetPreview: {
-    processing: "AI файлды өңдеуде",
+    processing: "AI файл жасауда",
+    countdownHint: "Шамамен қалды",
     failed: "Жасалмады",
   },
   postProcessingActions: {
