@@ -43,8 +43,8 @@ export function PostProcessingGalleryCard({
   const d = copy.postProcessingDesktop;
 
   const group = useMemo(
-    () => getPostProcessingCarouselAssets(asset, allAssets),
-    [asset, allAssets]
+    () => getPostProcessingCarouselAssets(asset),
+    [asset]
   );
   const [frameIndex, setFrameIndex] = useState(0);
   const safeIndex = Math.min(frameIndex, Math.max(0, group.length - 1));
