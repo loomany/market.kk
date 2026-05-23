@@ -158,6 +158,7 @@ import {
 } from "@/lib/studio/studioProductPhotoMode";
 import {
   loadStudioWorkspaceSession,
+  readInitialStudioMode,
   saveStudioWorkspaceSession,
   type ClothingWorkspaceDraft,
 } from "@/lib/studio/studioWorkspaceSession";
@@ -288,7 +289,9 @@ function StudioShellInner({
   );
   const modelPreview = useObjectUrlPreview();
 
-  const [studioMode, setStudioMode] = useState<StudioMode>("clothing-tryon");
+  const [studioMode, setStudioMode] = useState<StudioMode>(() =>
+    readInitialStudioMode()
+  );
   const [studioSessionHydrated, setStudioSessionHydrated] = useState(false);
   const studioHydrationStartedRef = useRef(false);
   const skipPhotoPersistRef = useRef(false);

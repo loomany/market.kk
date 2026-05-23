@@ -97,6 +97,11 @@ import {
   savePostProcessingTextOnlyDraft,
 } from "@/lib/studio/postProcessingTextOnlyDraft";
 import {
+  clearPostProcessingEditorDraft,
+  loadPostProcessingEditorDraft,
+  savePostProcessingEditorDraft,
+} from "@/lib/studio/postProcessingEditorDraft";
+import {
   createTextOnlyDraftAsset,
   isTextOnlyPostProcessAsset,
 } from "@/lib/studio/postProcessingTextOnly";
@@ -999,6 +1004,7 @@ export function ProcessedAssetsPanel({
     setTextOnlyEditorAsset(null);
     setEditorLivePreview(null);
     clearPostProcessingTextOnlyDraft();
+    clearPostProcessingEditorDraft();
     setEditorSwitchHint(null);
     setError(null);
   };
@@ -1009,6 +1015,7 @@ export function ProcessedAssetsPanel({
     setTextOnlyEditorAsset(null);
     setEditorLivePreview(null);
     clearPostProcessingTextOnlyDraft();
+    clearPostProcessingEditorDraft();
     setEditorSwitchHint(null);
     setError(null);
   };
@@ -1055,7 +1062,81 @@ export function ProcessedAssetsPanel({
       setVideoProvider("kling");
       setVideoVariantId(DEFAULT_VARIANT_BY_PROVIDER.kling);
     }
-  }, []);
+    if (isMobileLayout) {
+      setMobileSheetOpen(true);
+    } else {
+      setDesktopEditorOpen(true);
+    }
+  }, [isMobileLayout]);
+
+  const editorUiRestoredRef = useRef(false);
+  useEffect(() => {
+    if (editorUiRestoredRef.current) return;
+    const draft = loadPostProcessingEditorDraft();
+    if (!draft?.open) return;
+
+    const asset =
+      assets.find((a) => a.id === draft.selectedAssetId) ??
+      (draft.textOnly
+        ? loadPostProcessingTextOnlyDraft()?.draftAsset
+        : undefined);
+
+    if (!asset) {
+      if (assets.length === 0) return;
+      clearPostProcessingEditorDraft();
+      editorUiRestoredRef.current = true;
+      return;
+    }
+
+    editorUiRestoredRef.current = true;
+    setSelectedAssetId(asset.id);
+    setProcessingMode(draft.processingMode);
+
+    if (draft.editorLivePreviewId) {
+      const preview = assets.find((a) => a.id === draft.editorLivePreviewId);
+      if (preview) setEditorLivePreview(preview);
+    } else {
+      const inFlight = assets.find(
+        (a) =>
+          a.status === "processing" &&
+          (a.parentAssetId === asset.id || a.id === asset.id)
+      );
+      if (inFlight) setEditorLivePreview(inFlight);
+    }
+
+    if (draft.surface === "mobile" || isMobileLayout) {
+      setMobileSheetOpen(true);
+      setDesktopEditorOpen(false);
+    } else {
+      setDesktopEditorOpen(true);
+      setMobileSheetOpen(false);
+    }
+  }, [assets, isMobileLayout]);
+
+  useEffect(() => {
+    const editorOpen = desktopEditorOpen || mobileSheetOpen;
+    if (!editorOpen || !processingMode) {
+      clearPostProcessingEditorDraft();
+      return;
+    }
+    const assetId = editorAsset?.id;
+    if (!assetId) return;
+    savePostProcessingEditorDraft({
+      open: true,
+      selectedAssetId: assetId,
+      processingMode,
+      surface: mobileSheetOpen ? "mobile" : "desktop",
+      textOnly: isTextOnlyPostProcessAsset(editorAsset),
+      editorLivePreviewId: editorLivePreview?.id ?? null,
+    });
+  }, [
+    desktopEditorOpen,
+    mobileSheetOpen,
+    processingMode,
+    editorAsset,
+    editorLivePreview?.id,
+    isTextOnlySession,
+  ]);
 
   const resumeInFlightRef = useRef<Set<string>>(new Set());
   const recoverInFlightRef = useRef<Set<string>>(new Set());

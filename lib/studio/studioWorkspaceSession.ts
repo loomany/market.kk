@@ -84,3 +84,19 @@ export function clearStudioWorkspaceSession(): void {
   if (typeof window === "undefined") return;
   window.sessionStorage.removeItem(STUDIO_WORKSPACE_SESSION_KEY);
 }
+
+const STUDIO_MODES = [
+  "clothing-tryon",
+  "product-shot",
+  "post-processing",
+] as const satisfies readonly StudioMode[];
+
+/** Read saved tab synchronously on first client render (avoids wrong tab after F5). */
+export function readInitialStudioMode(): StudioMode {
+  if (typeof window === "undefined") return "clothing-tryon";
+  const mode = loadStudioWorkspaceSession()?.activeMode;
+  if (mode && (STUDIO_MODES as readonly string[]).includes(mode)) {
+    return mode;
+  }
+  return "clothing-tryon";
+}
