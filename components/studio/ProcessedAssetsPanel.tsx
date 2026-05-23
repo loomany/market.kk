@@ -105,6 +105,11 @@ import {
   runTextToImageGenerationRequest,
   runVideoGenerationRequest,
 } from "@/lib/studio/postProcessingGenerationClient";
+import {
+  parseGenerationJobSuccess,
+  type ParsedGenerationJobSuccess,
+} from "@/lib/studio/parseGenerationJobResult";
+import type { PendingGenerationJob } from "@/lib/studio/pendingGenerationClient";
 
 type ProcessedAssetsPanelProps = {
   assets: StudioSessionAsset[];
@@ -602,6 +607,7 @@ export function ProcessedAssetsPanel({
 
     setGenerationLoading(true);
     setError(null);
+    activeGenerationRef.current.add(pendingId);
 
     try {
       if (isTextOnlySession && processingMode === "image") {
@@ -955,6 +961,7 @@ export function ProcessedAssetsPanel({
       failPendingAsset(pendingId, pa.fileFailed);
       setError(pa.fileFailed);
     } finally {
+      activeGenerationRef.current.delete(pendingId);
       setGenerationLoading(false);
       setMobileSheetOpen(false);
     }
@@ -1031,6 +1038,8 @@ export function ProcessedAssetsPanel({
   }, []);
 
   const resumeInFlightRef = useRef<Set<string>>(new Set());
+  const recoverInFlightRef = useRef<Set<string>>(new Set());
+  const activeGenerationRef = useRef<Set<string>>(new Set());
 
   const applyVideoSuccess = (
     pendingId: string,
@@ -1113,6 +1122,50 @@ export function ProcessedAssetsPanel({
     removePendingGenerationJob(pendingId);
   };
 
+  const applyParsedGenerationSuccess = (
+    assetId: string,
+    parsed: ParsedGenerationJobSuccess,
+    job: PendingGenerationJob | null,
+    promptFallback: string
+  ) => {
+    if (parsed.kind === "video") {
+      const prompt =
+        job?.kind === "text-only-video"
+          ? job.userPrompt
+          : job?.kind === "video"
+            ? job.body.prompt
+            : promptFallback;
+      applyVideoSuccess(assetId, parsed.data as VideoGenerateResponse, prompt);
+      if (job?.kind === "text-only-video") {
+        clearPostProcessingTextOnlyDraft();
+        setTextOnlyEditorAsset(null);
+      }
+      return;
+    }
+
+    const outputFmt: ImageOutputFormat =
+      job?.kind === "text-to-image"
+        ? job.outputFormatUi
+        : job?.kind === "image"
+          ? job.body.outputFormat === "jpg"
+            ? "jpeg"
+            : job.body.outputFormat
+          : outputFormat;
+
+    if (job?.kind === "text-to-image") {
+      applyTextToImageSuccess(
+        assetId,
+        parsed.data as TextToImageGenerateSuccessResponse,
+        outputFmt
+      );
+      clearPostProcessingTextOnlyDraft();
+      setTextOnlyEditorAsset(null);
+      return;
+    }
+
+    applyImageSuccess(assetId, parsed.data as ImageEnhanceResponse, outputFmt);
+  };
+
   const handleGenerationBillingBlock = useCallback(
     (billingResponse: unknown, pendingId: string): boolean => {
       if (!onTokenBillingError) return false;
@@ -1130,6 +1183,7 @@ export function ProcessedAssetsPanel({
   useEffect(() => {
     for (const asset of assets) {
       if (asset.status !== "processing") continue;
+      if (activeGenerationRef.current.has(asset.id)) continue;
 
       if (isStuckProcessingAsset(asset)) {
         removePendingGenerationJob(asset.id);
@@ -1153,40 +1207,15 @@ export function ProcessedAssetsPanel({
         try {
           const outcome = await resumePendingGeneration(job);
           if (outcome.kind === "success") {
-            const payload = outcome.data;
-            if (job.kind === "text-only-video" && payload.ok && "video" in payload) {
-              applyVideoSuccess(
+            const parsed = parseGenerationJobSuccess(
+              outcome.data as Record<string, unknown>
+            );
+            if (parsed) {
+              applyParsedGenerationSuccess(
                 asset.id,
-                payload as VideoGenerateResponse,
-                job.userPrompt
-              );
-              clearPostProcessingTextOnlyDraft();
-              setTextOnlyEditorAsset(null);
-            } else if (job.kind === "video" && payload.ok && "video" in payload) {
-              applyVideoSuccess(
-                asset.id,
-                payload as VideoGenerateResponse,
-                job.body.prompt
-              );
-            } else if (
-              job.kind === "text-to-image" &&
-              payload.ok &&
-              "imageUrl" in payload
-            ) {
-              applyTextToImageSuccess(
-                asset.id,
-                payload as TextToImageGenerateSuccessResponse,
-                job.outputFormatUi
-              );
-              clearPostProcessingTextOnlyDraft();
-              setTextOnlyEditorAsset(null);
-            } else if (job.kind === "image" && payload.ok && "imageUrl" in payload) {
-              const fmt =
-                job.body.outputFormat === "jpg" ? "jpeg" : job.body.outputFormat;
-              applyImageSuccess(
-                asset.id,
-                payload as ImageEnhanceResponse,
-                fmt as ImageOutputFormat
+                parsed,
+                job,
+                asset.prompt ?? ""
               );
             } else {
               failPendingAsset(asset.id, pa.fileFailed);
@@ -1215,6 +1244,49 @@ export function ProcessedAssetsPanel({
       })();
     }
   }, [assets, handleGenerationBillingBlock, onDeleteAsset, onUpdateAsset]);
+
+  /** Recover gallery tiles when Fal finished but HTTP timed out or billing raced. */
+  useEffect(() => {
+    for (const asset of assets) {
+      if (asset.status !== "error" && asset.status !== "processing") continue;
+      if (activeGenerationRef.current.has(asset.id)) continue;
+      if (resumeInFlightRef.current.has(asset.id)) continue;
+      if (recoverInFlightRef.current.has(asset.id)) continue;
+      if (asset.status === "processing" && getPendingGenerationJob(asset.id)) {
+        continue;
+      }
+
+      recoverInFlightRef.current.add(asset.id);
+      void (async () => {
+        try {
+          const res = await fetch(
+            `/api/studio/generation-jobs/${encodeURIComponent(asset.id)}`,
+            { cache: "no-store" }
+          );
+          if (!res.ok) return;
+          const data = (await res.json()) as {
+            status?: string;
+            result?: Record<string, unknown>;
+          };
+          if (data.status !== "completed" || !data.result) return;
+          const parsed = parseGenerationJobSuccess(data.result);
+          if (!parsed) return;
+          const job = getPendingGenerationJob(asset.id);
+          applyParsedGenerationSuccess(
+            asset.id,
+            parsed,
+            job,
+            asset.prompt ?? ""
+          );
+          setError(null);
+        } catch {
+          /* keep current tile state */
+        } finally {
+          recoverInFlightRef.current.delete(asset.id);
+        }
+      })();
+    }
+  }, [assets]);
 
   const handleSaveUploadedSource = () => {
     if (!uploadedSource) return;

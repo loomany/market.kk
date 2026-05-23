@@ -11,10 +11,10 @@ export function listPostProcessingGalleryAssets(
   return assets.filter((a) => !a.parentAssetId && a.status !== "processing");
 }
 
-/** Stale or abandoned `processing` rows (e.g. after billing block or reload). */
+/** Stale `processing` rows with a local resume job past the TTL. */
 export function isStuckProcessingAsset(asset: StudioSessionAsset): boolean {
   if (asset.status !== "processing") return false;
   const job = getPendingGenerationJob(asset.id);
-  if (!job) return true;
+  if (!job) return false;
   return isPendingGenerationStale(job.startedAt);
 }

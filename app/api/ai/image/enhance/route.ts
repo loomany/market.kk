@@ -58,6 +58,7 @@ import { resolveImageEnhanceBillingCost } from "@/lib/tokens/resolveRouteBilling
 import { withGenerationIdempotency } from "@/lib/studio/withGenerationIdempotency";
 
 export const runtime = "nodejs";
+export const maxDuration = 300;
 
 const ROUTE_ID = "/api/ai/image/enhance";
 

@@ -1,6 +1,7 @@
 import type { ImageEnhanceResponse } from "@/lib/ai/imageEnhanceSchemas";
 import type { TextToImageGenerateSuccessResponse } from "@/lib/ai/textToImageSchemas";
 import type { VideoGenerateResponse } from "@/lib/ai/videoSchemas";
+import { parseGenerationJobSuccess } from "@/lib/studio/parseGenerationJobResult";
 import {
   getPendingGenerationJob,
   patchPendingGenerationJob,
@@ -45,7 +46,14 @@ export async function pollGenerationJobResult(
       errorCode?: string;
     };
     if (data.status === "completed" && data.result) {
-      return { kind: "success", data: data.result };
+      const parsed = parseGenerationJobSuccess(data.result);
+      if (parsed) {
+        return { kind: "success", data: parsed.data as Record<string, unknown> };
+      }
+      return {
+        kind: "error",
+        message: "Ответ генерации не содержит медиа.",
+      };
     }
     if (data.status === "failed" || data.status === "stale") {
       return {

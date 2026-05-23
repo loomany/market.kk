@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentSession } from "@/lib/auth/session";
 import {
-  completeGenerationJob,
-  failGenerationJob,
   findGenerationJobByAssetId,
   isGenerationJobStale,
   upsertGenerationJobProcessing,
@@ -68,24 +66,5 @@ export async function withGenerationIdempotency(
   });
 
   const response = await run();
-  let body: Record<string, unknown>;
-  try {
-    body = (await response.json()) as Record<string, unknown>;
-  } catch {
-    return response;
-  }
-
-  if (body.ok) {
-    const { _skipBilling: _b, ...stored } = body;
-    await completeGenerationJob(userId, clientAssetId, stored);
-  } else {
-    await failGenerationJob(
-      userId,
-      clientAssetId,
-      String(body.errorCode ?? "GENERATION_FAILED"),
-      String(body.message ?? body.error ?? "Generation failed")
-    );
-  }
-
-  return NextResponse.json(body, { status: response.status });
+  return response;
 }

@@ -23,6 +23,7 @@ import { normalizeTokenAmount } from "@/lib/tokens/tokenAmount";
 import { withGenerationIdempotency } from "@/lib/studio/withGenerationIdempotency";
 
 export const runtime = "nodejs";
+export const maxDuration = 300;
 
 const ROUTE_ID = "/api/ai/image/text-generate";
 

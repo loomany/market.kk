@@ -21,6 +21,10 @@ import { assertLocale, indexableLocales } from "@/lib/i18n/localeConfig";
 import { formatTokenChargeNumber } from "@/lib/tokens/formatTokens";
 import { normalizeTokenAmount } from "@/lib/tokens/tokenAmount";
 import { isClothingPhotoPipelineRequest } from "@/lib/tokens/clothingPipelineBilling";
+import {
+  extractClientAssetIdFromRequest,
+  persistGenerationJobOutcome,
+} from "@/lib/studio/persistGenerationJobOutcome";
 
 export type GenerationBillingMode =
   | "skip"
@@ -344,6 +348,8 @@ export async function withGenerationBilling(params: {
   const access = await beginGenerationBilling(params);
   if (!access.ok) return access.response;
 
+  const clientAssetId = await extractClientAssetIdFromRequest(params.request);
+
   const response = await params.run();
   let body: Record<string, unknown>;
   try {
@@ -353,5 +359,10 @@ export async function withGenerationBilling(params: {
   }
 
   const finalized = await finalizeGenerationBilling(access.ctx, body);
+
+  if (clientAssetId) {
+    await persistGenerationJobOutcome(clientAssetId, finalized);
+  }
+
   return NextResponse.json(finalized, { status: response.status });
 }

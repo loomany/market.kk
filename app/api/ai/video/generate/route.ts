@@ -20,6 +20,8 @@ import { resolveVideoGenerateBillingCost } from "@/lib/tokens/resolveRouteBillin
 import { withGenerationIdempotency } from "@/lib/studio/withGenerationIdempotency";
 
 export const runtime = "nodejs";
+/** Kling/Veo can run several minutes; default serverless cap drops the HTTP response while Fal still finishes. */
+export const maxDuration = 300;
 
 const ROUTE_ID = "/api/ai/video/generate";
 

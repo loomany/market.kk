@@ -170,7 +170,9 @@ export function StudioAssetMediaView({
       ) : errored ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-3 text-center text-red-700">
           <AlertCircle className="h-8 w-8" aria-hidden />
-          <p className="text-xs font-medium">{s.failed}</p>
+          <p className="text-xs font-medium">
+            {asset.errorMessage?.trim() || s.failed}
+          </p>
         </div>
       ) : isVideo && asset.url ? (
         <video
