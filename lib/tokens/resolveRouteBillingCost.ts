@@ -62,11 +62,10 @@ export async function resolveModelGenerationBillingCost(
   }).tokens;
 }
 
-export async function resolveVideoGenerateBillingCost(
-  request: Request
-): Promise<number> {
+export function resolveVideoBillingTokensFromPayload(
+  body: Record<string, unknown>
+): number {
   try {
-    const body = await request.clone().json();
     const parsed = videoGenerateRequestSchema.safeParse(body);
     if (!parsed.success) {
       return normalizeTokenAmount(getGenerationCost("video"));
@@ -97,11 +96,21 @@ export async function resolveVideoGenerateBillingCost(
   }
 }
 
-export async function resolveImageEnhanceBillingCost(
+export async function resolveVideoGenerateBillingCost(
   request: Request
 ): Promise<number> {
   try {
     const body = (await request.clone().json()) as Record<string, unknown>;
+    return resolveVideoBillingTokensFromPayload(body);
+  } catch {
+    return normalizeTokenAmount(getGenerationCost("video"));
+  }
+}
+
+export function resolveImageEnhanceBillingTokensFromPayload(
+  body: Record<string, unknown>
+): number {
+  try {
     const editorRaw =
       (body.selectedEditor as string | undefined) ??
       (body.editor as string | undefined) ??
@@ -119,6 +128,36 @@ export async function resolveImageEnhanceBillingCost(
       mockMode: isMockMode(),
     });
     return normalizeTokenAmount(preflightTokensFromEstimate(estimate));
+  } catch {
+    return normalizeTokenAmount(getGenerationCost("enhance"));
+  }
+}
+
+export function resolveTextToImageBillingTokensFromPayload(
+  body: Record<string, unknown>
+): number {
+  try {
+    const runOpenAiPromptPackage = body.skipPromptPackage !== true;
+    const estimate = estimatePostProcessTextToImageCost({
+      runOpenAiPromptPackage,
+      mockMode: isMockMode(),
+    });
+    return normalizeTokenAmount(preflightTokensFromEstimate(estimate));
+  } catch {
+    return normalizeTokenAmount(
+      usdToTokenAmount(
+        OPENAI_COST.imagePromptPackage + FAL_IMAGE_COST.nanoBananaProT2i
+      )
+    );
+  }
+}
+
+export async function resolveImageEnhanceBillingCost(
+  request: Request
+): Promise<number> {
+  try {
+    const body = (await request.clone().json()) as Record<string, unknown>;
+    return resolveImageEnhanceBillingTokensFromPayload(body);
   } catch {
     return normalizeTokenAmount(getGenerationCost("enhance"));
   }
@@ -161,12 +200,7 @@ export async function resolveTextToImageBillingCost(
 ): Promise<number> {
   try {
     const body = (await request.clone().json()) as Record<string, unknown>;
-    const runOpenAiPromptPackage = body.skipPromptPackage !== true;
-    const estimate = estimatePostProcessTextToImageCost({
-      runOpenAiPromptPackage,
-      mockMode: isMockMode(),
-    });
-    return normalizeTokenAmount(preflightTokensFromEstimate(estimate));
+    return resolveTextToImageBillingTokensFromPayload(body);
   } catch {
     return normalizeTokenAmount(
       usdToTokenAmount(

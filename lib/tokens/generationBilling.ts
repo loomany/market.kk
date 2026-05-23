@@ -2,8 +2,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { getCurrentSession } from "@/lib/auth/session";
 import { isMockMode } from "@/lib/ai/paidAiGuard";
-import { applyVitrinaWatermarkToUrl } from "@/lib/images/applyVitrinaWatermark";
-import { getFalClientOrThrow } from "@/lib/ai/falClient";
+import { watermarkGenerationPayload } from "@/lib/images/watermarkGenerationPayload";
 import {
   getGenerationCost,
   spendUserTokens,
@@ -21,6 +20,7 @@ import { assertLocale, indexableLocales } from "@/lib/i18n/localeConfig";
 import { formatTokenChargeNumber } from "@/lib/tokens/formatTokens";
 import { normalizeTokenAmount } from "@/lib/tokens/tokenAmount";
 import { isClothingPhotoPipelineRequest } from "@/lib/tokens/clothingPipelineBilling";
+import { patchGenerationJobRequestPayload } from "@/lib/studio/generationJobDb";
 import {
   extractClientAssetIdFromRequest,
   persistGenerationJobOutcome,
@@ -252,45 +252,6 @@ export async function beginGenerationBilling(params: {
   };
 }
 
-async function watermarkPayloadUrls(body: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const clone = structuredClone(body);
-
-  if (typeof clone.image === "object" && clone.image && "url" in (clone.image as object)) {
-    const image = clone.image as { url: string };
-    image.url = await watermarkAndUpload(image.url);
-  }
-
-  if (typeof clone.imageUrl === "string" && clone.imageUrl) {
-    clone.imageUrl = await watermarkAndUpload(clone.imageUrl);
-  }
-
-  if (Array.isArray(clone.images)) {
-    clone.images = await Promise.all(
-      (clone.images as { url?: string }[]).map(async (item) => {
-        if (!item?.url) return item;
-        return { ...item, url: await watermarkAndUpload(item.url) };
-      })
-    );
-  }
-
-  if (typeof clone.imageUrl === "string" && clone.imageUrl) {
-    clone.imageUrl = await watermarkAndUpload(clone.imageUrl);
-  }
-
-  return clone;
-}
-
-async function watermarkAndUpload(url: string): Promise<string> {
-  const buffer = await applyVitrinaWatermarkToUrl(url);
-  const fal = getFalClientOrThrow({
-    provider: "fal",
-    route: "/tokens/watermark",
-  });
-  const blob = new Blob([new Uint8Array(buffer)], { type: "image/jpeg" });
-  const file = new File([blob], "vitrina-watermarked.jpg", { type: "image/jpeg" });
-  return fal.storage.upload(file);
-}
-
 export async function finalizeGenerationBilling(
   ctx: GenerationBillingContext,
   responseBody: Record<string, unknown> & { ok?: boolean }
@@ -309,7 +270,7 @@ export async function finalizeGenerationBilling(
   }
 
   if (ctx.mode === "guest_free") {
-    const watermarked = await watermarkPayloadUrls(responseBody);
+    const watermarked = await watermarkGenerationPayload(responseBody);
     await markGuestGenerationUsed();
     return watermarked;
   }
@@ -349,6 +310,15 @@ export async function withGenerationBilling(params: {
   if (!access.ok) return access.response;
 
   const clientAssetId = await extractClientAssetIdFromRequest(params.request);
+  if (
+    clientAssetId &&
+    access.ctx.userId &&
+    access.ctx.mode === "guest_free"
+  ) {
+    await patchGenerationJobRequestPayload(access.ctx.userId, clientAssetId, {
+      applyWatermark: true,
+    });
+  }
 
   const response = await params.run();
   let body: Record<string, unknown>;
@@ -359,6 +329,17 @@ export async function withGenerationBilling(params: {
   }
 
   const finalized = await finalizeGenerationBilling(access.ctx, body);
+
+  if (
+    clientAssetId &&
+    access.ctx.userId &&
+    access.ctx.spendCommitted &&
+    finalized.ok === true
+  ) {
+    await patchGenerationJobRequestPayload(access.ctx.userId, clientAssetId, {
+      billingSpent: true,
+    });
+  }
 
   if (clientAssetId) {
     await persistGenerationJobOutcome(clientAssetId, finalized);

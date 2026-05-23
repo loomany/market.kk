@@ -37,6 +37,8 @@ const assetSchema = z.object({
     .enum(["upload", "text-only-image", "text-only-video"])
     .optional(),
   status: z.enum(["ready", "processing", "error"]).optional(),
+  startedAt: z.string().optional(),
+  errorMessage: z.string().optional(),
 });
 
 function serializeAsset(row: {
@@ -108,6 +110,14 @@ function serializeAsset(row: {
       row.settings?.status === "processing" ||
       row.settings?.status === "error"
         ? (row.settings.status as "ready" | "processing" | "error")
+        : undefined,
+    startedAt:
+      typeof row.settings?.startedAt === "string"
+        ? row.settings.startedAt
+        : undefined,
+    errorMessage:
+      typeof row.settings?.errorMessage === "string"
+        ? row.settings.errorMessage
         : undefined,
   };
 }
@@ -198,6 +208,12 @@ export async function POST(request: Request) {
   }
   if (asset.status) {
     settings.status = asset.status;
+  }
+  if (asset.startedAt) {
+    settings.startedAt = asset.startedAt;
+  }
+  if (asset.errorMessage) {
+    settings.errorMessage = asset.errorMessage;
   }
 
   const { error: assetError } = await admin.from("studio_assets").upsert({

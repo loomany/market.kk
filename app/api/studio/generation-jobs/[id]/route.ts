@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import { getCurrentSession } from "@/lib/auth/session";
 import {
+  completeGenerationJob,
   findGenerationJobByAssetId,
   isGenerationJobStale,
 } from "@/lib/studio/generationJobDb";
+import { chargeGenerationJobTokensIfNeeded } from "@/lib/studio/chargeGenerationJobTokens";
+import type { GenerationJobRow } from "@/lib/studio/generationJobDb";
+import { syncFalVideoJobFromRow } from "@/lib/studio/falVideoQueueSync";
+import { parseGenerationJobSuccess } from "@/lib/studio/parseGenerationJobResult";
 
 export const runtime = "nodejs";
 
@@ -35,11 +40,19 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   if (job.status === "completed" && job.response_payload) {
-    return NextResponse.json({
-      ok: true,
-      status: "completed",
-      result: job.response_payload,
-    });
+    const stored = job.response_payload as Record<string, unknown>;
+    if (parseGenerationJobSuccess(stored)) {
+      await chargeGenerationJobTokensIfNeeded(
+        session.userId,
+        clientAssetId,
+        job as GenerationJobRow
+      );
+      return NextResponse.json({
+        ok: true,
+        status: "completed",
+        result: job.response_payload,
+      });
+    }
   }
 
   if (job.status === "failed") {
@@ -58,6 +71,37 @@ export async function GET(_request: Request, context: RouteContext) {
       errorCode: "GENERATION_STALE",
       message: "Генерация прервана. Запустите снова.",
     });
+  }
+
+  if (job.status === "processing" && job.type === "video") {
+    const synced = await syncFalVideoJobFromRow(job);
+    if (synced.kind === "completed") {
+      await completeGenerationJob(session.userId, clientAssetId, synced.payload);
+      const billedJob = await findGenerationJobByAssetId(
+        session.userId,
+        clientAssetId
+      );
+      if (billedJob) {
+        await chargeGenerationJobTokensIfNeeded(
+          session.userId,
+          clientAssetId,
+          billedJob
+        );
+      }
+      return NextResponse.json({
+        ok: true,
+        status: "completed",
+        result: synced.payload,
+      });
+    }
+    if (synced.kind === "failed") {
+      return NextResponse.json({
+        ok: false,
+        status: "failed",
+        errorCode: "FAL_VIDEO_GENERATION_FAILED",
+        message: synced.message,
+      });
+    }
   }
 
   return NextResponse.json({

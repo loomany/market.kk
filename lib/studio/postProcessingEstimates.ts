@@ -1,2 +1,2 @@
-/** UI countdown for post-processing (video / image) — display only. */
-export const POST_PROCESSING_COUNTDOWN_SEC = 4 * 60;
+/** UI estimate for post-processing (Kling video often 3–5+ min). Display only — not a hard timeout. */
+export const POST_PROCESSING_COUNTDOWN_SEC = 5 * 60;

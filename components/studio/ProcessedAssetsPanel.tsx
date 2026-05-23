@@ -79,12 +79,14 @@ import {
   sumStudioCostEstimates,
 } from "@/lib/ai/studioCostEstimateUtils";
 import { tryApplyTokenBillingError } from "@/lib/tokens/billingErrorPayload";
+import { cn } from "@/lib/utils";
 import { TokenChargeHint } from "./TokenChargeHint";
 import type { TokenBillingErrorPayload } from "@/lib/tokens/billingErrorPayload";
 import { isStuckProcessingAsset } from "@/lib/studio/postProcessingGalleryAssets";
 import {
   getPendingGenerationJob,
   isPendingGenerationStale,
+  listPendingGenerationJobs,
   patchPendingGenerationJob,
   removePendingGenerationJob,
   savePendingGenerationJob,
@@ -102,10 +104,22 @@ import {
   savePostProcessingEditorDraft,
 } from "@/lib/studio/postProcessingEditorDraft";
 import {
+  readInitialPostProcessingEditorHydration,
+  resolveRestoredEditorAssetForDraft,
+} from "@/lib/studio/postProcessingEditorHydration";
+import {
+  buildProcessingAssetFromJob,
+  resolveEditorInFlightPreview,
+} from "@/lib/studio/postProcessingInFlightRestore";
+import { fetchCompletedGenerationPayload } from "@/lib/studio/recoverGenerationFromServer";
+import { getFalMetaFromPendingJob } from "@/lib/studio/pendingJobFalMeta";
+import {
   createTextOnlyDraftAsset,
   isTextOnlyPostProcessAsset,
 } from "@/lib/studio/postProcessingTextOnly";
 import {
+  fetchGenerationJobViaGet,
+  syncGenerationJobStatus,
   resumePendingGeneration,
   runImageGenerationRequest,
   runTextToImageGenerationRequest,
@@ -115,6 +129,7 @@ import {
   parseGenerationJobSuccess,
   type ParsedGenerationJobSuccess,
 } from "@/lib/studio/parseGenerationJobResult";
+import { settleGenerationBillingClient } from "@/lib/studio/settleGenerationBillingClient";
 import type { PendingGenerationJob } from "@/lib/studio/pendingGenerationClient";
 
 type ProcessedAssetsPanelProps = {
@@ -179,12 +194,31 @@ export function ProcessedAssetsPanel({
   );
 
   const firstSelectableId = selectableAssets[0]?.id ?? assets[0]?.id ?? "";
-  const pendingEditorSelectionRef = useRef<string | null>(null);
-  const [selectedAssetId, setSelectedAssetId] = useState(firstSelectableId);
-  const [processingMode, setProcessingMode] = useState<PostProcessingMode | null>(
-    null
+  const initialEditorHydrationRef =
+    useRef<ReturnType<typeof readInitialPostProcessingEditorHydration>>(null);
+  if (!initialEditorHydrationRef.current) {
+    initialEditorHydrationRef.current =
+      readInitialPostProcessingEditorHydration("");
+  }
+  const initialEditorHydration = initialEditorHydrationRef.current;
+  const pendingEditorSelectionRef = useRef<string | null>(
+    initialEditorHydration.selectedAssetId
   );
-  const [desktopEditorOpen, setDesktopEditorOpen] = useState(false);
+  const [selectedAssetId, setSelectedAssetId] = useState(
+    () =>
+      initialEditorHydration.selectedAssetId ??
+      firstSelectableId
+  );
+  const [processingMode, setProcessingMode] = useState<PostProcessingMode | null>(
+    () => initialEditorHydration.processingMode
+  );
+  const [desktopEditorOpen, setDesktopEditorOpen] = useState(
+    () => initialEditorHydration.desktopEditorOpen
+  );
+  const [restoredEditorAsset, setRestoredEditorAsset] =
+    useState<StudioSessionAsset | null>(
+      () => initialEditorHydration.restoredEditorAsset
+    );
   const [videoProvider, setVideoProvider] = useState<VideoProviderId>("kling");
   const [videoVariantId, setVideoVariantId] = useState<VideoVariantId>(
     DEFAULT_VARIANT_BY_PROVIDER.kling
@@ -198,10 +232,21 @@ export function ProcessedAssetsPanel({
   /** Inline hint shown when switching editor reset incompatible options. */
   const [editorSwitchHint, setEditorSwitchHint] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
-  const [generationLoading, setGenerationLoading] = useState(false);
+  const [generationLoading, setGenerationLoading] = useState(
+    () => initialEditorHydration.generationLoading
+  );
+  const [statusRefreshBusy, setStatusRefreshBusy] = useState(false);
+  const [statusRefreshHint, setStatusRefreshHint] = useState<string | null>(null);
+
+  const resumeInFlightRef = useRef<Set<string>>(new Set());
+  const recoverInFlightRef = useRef<Set<string>>(new Set());
+  /** Client-side POST still running (blocks duplicate resume). */
+  const activeGenerationRef = useRef<Set<string>>(new Set());
   /** Left editor preview: countdown while generating, then result (replaces source). */
   const [editorLivePreview, setEditorLivePreview] =
-    useState<StudioSessionAsset | null>(null);
+    useState<StudioSessionAsset | null>(
+      () => initialEditorHydration.editorLivePreview
+    );
   const [error, setError] = useState<string | null>(null);
 
   const [saasQuality, setSaasQuality] = useState<SaasQualityTier>("balanced");
@@ -214,7 +259,9 @@ export function ProcessedAssetsPanel({
     useState<VideoMotionPresetId>("subtle-motion");
   const [preserveProduct, setPreserveProduct] = useState(true);
   const [outputFormat, setOutputFormat] = useState<ImageOutputFormat>("png");
-  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(
+    () => initialEditorHydration.mobileSheetOpen
+  );
   const [videoGenerateAudio, setVideoGenerateAudio] = useState(false);
   const [videoSoundPrompt, setVideoSoundPrompt] = useState("");
   const [videoUseNegativePrompt, setVideoUseNegativePrompt] = useState(false);
@@ -227,7 +274,9 @@ export function ProcessedAssetsPanel({
   >();
   /** Editor session without uploaded reference (text-to-image / text-to-video). */
   const [textOnlyEditorAsset, setTextOnlyEditorAsset] =
-    useState<StudioSessionAsset | null>(null);
+    useState<StudioSessionAsset | null>(
+      () => initialEditorHydration.textOnlyEditorAsset
+    );
 
   /**
    * In-memory cache for product preservation analyses, keyed by asset id.
@@ -335,7 +384,8 @@ export function ProcessedAssetsPanel({
     selectableAssets[0] ??
     assets[0];
 
-  const editorAsset = textOnlyEditorAsset ?? selectedAsset;
+  const editorAsset =
+    textOnlyEditorAsset ?? restoredEditorAsset ?? selectedAsset;
   const editorDisplayAsset = editorLivePreview ?? editorAsset;
 
   const gallerySourceImageUrl = editorAsset
@@ -429,9 +479,18 @@ export function ProcessedAssetsPanel({
     promptNormalization.normalizedUserIntent.trim().length >= 8 &&
     imageEditorReady;
 
+  const processingPreviewId =
+    editorLivePreview?.status === "processing" ? editorLivePreview.id : null;
+
+  const isPostProcessGenerating = Boolean(
+    generationLoading || editorLivePreview?.status === "processing"
+  );
+
+  const showGenerationReset = Boolean(processingPreviewId);
+
   const canGenerate = Boolean(
     workflowReady &&
-      !generationLoading &&
+      !isPostProcessGenerating &&
       (isTextOnlySession
         ? processingMode === "video"
           ? videoGenerationReady
@@ -567,7 +626,11 @@ export function ProcessedAssetsPanel({
     assetId: string,
     mode: PostProcessingMode,
     surface: "desktop" | "mobile",
-    textOnly: boolean
+    textOnly: boolean,
+    inFlight?: {
+      editorLivePreviewId: string;
+      processingStartedAt: string;
+    } | null
   ) => {
     pendingEditorSelectionRef.current = assetId;
     savePostProcessingEditorDraft({
@@ -576,7 +639,9 @@ export function ProcessedAssetsPanel({
       processingMode: mode,
       surface,
       textOnly,
-      editorLivePreviewId: null,
+      editorLivePreviewId: inFlight?.editorLivePreviewId ?? null,
+      generationInFlight: Boolean(inFlight),
+      processingStartedAt: inFlight?.processingStartedAt ?? null,
     });
   };
 
@@ -619,7 +684,15 @@ export function ProcessedAssetsPanel({
       setError(pa.selectFileFirst);
       return;
     }
-    if (!isTextOnlySession && !effectiveSourceImageUrl) {
+    if (!isTextOnlySession && !effectiveSourceImageUrl?.trim()) {
+      setError(pa.selectFileFirst);
+      return;
+    }
+    if (
+      !isTextOnlySession &&
+      processingMode === "video" &&
+      !/^https?:\/\//i.test(effectiveSourceImageUrl.trim())
+    ) {
       setError(pa.selectFileFirst);
       return;
     }
@@ -704,6 +777,12 @@ export function ProcessedAssetsPanel({
       };
       onAssetCreated(pendingGalleryAsset);
       setEditorLivePreview(pendingGalleryAsset);
+      countdownAutoRefreshRef.current = new Set();
+      setStatusRefreshHint(copy.studioAssetPreview.refreshGenerationRunning);
+      persistOpenEditorDraft(parentId, processingMode, isMobileLayout ? "mobile" : "desktop", isTextOnlySession, {
+        editorLivePreviewId: pendingId,
+        processingStartedAt: startedAt,
+      });
       if (isVideo) {
         const apiQuality = mapSaasQualityToVideoApi(videoVariantId, saasQuality);
         let sourceImageUrlForVideo = effectiveSourceImageUrl ?? "";
@@ -735,6 +814,16 @@ export function ProcessedAssetsPanel({
           referenceVideoDurationSeconds:
             referenceVideoDurationSec ?? undefined,
         };
+
+        if (!isTextOnlySession) {
+          savePendingGenerationJob({
+            kind: "video",
+            clientAssetId: pendingId,
+            parentAssetId: parentId,
+            startedAt,
+            body: videoBody,
+          });
+        }
 
         if (isTextOnlySession) {
           const frameClientAssetId = newAssetId();
@@ -836,17 +925,26 @@ export function ProcessedAssetsPanel({
             }
           }
           videoBody.sourceImageUrl = sourceImageUrlForVideo;
-        } else {
-          savePendingGenerationJob({
-            kind: "video",
-            clientAssetId: pendingId,
-            parentAssetId: parentId,
-            startedAt,
-            body: videoBody,
-          });
         }
 
         const outcome = await runVideoGenerationRequest(videoBody);
+        if (outcome.kind === "in_progress") {
+          if (outcome.falRequestId) {
+            patchPendingGenerationJob(pendingId, (j) => {
+              if (j.kind !== "video") return j;
+              return {
+                ...j,
+                falRequestId: outcome.falRequestId,
+                falEndpoint:
+                  outcome.falEndpoint ??
+                  getVideoVariant(videoVariantId).falEndpoint,
+              };
+            });
+          }
+          setStatusRefreshHint(
+            copy.studioAssetPreview.refreshGenerationRunning
+          );
+        }
         if (outcome.kind === "success") {
           applyVideoSuccess(pendingId, outcome.data, userIntent);
           clearPostProcessingTextOnlyDraft();
@@ -860,21 +958,22 @@ export function ProcessedAssetsPanel({
           ) {
             return;
           }
+          if (await tryRecoverAndApplyGeneration(pendingId, userIntent)) {
+            clearPostProcessingTextOnlyDraft();
+            setTextOnlyEditorAsset(null);
+            return;
+          }
+          if (await resumeOrRecoverAfterDisconnect(pendingId, userIntent)) {
+            return;
+          }
           const msg = friendlyPostProcessError(outcome.message, pa);
           failPendingAsset(pendingId, msg);
           setError(msg);
           return;
         }
-        const resumeJob = getPendingGenerationJob(pendingId);
-        if (!resumeJob) return;
-        const polled = await resumePendingGeneration(resumeJob);
-        if (polled.kind === "success" && polled.data.ok && "video" in polled.data) {
-          applyVideoSuccess(pendingId, polled.data as VideoGenerateResponse, userIntent);
-          clearPostProcessingTextOnlyDraft();
-          setTextOnlyEditorAsset(null);
-        } else if (polled.kind === "error") {
-          failPendingAsset(pendingId, friendlyPostProcessError(polled.message, pa));
-          setError(friendlyPostProcessError(polled.message, pa));
+        if (outcome.kind === "in_progress") {
+          setGenerationLoading(true);
+          return;
         }
         return;
       }
@@ -1011,11 +1110,20 @@ export function ProcessedAssetsPanel({
         setError(friendlyPostProcessError(polled.message, pa));
       }
     } catch {
-      failPendingAsset(pendingId, pa.fileFailed);
-      setError(pa.fileFailed);
+      const fallbackPrompt =
+        processingMode === "video"
+          ? resolvedVideoIntent
+          : promptNormalization.normalizedUserIntent;
+      const recovered = await resumeOrRecoverAfterDisconnect(
+        pendingId,
+        fallbackPrompt
+      );
+      if (!recovered) {
+        failPendingAsset(pendingId, pa.fileFailed);
+        setError(pa.fileFailed);
+      }
     } finally {
       activeGenerationRef.current.delete(pendingId);
-      setGenerationLoading(false);
       setMobileSheetOpen(false);
     }
   };
@@ -1044,6 +1152,7 @@ export function ProcessedAssetsPanel({
     setDesktopEditorOpen(false);
     setProcessingMode(null);
     setTextOnlyEditorAsset(null);
+    setRestoredEditorAsset(null);
     setEditorLivePreview(null);
     pendingEditorSelectionRef.current = null;
     clearPostProcessingTextOnlyDraft();
@@ -1056,6 +1165,7 @@ export function ProcessedAssetsPanel({
     setMobileSheetOpen(false);
     setProcessingMode(null);
     setTextOnlyEditorAsset(null);
+    setRestoredEditorAsset(null);
     setEditorLivePreview(null);
     pendingEditorSelectionRef.current = null;
     clearPostProcessingTextOnlyDraft();
@@ -1108,16 +1218,33 @@ export function ProcessedAssetsPanel({
     }
   }, []);
 
-  const editorUiRestoredRef = useRef(false);
+  const editorUiRestoredRef = useRef(initialEditorHydration.editorDraftOpen);
+  const inFlightAssetEnsuredRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!initialEditorHydration.editorDraftOpen) return;
+    if (isMobileLayout) {
+      setMobileSheetOpen(true);
+      setDesktopEditorOpen(false);
+    } else {
+      setDesktopEditorOpen(true);
+      setMobileSheetOpen(false);
+    }
+  }, [initialEditorHydration.editorDraftOpen, isMobileLayout]);
+
+  useEffect(() => {
+    if (!restoredEditorAsset) return;
+    if (assets.some((a) => a.id === restoredEditorAsset.id)) {
+      setRestoredEditorAsset(null);
+    }
+  }, [assets, restoredEditorAsset]);
+
   useEffect(() => {
     if (editorUiRestoredRef.current) return;
     const draft = loadPostProcessingEditorDraft();
-    if (!draft?.open) {
-      editorUiRestoredRef.current = true;
-      return;
-    }
-
     editorUiRestoredRef.current = true;
+    if (!draft?.open) return;
+
     pendingEditorSelectionRef.current = draft.selectedAssetId;
     setSelectedAssetId(draft.selectedAssetId);
     setProcessingMode(draft.processingMode);
@@ -1127,66 +1254,124 @@ export function ProcessedAssetsPanel({
       if (textDraft) setTextOnlyEditorAsset(textDraft.draftAsset);
     }
 
-    if (draft.surface === "mobile" || isMobileLayout) {
-      setMobileSheetOpen(true);
-      setDesktopEditorOpen(false);
-    } else {
-      setDesktopEditorOpen(true);
-      setMobileSheetOpen(false);
+    const previewId = draft.editorLivePreviewId;
+    if (previewId) {
+      const preview = resolveEditorInFlightPreview(
+        previewId,
+        assets,
+        draft.processingStartedAt
+      );
+      if (preview) {
+        setEditorLivePreview(preview);
+        if (draft.generationInFlight) {
+          const resumeJob = getPendingGenerationJob(previewId);
+          if (resumeJob && !isPendingGenerationStale(resumeJob.startedAt)) {
+            setGenerationLoading(true);
+          } else {
+            savePostProcessingEditorDraft({
+              ...draft,
+              generationInFlight: false,
+            });
+          }
+        }
+      }
+    } else if (draft.generationInFlight) {
+      const job =
+        listPendingGenerationJobs().find(
+          (j) =>
+            j.parentAssetId === draft.selectedAssetId ||
+            j.clientAssetId === draft.selectedAssetId
+        ) ?? null;
+      if (job) {
+        const preview = buildProcessingAssetFromJob(job, assets);
+        setEditorLivePreview(preview);
+        setGenerationLoading(true);
+      }
     }
-  }, [isMobileLayout]);
+
+    if (!editorLivePreview && !restoredEditorAsset) {
+      const textOnly = draft.textOnly
+        ? (loadPostProcessingTextOnlyDraft()?.draftAsset ?? null)
+        : null;
+      const placeholder = resolveRestoredEditorAssetForDraft(
+        draft,
+        assets,
+        textOnly
+      );
+      if (placeholder) setRestoredEditorAsset(placeholder);
+    }
+  }, [assets, editorLivePreview, restoredEditorAsset]);
 
   useEffect(() => {
     const draft = loadPostProcessingEditorDraft();
-    if (!draft?.open) return;
+    if (!draft?.open || !draft.editorLivePreviewId) return;
+    if (editorLivePreview?.id === draft.editorLivePreviewId) return;
 
-    const asset =
-      assets.find((a) => a.id === draft.selectedAssetId) ??
-      (draft.textOnly
-        ? loadPostProcessingTextOnlyDraft()?.draftAsset
-        : undefined);
-
-    if (draft.editorLivePreviewId) {
-      const preview = assets.find((a) => a.id === draft.editorLivePreviewId);
-      if (preview) setEditorLivePreview(preview);
-      return;
-    }
-
-    if (!asset) return;
-
-    const inFlight = assets.find(
-      (a) =>
-        a.status === "processing" &&
-        (a.parentAssetId === asset.id || a.id === asset.id)
+    const preview = resolveEditorInFlightPreview(
+      draft.editorLivePreviewId,
+      assets,
+      draft.processingStartedAt
     );
-    if (inFlight) setEditorLivePreview(inFlight);
-  }, [assets]);
+    if (!preview) return;
+
+    setEditorLivePreview(preview);
+    if (draft.generationInFlight) {
+      setGenerationLoading(true);
+    }
+  }, [assets, editorLivePreview?.id]);
+
+  useEffect(() => {
+    const draft = loadPostProcessingEditorDraft();
+    const previewId = draft?.editorLivePreviewId;
+    if (!draft?.open || !previewId) return;
+    if (assets.some((a) => a.id === previewId)) return;
+    if (inFlightAssetEnsuredRef.current === previewId) return;
+
+    const job = getPendingGenerationJob(previewId);
+    if (!job) return;
+
+    inFlightAssetEnsuredRef.current = previewId;
+    onAssetCreated(buildProcessingAssetFromJob(job, assets));
+  }, [assets, onAssetCreated]);
 
   useEffect(() => {
     const editorOpen = desktopEditorOpen || mobileSheetOpen;
     if (!editorOpen || !processingMode) return;
     const assetId = editorAsset?.id;
     if (!assetId) return;
+
+    const inFlightId = editorLivePreview?.id;
+    const job = inFlightId ? getPendingGenerationJob(inFlightId) : null;
+    const clientRequestActive = inFlightId
+      ? activeGenerationRef.current.has(inFlightId)
+      : false;
+    const generationInFlight = Boolean(
+      job && !isPendingGenerationStale(job.startedAt)
+    ) || clientRequestActive;
+
     savePostProcessingEditorDraft({
       open: true,
       selectedAssetId: assetId,
       processingMode,
       surface: mobileSheetOpen ? "mobile" : "desktop",
       textOnly: isTextOnlyPostProcessAsset(editorAsset),
-      editorLivePreviewId: editorLivePreview?.id ?? null,
+      editorLivePreviewId: inFlightId ?? null,
+      generationInFlight,
+      processingStartedAt:
+        editorLivePreview?.startedAt ??
+        job?.startedAt ??
+        loadPostProcessingEditorDraft()?.processingStartedAt ??
+        null,
     });
   }, [
     desktopEditorOpen,
     mobileSheetOpen,
     processingMode,
     editorAsset,
-    editorLivePreview?.id,
+    editorLivePreview,
+    generationLoading,
     isTextOnlySession,
   ]);
-
-  const resumeInFlightRef = useRef<Set<string>>(new Set());
-  const recoverInFlightRef = useRef<Set<string>>(new Set());
-  const activeGenerationRef = useRef<Set<string>>(new Set());
 
   const applyVideoSuccess = (
     pendingId: string,
@@ -1194,6 +1379,7 @@ export function ProcessedAssetsPanel({
     userIntent: string
   ) => {
     if (!data.ok) return;
+    setGenerationLoading(false);
     onUpdateAsset(pendingId, {
       status: "ready",
       url: data.video.url,
@@ -1209,6 +1395,7 @@ export function ProcessedAssetsPanel({
       prompt: userIntent,
     });
     removePendingGenerationJob(pendingId);
+    void settleGenerationBillingClient(pendingId);
   };
 
   const applyTextToImageSuccess = (
@@ -1244,6 +1431,7 @@ export function ProcessedAssetsPanel({
     outputFormat: ImageOutputFormat
   ) => {
     if (!data.ok) return;
+    setGenerationLoading(false);
     setLastFinalPrompt(data.promptUsed ?? null);
     setLastImageEnhanceDebug(data.debug ?? null);
     onUpdateAsset(pendingId, {
@@ -1259,9 +1447,11 @@ export function ProcessedAssetsPanel({
       prompt: data.promptUsed,
     });
     removePendingGenerationJob(pendingId);
+    void settleGenerationBillingClient(pendingId);
   };
 
   const failPendingAsset = (pendingId: string, message: string) => {
+    setGenerationLoading(false);
     onUpdateAsset(pendingId, {
       status: "error",
       errorMessage: message,
@@ -1313,6 +1503,62 @@ export function ProcessedAssetsPanel({
     applyImageSuccess(assetId, parsed.data as ImageEnhanceResponse, outputFmt);
   };
 
+  const tryRecoverAndApplyGeneration = async (
+    pendingId: string,
+    promptFallback: string
+  ): Promise<boolean> => {
+    const payload = await fetchCompletedGenerationPayload(pendingId);
+    if (!payload) return false;
+    const parsed = parseGenerationJobSuccess(payload);
+    if (!parsed) return false;
+    const job = getPendingGenerationJob(pendingId);
+    applyParsedGenerationSuccess(pendingId, parsed, job, promptFallback);
+    setError(null);
+    return true;
+  };
+
+  const resumeOrRecoverAfterDisconnect = async (
+    pendingId: string,
+    promptFallback: string
+  ): Promise<boolean> => {
+    if (await tryRecoverAndApplyGeneration(pendingId, promptFallback)) {
+      return true;
+    }
+    const job = getPendingGenerationJob(pendingId);
+    if (!job) return false;
+    const polled = await resumePendingGeneration(job);
+    if (polled.kind === "success") {
+      const parsed = parseGenerationJobSuccess(
+        polled.data as Record<string, unknown>
+      );
+      if (parsed) {
+        applyParsedGenerationSuccess(pendingId, parsed, job, promptFallback);
+        setError(null);
+        return true;
+      }
+    }
+    if (polled.kind === "in_progress") {
+      setGenerationLoading(true);
+      setStatusRefreshHint(copy.studioAssetPreview.refreshStillProcessing);
+      return true;
+    }
+    if (polled.kind === "error") {
+      if (
+        polled.billing &&
+        handleGenerationBillingBlock(
+          polled.billingResponse ?? polled,
+          pendingId
+        )
+      ) {
+        return true;
+      }
+      failPendingAsset(pendingId, friendlyPostProcessError(polled.message, pa));
+      setError(friendlyPostProcessError(polled.message, pa));
+      return true;
+    }
+    return false;
+  };
+
   const handleGenerationBillingBlock = useCallback(
     (billingResponse: unknown, pendingId: string): boolean => {
       if (!onTokenBillingError) return false;
@@ -1326,6 +1572,264 @@ export function ProcessedAssetsPanel({
     },
     [onTokenBillingError, onDeleteAsset]
   );
+
+  const statusRefreshInFlightRef = useRef(false);
+  const countdownAutoRefreshRef = useRef<Set<string>>(new Set());
+
+  const releaseStuckGeneration = useCallback(
+    (assetId: string) => {
+      activeGenerationRef.current.delete(assetId);
+      setGenerationLoading(false);
+      removePendingGenerationJob(assetId);
+      resumeInFlightRef.current.delete(assetId);
+      recoverInFlightRef.current.delete(assetId);
+
+      const draft = loadPostProcessingEditorDraft();
+      if (draft) {
+        savePostProcessingEditorDraft({
+          ...draft,
+          generationInFlight: false,
+          editorLivePreviewId: null,
+          processingStartedAt: null,
+        });
+      }
+
+      onDeleteAsset(assetId);
+      setEditorLivePreview(null);
+      setStatusRefreshHint(null);
+    },
+    [
+      editorAsset?.id,
+      isTextOnlySession,
+      mobileSheetOpen,
+      onDeleteAsset,
+      processingMode,
+    ]
+  );
+
+  useEffect(() => {
+    if (editorLivePreview?.status === "processing") {
+      setGenerationLoading(true);
+    }
+  }, [editorLivePreview?.id, editorLivePreview?.status]);
+
+  const patchFalMetaFromSyncOutcome = useCallback(
+    (
+      assetId: string,
+      outcome: { falRequestId?: string; falEndpoint?: string }
+    ) => {
+      if (!outcome.falRequestId) return;
+      patchPendingGenerationJob(assetId, (j) => {
+        if (j.kind === "video") {
+          return {
+            ...j,
+            falRequestId: outcome.falRequestId,
+            falEndpoint:
+              outcome.falEndpoint ??
+              j.falEndpoint ??
+              getVideoVariant(videoVariantId).falEndpoint,
+          };
+        }
+        if (j.kind === "text-only-video") {
+          return {
+            ...j,
+            falRequestId: outcome.falRequestId,
+            falEndpoint: outcome.falEndpoint ?? j.falEndpoint,
+          };
+        }
+        return j;
+      });
+    },
+    [videoVariantId]
+  );
+
+  const handleRefreshGenerationStatus = useCallback(
+    async (assetId: string) => {
+      if (statusRefreshInFlightRef.current) return;
+      statusRefreshInFlightRef.current = true;
+      setStatusRefreshBusy(true);
+      const spa = copy.studioAssetPreview;
+
+      try {
+        const asset = assets.find((a) => a.id === assetId);
+        const job = getPendingGenerationJob(assetId);
+        const falMeta = getFalMetaFromPendingJob(job);
+        const outcome = await syncGenerationJobStatus(assetId, {
+          falRequestId: falMeta.falRequestId,
+          falEndpoint: falMeta.falEndpoint,
+          requestPayload: falMeta.requestPayload,
+        });
+
+        if (outcome.kind === "in_progress") {
+          patchFalMetaFromSyncOutcome(assetId, outcome);
+        }
+
+        if (outcome.kind === "success") {
+          const parsed = parseGenerationJobSuccess(
+            outcome.data as Record<string, unknown>
+          );
+          if (parsed) {
+            applyParsedGenerationSuccess(
+              assetId,
+              parsed,
+              job,
+              asset?.prompt ?? ""
+            );
+            setGenerationLoading(false);
+            setStatusRefreshHint(null);
+            countdownAutoRefreshRef.current.delete(assetId);
+            return;
+          }
+          if (await tryRecoverAndApplyGeneration(assetId, asset?.prompt ?? "")) {
+            setGenerationLoading(false);
+            setStatusRefreshHint(null);
+            countdownAutoRefreshRef.current.delete(assetId);
+            return;
+          }
+          setGenerationLoading(true);
+          setStatusRefreshHint(spa.refreshStillProcessing);
+          return;
+        }
+
+        if (outcome.kind === "error") {
+          if (
+            outcome.errorCode === "SYNC_SERVER_ERROR" ||
+            outcome.errorCode === "SERVER_ERROR"
+          ) {
+            const viaGet = await fetchGenerationJobViaGet(assetId);
+            if (viaGet.kind === "success") {
+              const parsed = parseGenerationJobSuccess(
+                viaGet.data as Record<string, unknown>
+              );
+              if (parsed) {
+                applyParsedGenerationSuccess(
+                  assetId,
+                  parsed,
+                  job,
+                  asset?.prompt ?? ""
+                );
+                setGenerationLoading(false);
+                setStatusRefreshHint(null);
+                countdownAutoRefreshRef.current.delete(assetId);
+                return;
+              }
+            }
+          }
+          if (outcome.errorCode === "AUTH_REQUIRED") {
+            setStatusRefreshHint(spa.refreshAuthRequired);
+            setGenerationLoading(true);
+            return;
+          }
+          if (outcome.errorCode === "NOT_FOUND") {
+            setStatusRefreshHint(
+              asset?.status === "processing"
+                ? spa.refreshGenerationRunning
+                : spa.refreshLostSession
+            );
+            setGenerationLoading(true);
+            return;
+          }
+          if (
+            outcome.billing &&
+            handleGenerationBillingBlock(
+              outcome.billingResponse ?? outcome,
+              assetId
+            )
+          ) {
+            setGenerationLoading(false);
+            return;
+          }
+          const msg = friendlyPostProcessError(outcome.message, pa);
+          failPendingAsset(assetId, msg);
+          setError(msg);
+          setGenerationLoading(false);
+          return;
+        }
+
+        if (asset && isStuckProcessingAsset(asset)) {
+          releaseStuckGeneration(assetId);
+          setStatusRefreshHint(spa.refreshLostSession);
+          return;
+        }
+
+        setGenerationLoading(true);
+        if (asset?.status === "processing") {
+          const restored = resolveEditorInFlightPreview(
+            assetId,
+            assets,
+            asset.startedAt
+          );
+          if (restored) setEditorLivePreview(restored);
+          setStatusRefreshHint(spa.refreshGenerationRunning);
+          return;
+        }
+
+        const orphaned =
+          !activeGenerationRef.current.has(assetId) &&
+          !getPendingGenerationJob(assetId);
+        setStatusRefreshHint(
+          orphaned ? spa.refreshLostSession : spa.refreshStillProcessing
+        );
+      } catch {
+        setGenerationLoading(true);
+        setStatusRefreshHint(spa.refreshStillProcessing);
+      } finally {
+        setStatusRefreshBusy(false);
+        statusRefreshInFlightRef.current = false;
+      }
+    },
+    [
+      assets,
+      copy.studioAssetPreview,
+      handleGenerationBillingBlock,
+      onDeleteAsset,
+      pa,
+      patchFalMetaFromSyncOutcome,
+      releaseStuckGeneration,
+    ]
+  );
+
+  const handleGenerationCountdownZero = useCallback(
+    (assetId: string) => {
+      if (countdownAutoRefreshRef.current.has(assetId)) return;
+      countdownAutoRefreshRef.current.add(assetId);
+      void handleRefreshGenerationStatus(assetId);
+    },
+    [handleRefreshGenerationStatus]
+  );
+
+  useEffect(() => {
+    const previewId = editorLivePreview?.id;
+    if (editorLivePreview?.status !== "processing" || !previewId) {
+      return;
+    }
+
+    const poll = () => {
+      const job = getPendingGenerationJob(previewId);
+      const falMeta = getFalMetaFromPendingJob(job);
+      const hasFalLink = Boolean(falMeta.falRequestId);
+      if (activeGenerationRef.current.has(previewId) && !hasFalLink) {
+        const startedMs = job?.startedAt
+          ? Date.now() - new Date(job.startedAt).getTime()
+          : 0;
+        if (startedMs < 4_000) return;
+      }
+      void handleRefreshGenerationStatus(previewId);
+    };
+
+    const job = getPendingGenerationJob(previewId);
+    const firstPollMs = getFalMetaFromPendingJob(job).falRequestId ? 2_000 : 4_000;
+    const initialDelayId = window.setTimeout(poll, firstPollMs);
+    const intervalId = window.setInterval(poll, 4_000);
+    return () => {
+      window.clearTimeout(initialDelayId);
+      window.clearInterval(intervalId);
+    };
+  }, [
+    editorLivePreview?.id,
+    editorLivePreview?.status,
+    handleRefreshGenerationStatus,
+  ]);
 
   useEffect(() => {
     for (const asset of assets) {
@@ -1379,18 +1883,30 @@ export function ProcessedAssetsPanel({
             ) {
               return;
             }
-            failPendingAsset(asset.id, friendlyPostProcessError(outcome.message, pa));
-            setError(friendlyPostProcessError(outcome.message, pa));
+            const msg = friendlyPostProcessError(outcome.message, pa);
+            failPendingAsset(asset.id, msg);
+            if (editorLivePreview?.id === asset.id) {
+              setError(msg);
+            }
           }
         } catch {
           failPendingAsset(asset.id, pa.fileFailed);
-          setError(pa.fileFailed);
+          if (editorLivePreview?.id === asset.id) {
+            setError(pa.fileFailed);
+          }
         } finally {
           resumeInFlightRef.current.delete(asset.id);
         }
       })();
     }
-  }, [assets, handleGenerationBillingBlock, onDeleteAsset, onUpdateAsset]);
+  }, [
+    assets,
+    editorLivePreview?.id,
+    handleGenerationBillingBlock,
+    onDeleteAsset,
+    onUpdateAsset,
+    pa,
+  ]);
 
   /** Recover gallery tiles when Fal finished but HTTP timed out or billing raced. */
   useEffect(() => {
@@ -1468,10 +1984,32 @@ export function ProcessedAssetsPanel({
     desktopEditorOpen &&
     Boolean(processingMode && editorDisplayAsset);
 
+  const keepEditorChromeOnReload =
+    initialEditorHydration.editorDraftOpen &&
+    Boolean(processingMode) &&
+    (desktopEditorOpen || mobileSheetOpen);
+
   const mobileSheetTitle = processingMode ? postProcessEditorTitle : "";
 
   const settingsBody = (
-    <>
+    <div className="relative">
+      {isPostProcessGenerating ? (
+        <div
+          className="absolute inset-0 z-20 flex items-center justify-center rounded-[16px] bg-white/80 px-4 backdrop-blur-[1px]"
+          aria-live="polite"
+        >
+          <p className="max-w-xs text-center text-sm font-medium leading-6 text-slate-700">
+            {pa.generationSettingsLocked}
+          </p>
+        </div>
+      ) : null}
+      <div
+        className={cn(
+          "space-y-6",
+          isPostProcessGenerating &&
+            "pointer-events-none select-none opacity-45"
+        )}
+      >
           {!isTextOnlySession && !canProcessSource && editorAsset ? (
             <p className="rounded-[16px] border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
               {pa.selectFileFirst}
@@ -1482,7 +2020,7 @@ export function ProcessedAssetsPanel({
             <VideoProviderSelect
               value={videoProvider}
               onChange={handleVideoProviderChange}
-              disabled={generationLoading}
+              disabled={isPostProcessGenerating}
               motionOnly={motionVideoUpload}
             />
           ) : null}
@@ -1542,7 +2080,7 @@ export function ProcessedAssetsPanel({
                     : null
                 );
               }}
-              disabled={generationLoading}
+              disabled={isPostProcessGenerating}
             />
           ) : null}
 
@@ -1568,7 +2106,7 @@ export function ProcessedAssetsPanel({
                 negativePrompt={imageNegativePrompt}
                 onUseNegativePromptChange={setImageUseNegativePrompt}
                 onNegativePromptChange={setImageNegativePrompt}
-                disabled={generationLoading}
+                disabled={isPostProcessGenerating}
               />
               {!isTextOnlySession && mockMode ? (
                 <p className="rounded-[14px] border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
@@ -1610,7 +2148,7 @@ export function ProcessedAssetsPanel({
               onUseNegativePromptChange={setVideoUseNegativePrompt}
               onNegativePromptChange={setVideoNegativePrompt}
               onKeepReferenceSoundChange={setVideoKeepReferenceSound}
-              disabled={generationLoading}
+              disabled={isPostProcessGenerating}
             />
           ) : null}
 
@@ -1628,7 +2166,7 @@ export function ProcessedAssetsPanel({
                 value={prompt}
                 onChange={(event) => setPrompt(event.target.value)}
                 rows={4}
-                disabled={generationLoading}
+                disabled={isPostProcessGenerating}
                 placeholder={pa.promptPlaceholder}
                 className="w-full rounded-[18px] border border-border bg-white px-3 py-3 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-50"
               />
@@ -1965,7 +2503,7 @@ export function ProcessedAssetsPanel({
               <Button
                 className="min-w-0 flex-1 gap-2 px-4 sm:gap-3 sm:px-5"
                 size="lg"
-                loading={generationLoading}
+                loading={isPostProcessGenerating}
                 disabled={!canGenerate}
                 onClick={handleGenerate}
               >
@@ -1988,7 +2526,8 @@ export function ProcessedAssetsPanel({
             </div>
           ) : null}
 
-    </>
+      </div>
+    </div>
   );
 
   const d = copy.postProcessingDesktop;
@@ -2002,7 +2541,31 @@ export function ProcessedAssetsPanel({
           title={postProcessEditorTitle}
           onBack={closeDesktopEditor}
           settings={settingsBody}
+          onRefreshGenerationStatus={
+            processingPreviewId
+              ? () => void handleRefreshGenerationStatus(processingPreviewId)
+              : undefined
+          }
+          onResetGeneration={
+            showGenerationReset && processingPreviewId
+              ? () => releaseStuckGeneration(processingPreviewId)
+              : undefined
+          }
+          refreshGenerationBusy={statusRefreshBusy}
+          refreshGenerationHint={statusRefreshHint}
+          onGenerationCountdownZero={
+            processingPreviewId
+              ? () => handleGenerationCountdownZero(processingPreviewId)
+              : undefined
+          }
         />
+      ) : keepEditorChromeOnReload ? (
+        <div
+          className="flex min-h-[min(70vh,640px)] items-center justify-center rounded-[20px] border border-border/60 bg-white"
+          aria-busy="true"
+        >
+          <p className="text-sm font-medium text-slate-600">{pa.restoringEditor}</p>
+        </div>
       ) : (
         <>
           <PostProcessingUploadSection
@@ -2013,7 +2576,7 @@ export function ProcessedAssetsPanel({
             onSave={handleSaveUploadedSource}
             onStartTextOnlyImage={() => startTextOnlyWorkflow("image")}
             onStartTextOnlyVideo={() => startTextOnlyWorkflow("video")}
-            disabled={generationLoading}
+            disabled={isPostProcessGenerating}
           />
 
           {isMobileLayout ? (
@@ -2054,6 +2617,27 @@ export function ProcessedAssetsPanel({
                       asset={editorLivePreview}
                       variant="gallery"
                       className="aspect-[9/16] w-full"
+                      onRefreshStatus={
+                        processingPreviewId
+                          ? () =>
+                              void handleRefreshGenerationStatus(
+                                processingPreviewId
+                              )
+                          : undefined
+                      }
+                      onResetGeneration={
+                        showGenerationReset && processingPreviewId
+                          ? () => releaseStuckGeneration(processingPreviewId)
+                          : undefined
+                      }
+                      refreshStatusBusy={statusRefreshBusy}
+                      refreshStatusHint={statusRefreshHint}
+                      onCountdownReachedZero={
+                        processingPreviewId
+                          ? () =>
+                              handleGenerationCountdownZero(processingPreviewId)
+                          : undefined
+                      }
                     />
                   ) : null}
                   {settingsBody}

@@ -4,7 +4,10 @@ import { getCurrentSession } from "@/lib/auth/session";
 import {
   completeGenerationJob,
   failGenerationJob,
+  findGenerationJobByAssetId,
 } from "@/lib/studio/generationJobDb";
+import { chargeGenerationJobTokensIfNeeded } from "@/lib/studio/chargeGenerationJobTokens";
+import { parseGenerationJobSuccess } from "@/lib/studio/parseGenerationJobResult";
 
 export async function extractClientAssetIdFromRequest(
   request: Request
@@ -30,15 +33,26 @@ export async function persistGenerationJobOutcome(
 
   if (body.ok === true) {
     const { _skipBilling: _b, ...stored } = body;
+    if (!parseGenerationJobSuccess(stored)) {
+      return;
+    }
     await completeGenerationJob(userId, clientAssetId, stored);
+    const row = await findGenerationJobByAssetId(userId, clientAssetId);
+    if (row) {
+      await chargeGenerationJobTokensIfNeeded(userId, clientAssetId, row);
+    }
     return;
   }
 
   if (body.ok === false) {
+    const errorCode = String(body.errorCode ?? body.code ?? "GENERATION_FAILED");
+    if (errorCode === "GENERATION_IN_PROGRESS") {
+      return;
+    }
     await failGenerationJob(
       userId,
       clientAssetId,
-      String(body.errorCode ?? body.code ?? "GENERATION_FAILED"),
+      errorCode,
       String(body.message ?? body.error ?? "Generation failed")
     );
   }

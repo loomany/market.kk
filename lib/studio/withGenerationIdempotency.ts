@@ -5,6 +5,7 @@ import {
   isGenerationJobStale,
   upsertGenerationJobProcessing,
 } from "@/lib/studio/generationJobDb";
+import { parseGenerationJobSuccess } from "@/lib/studio/parseGenerationJobResult";
 
 export type GenerationIdempotencyContext = {
   clientAssetId?: string;
@@ -34,8 +35,8 @@ export async function withGenerationIdempotency(
   const existing = await findGenerationJobByAssetId(userId, clientAssetId);
 
   if (existing?.status === "completed" && existing.response_payload) {
-    const payload = existing.response_payload as { ok?: boolean };
-    if (payload.ok) {
+    const payload = existing.response_payload as Record<string, unknown>;
+    if (parseGenerationJobSuccess(payload)) {
       return NextResponse.json({
         ...existing.response_payload,
         _skipBilling: true,
@@ -44,12 +45,22 @@ export async function withGenerationIdempotency(
   }
 
   if (existing?.status === "processing" && !isGenerationJobStale(existing.created_at)) {
+    const rp = (existing.request_payload ?? {}) as Record<string, unknown>;
+    const falRequestId =
+      typeof rp.falRequestId === "string" ? rp.falRequestId.trim() : undefined;
+    const falEndpoint =
+      (typeof rp.falEndpoint === "string" ? rp.falEndpoint.trim() : "") ||
+      (typeof existing.model === "string" ? existing.model.trim() : "") ||
+      undefined;
     return NextResponse.json(
       {
         ok: false,
         errorCode: "GENERATION_IN_PROGRESS",
         inProgress: true,
         clientAssetId,
+        falRequestId,
+        falEndpoint,
+        model: falEndpoint,
       },
       { status: 202 }
     );

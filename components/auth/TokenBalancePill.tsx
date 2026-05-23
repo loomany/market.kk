@@ -59,8 +59,13 @@ export function TokenBalancePill({ className }: { className?: string }) {
   useEffect(() => {
     void loadBalance();
     const onAuth = () => void loadBalance();
+    const onTokens = () => void loadBalance();
     window.addEventListener("vitrina-auth-changed", onAuth);
-    return () => window.removeEventListener("vitrina-auth-changed", onAuth);
+    window.addEventListener("vitrina-tokens-changed", onTokens);
+    return () => {
+      window.removeEventListener("vitrina-auth-changed", onAuth);
+      window.removeEventListener("vitrina-tokens-changed", onTokens);
+    };
   }, [loadBalance]);
 
   if (!signedIn) return null;

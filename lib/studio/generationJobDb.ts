@@ -8,8 +8,11 @@ export type GenerationJobRow = {
   asset_id: string | null;
   type: string;
   status: string;
+  provider: string | null;
+  model: string | null;
   request_payload: Record<string, unknown>;
   response_payload: Record<string, unknown> | null;
+  estimated_cost: number | null;
   error_code: string | null;
   error_message: string | null;
   created_at: string;
@@ -28,7 +31,7 @@ export async function findGenerationJobByAssetId(
   const { data, error } = await admin
     .from("generation_jobs")
     .select(
-      "id,user_id,asset_id,type,status,request_payload,response_payload,error_code,error_message,created_at,completed_at"
+      "id,user_id,asset_id,type,status,provider,model,request_payload,response_payload,error_code,error_message,estimated_cost,created_at,completed_at"
     )
     .eq("user_id", userId)
     .eq("asset_id", clientAssetId)
@@ -70,6 +73,7 @@ export async function upsertGenerationJobProcessing(params: {
     request_payload: params.requestPayload,
     estimated_cost: params.estimatedCost ?? null,
     status: "processing",
+    response_payload: null,
     error_code: null,
     error_message: null,
     completed_at: null,
@@ -80,6 +84,28 @@ export async function upsertGenerationJobProcessing(params: {
   } else {
     await admin.from("generation_jobs").insert(row);
   }
+}
+
+export async function patchGenerationJobRequestPayload(
+  userId: string,
+  clientAssetId: string,
+  patch: Record<string, unknown>
+): Promise<void> {
+  const admin = createSupabaseAdminClient();
+  if (!admin) return;
+
+  const existing = await findGenerationJobByAssetId(userId, clientAssetId);
+  if (!existing) return;
+
+  const merged = {
+    ...(existing.request_payload as Record<string, unknown>),
+    ...patch,
+  };
+
+  await admin
+    .from("generation_jobs")
+    .update({ request_payload: merged })
+    .eq("id", existing.id);
 }
 
 export async function completeGenerationJob(
@@ -114,6 +140,7 @@ export async function failGenerationJob(
     .from("generation_jobs")
     .update({
       status: "failed",
+      response_payload: null,
       error_code: errorCode,
       error_message: errorMessage,
       completed_at: new Date().toISOString(),

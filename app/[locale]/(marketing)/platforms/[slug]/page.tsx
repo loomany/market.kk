@@ -74,7 +74,10 @@ export default async function PlatformDetailPage({ params }: PageProps) {
         data={[
           breadcrumbJsonLd([
             { name: "Home", url: `/${locale}` },
-            { name: "Platforms", url: `/${locale}/platforms` },
+            {
+              name: locale === "ru" ? "Площадки" : locale === "kk" ? "Алаңдар" : "Platforms",
+              url: `/${locale}/platforms`,
+            },
             { name: page.name, url: `/${locale}/platforms/${content.slug}` },
           ]),
           faqJsonLd(content.faq),
@@ -92,7 +95,7 @@ export default async function PlatformDetailPage({ params }: PageProps) {
         ]}
       />
       <Link href={`/${locale}/platforms`} className="text-sm font-semibold text-teal-700">
-        ← Platforms
+        ← {locale === "ru" ? "Площадки" : locale === "kk" ? "Алаңдар" : "Platforms"}
       </Link>
       <h1 className="mt-6 text-4xl font-bold tracking-tight text-slate-950">
         {content.h1}

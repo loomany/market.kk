@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { fal } from "@fal-ai/client";
 import { getFalClientOrThrow } from "@/lib/ai/falClient";
+import { getCurrentSession } from "@/lib/auth/session";
+import { waitForFalVideoQueueResult } from "@/lib/studio/falVideoQueueSync";
+import { patchGenerationJobRequestPayload } from "@/lib/studio/generationJobDb";
 import { OPENAI_COST } from "@/lib/ai/generationCostPricing";
 import { estimateVideoOrThrow } from "@/lib/ai/pricing";
 import {
@@ -20,8 +22,8 @@ import { resolveVideoGenerateBillingCost } from "@/lib/tokens/resolveRouteBillin
 import { withGenerationIdempotency } from "@/lib/studio/withGenerationIdempotency";
 
 export const runtime = "nodejs";
-/** Kling/Veo can run several minutes; default serverless cap drops the HTTP response while Fal still finishes. */
-export const maxDuration = 300;
+/** Prompt packaging + Fal queue (Kling 1.5/3 can exceed 5 min wall time). */
+export const maxDuration = 600;
 
 const ROUTE_ID = "/api/ai/video/generate";
 
@@ -242,7 +244,7 @@ async function handleVideoGeneratePost(request: Request) {
   }
 
   try {
-    getFalClientOrThrow({
+    const fal = getFalClientOrThrow({
       provider: "fal",
       route: "/api/ai/video/generate",
       estimatedCostUsd: estimatedCost,
@@ -267,38 +269,46 @@ async function handleVideoGeneratePost(request: Request) {
       );
     }
 
-    const result = await fal.subscribe(variant.falEndpoint, {
-      input: falInput,
-      logs: true,
-      onQueueUpdate(update) {
-        if (update.status === "IN_PROGRESS") {
-          console.log("[fal video] progress");
-        }
-      },
-    });
+    const { request_id: falRequestId } = await fal.queue.submit(
+      variant.falEndpoint,
+      { input: falInput }
+    );
 
-    const resultData = result.data as {
-      video?: { url: string; width?: number; height?: number; duration?: number };
-    };
-
-    if (!resultData.video?.url) {
-      throw new Error("Video model returned no video URL");
+    const session = await getCurrentSession();
+    if (session?.userId && data.clientAssetId) {
+      await patchGenerationJobRequestPayload(session.userId, data.clientAssetId, {
+        falRequestId,
+        falEndpoint: variant.falEndpoint,
+      });
     }
 
-    return NextResponse.json({
-      ok: true,
-      provider: "fal",
-      model: variant.falEndpoint,
-      video: {
-        url: resultData.video.url,
-        width: resultData.video.width,
-        height: resultData.video.height,
-        duration: resultData.video.duration ?? data.durationSeconds,
-        format: "mp4",
-      },
-      requestId: result.requestId,
+    const queueResult = await waitForFalVideoQueueResult({
+      falEndpoint: variant.falEndpoint,
+      falRequestId,
+      requestPayload: data as unknown as Record<string, unknown>,
       estimatedCost,
     });
+
+    if (queueResult.kind === "in_progress") {
+      return NextResponse.json(
+        {
+          ok: false,
+          errorCode: "GENERATION_IN_PROGRESS",
+          inProgress: true,
+          clientAssetId: data.clientAssetId,
+          falRequestId,
+          falEndpoint: variant.falEndpoint,
+          model: variant.falEndpoint,
+        },
+        { status: 202 }
+      );
+    }
+
+    if (queueResult.kind === "failed") {
+      throw new Error(queueResult.message);
+    }
+
+    return NextResponse.json(queueResult.payload);
   } catch (error) {
     if (isPaidAiGuardError(error)) {
       return NextResponse.json(paidAiGuardResponse(error), {

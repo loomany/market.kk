@@ -9,6 +9,10 @@ export type PostProcessingEditorDraft = {
   surface: "desktop" | "mobile";
   textOnly: boolean;
   editorLivePreviewId?: string | null;
+  /** True while «Создать видео/изображение» request is in flight. */
+  generationInFlight?: boolean;
+  /** ISO timestamp for countdown when asset row lacks startedAt after API merge. */
+  processingStartedAt?: string | null;
 };
 
 export function savePostProcessingEditorDraft(

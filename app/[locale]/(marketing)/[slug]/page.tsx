@@ -191,10 +191,14 @@ export default async function StaticSeoPage({ params }: PageProps) {
           {locale === "ru" ? "Открыть студию" : locale === "kk" ? "Студияны ашу" : "Open studio"}
         </Link>
         <Link href={`/${locale}/use-cases`} className="rounded-lg border border-border bg-white px-4 py-2 text-sm font-semibold text-slate-800">
-          Use cases
+          {locale === "ru"
+            ? "Варианты использования"
+            : locale === "kk"
+              ? "Қолдану мысалдары"
+              : "Use cases"}
         </Link>
         <Link href={`/${locale}/platforms`} className="rounded-lg border border-border bg-white px-4 py-2 text-sm font-semibold text-slate-800">
-          Platforms
+          {locale === "ru" ? "Площадки" : locale === "kk" ? "Алаңдар" : "Platforms"}
         </Link>
       </div>
     </main>

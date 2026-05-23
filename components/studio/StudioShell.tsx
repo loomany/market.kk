@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -564,6 +564,11 @@ function StudioShellInner({
       if (workspace) {
         applyClothingWorkspaceDraft(workspace.clothing);
         setProductShotSettings(workspace.productCard.productShotSettings);
+      }
+
+      const localSessionAssets = loadStudioSessionAssets();
+      if (localSessionAssets.length > 0) {
+        setSessionAssets(localSessionAssets);
       }
 
       if (isStudioProductPhotoMode(activeMode)) {
@@ -1183,9 +1188,27 @@ function StudioShellInner({
     (incoming: StudioSessionAsset[]) => {
       if (incoming.length === 0) return;
       setSessionAssets((prev) => {
+        const prevById = new Map(prev.map((asset) => [asset.id, asset]));
+        const mergedIncoming = incoming.map((apiAsset) => {
+          const local = prevById.get(apiAsset.id);
+          if (!local) return apiAsset;
+          if (local.status !== "processing" && apiAsset.status !== "processing") {
+            return apiAsset;
+          }
+          return {
+            ...apiAsset,
+            status: local.status ?? apiAsset.status,
+            startedAt: local.startedAt ?? apiAsset.startedAt,
+            errorMessage: local.errorMessage ?? apiAsset.errorMessage,
+            sourceImageUrl: local.sourceImageUrl ?? apiAsset.sourceImageUrl,
+            parentAssetId: local.parentAssetId ?? apiAsset.parentAssetId,
+            postProcessOrigin:
+              local.postProcessOrigin ?? apiAsset.postProcessOrigin,
+          };
+        });
         const savedIds = new Set(incoming.map((asset) => asset.id));
         return [
-          ...incoming,
+          ...mergedIncoming,
           ...prev.filter((asset) => !savedIds.has(asset.id)),
         ].slice(0, 48);
       });

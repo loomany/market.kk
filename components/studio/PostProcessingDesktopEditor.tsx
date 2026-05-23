@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/Card";
 import type { StudioSessionAsset } from "./types";
@@ -14,6 +14,11 @@ type PostProcessingDesktopEditorProps = {
   title: string;
   onBack: () => void;
   settings: React.ReactNode;
+  onRefreshGenerationStatus?: () => void;
+  onResetGeneration?: () => void;
+  refreshGenerationBusy?: boolean;
+  refreshGenerationHint?: string | null;
+  onGenerationCountdownZero?: () => void;
 };
 
 export function PostProcessingDesktopEditor({
@@ -22,15 +27,36 @@ export function PostProcessingDesktopEditor({
   title,
   onBack,
   settings,
+  onRefreshGenerationStatus,
+  onResetGeneration,
+  refreshGenerationBusy,
+  refreshGenerationHint,
+  onGenerationCountdownZero,
 }: PostProcessingDesktopEditorProps) {
   const { copy } = useStudioCopy();
   const d = copy.postProcessingDesktop;
 
   const group = useMemo(
-    () => getPostProcessingCarouselAssets(asset),
-    [asset]
+    () => getPostProcessingCarouselAssets(asset, allAssets),
+    [asset, allAssets]
   );
   const [frameIndex, setFrameIndex] = useState(0);
+  const autoFocusedProcessingIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const processingIndex = group.findIndex((item) => item.status === "processing");
+    if (processingIndex < 0) {
+      autoFocusedProcessingIdRef.current = null;
+      return;
+    }
+    const processingId = group[processingIndex]?.id;
+    if (!processingId || autoFocusedProcessingIdRef.current === processingId) {
+      return;
+    }
+    autoFocusedProcessingIdRef.current = processingId;
+    setFrameIndex(processingIndex);
+  }, [group]);
+
   const safeIndex = Math.min(frameIndex, Math.max(0, group.length - 1));
   const displayAsset = group[safeIndex] ?? asset;
 
@@ -66,6 +92,23 @@ export function PostProcessingDesktopEditor({
               carouselTotal={group.length}
               onCarouselPrev={group.length > 1 ? () => cycle(-1) : undefined}
               onCarouselNext={group.length > 1 ? () => cycle(1) : undefined}
+              onRefreshStatus={
+                displayAsset.status === "processing"
+                  ? onRefreshGenerationStatus
+                  : undefined
+              }
+              onResetGeneration={
+                displayAsset.status === "processing"
+                  ? onResetGeneration
+                  : undefined
+              }
+              refreshStatusBusy={refreshGenerationBusy}
+              refreshStatusHint={refreshGenerationHint}
+              onCountdownReachedZero={
+                displayAsset.status === "processing"
+                  ? onGenerationCountdownZero
+                  : undefined
+              }
             />
           </CardContent>
         </Card>

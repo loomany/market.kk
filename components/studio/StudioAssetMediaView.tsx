@@ -1,7 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { AlertCircle, ChevronLeft, ChevronRight, Film, ImageIcon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Film,
+  ImageIcon,
+  RefreshCw,
+} from "lucide-react";
+import { Button } from "@/components/ui/Button";
 import type { StudioSessionAsset } from "./types";
 import {
   assetPreviewUrl,
@@ -21,12 +29,22 @@ function CompactCountdown({
   startedAt,
   totalSeconds,
   large = false,
+  onReachedZero,
+  onOvertimeChange,
 }: {
   startedAt: string;
   totalSeconds: number;
   large?: boolean;
+  onReachedZero?: () => void;
+  onOvertimeChange?: (overtime: boolean) => void;
 }) {
   const [remaining, setRemaining] = useState(totalSeconds);
+  const zeroFiredRef = useRef(false);
+  const overtime = remaining <= 0;
+
+  useEffect(() => {
+    zeroFiredRef.current = false;
+  }, [startedAt, totalSeconds]);
 
   useEffect(() => {
     const tick = () => {
@@ -39,6 +57,29 @@ function CompactCountdown({
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
   }, [startedAt, totalSeconds]);
+
+  useEffect(() => {
+    if (remaining > 0 || !onReachedZero || zeroFiredRef.current) return;
+    zeroFiredRef.current = true;
+    onReachedZero();
+  }, [remaining, onReachedZero]);
+
+  useEffect(() => {
+    onOvertimeChange?.(overtime);
+  }, [overtime, onOvertimeChange]);
+
+  if (overtime) {
+    return (
+      <span
+        className={cn(
+          "font-semibold text-teal-800",
+          large ? "text-2xl tracking-tight sm:text-3xl" : "text-base"
+        )}
+      >
+        …
+      </span>
+    );
+  }
 
   return (
     <span
@@ -66,6 +107,12 @@ type StudioAssetMediaViewProps = {
   carouselTotal?: number;
   onCarouselPrev?: () => void;
   onCarouselNext?: () => void;
+  /** Manual status check while `processing` (post-processing editor). */
+  onRefreshStatus?: () => void;
+  onResetGeneration?: () => void;
+  refreshStatusBusy?: boolean;
+  refreshStatusHint?: string | null;
+  onCountdownReachedZero?: () => void;
 };
 
 export function StudioAssetMediaView({
@@ -78,6 +125,11 @@ export function StudioAssetMediaView({
   carouselTotal = 1,
   onCarouselPrev,
   onCarouselNext,
+  onRefreshStatus,
+  onResetGeneration,
+  refreshStatusBusy = false,
+  refreshStatusHint = null,
+  onCountdownReachedZero,
 }: StudioAssetMediaViewProps) {
   const { copy } = useStudioCopy();
   const s = copy.studioAssetPreview;
@@ -85,6 +137,7 @@ export function StudioAssetMediaView({
   const previewUrl = assetPreviewUrl(asset);
   const processing = asset.status === "processing";
   const errored = asset.status === "error";
+  const [countdownOvertime, setCountdownOvertime] = useState(false);
   const isVideo = isVideoAsset(asset) && !processing && Boolean(asset.url);
   const imgFit = circle ? "object-cover" : "object-contain";
   const showCarousel = carouselTotal > 1 && onCarouselPrev && onCarouselNext;
@@ -182,13 +235,109 @@ export function StudioAssetMediaView({
                     : "text-[10px]"
                 )}
               >
-                {s.countdownHint}
+                {countdownOvertime ? s.countdownOvertimeHint : s.countdownHint}
               </span>
               <CompactCountdown
                 startedAt={asset.startedAt}
                 totalSeconds={POST_PROCESSING_COUNTDOWN_SEC}
                 large={variant === "gallery" || variant === "hero"}
+                onReachedZero={onCountdownReachedZero}
+                onOvertimeChange={setCountdownOvertime}
               />
+              {countdownOvertime ? (
+                <p className="max-w-[18rem] text-[11px] leading-snug text-slate-600">
+                  {s.countdownOvertimeLine}
+                </p>
+              ) : null}
+              {onRefreshStatus ? (
+                <div className="mt-1 flex w-full max-w-[18rem] flex-col items-stretch gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={refreshStatusBusy}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRefreshStatus();
+                    }}
+                    className="h-9 w-full gap-1.5 border-slate-300/90 bg-white/95 text-xs font-semibold text-slate-800 shadow-sm hover:bg-white"
+                  >
+                    <RefreshCw
+                      className={cn(
+                        "h-3.5 w-3.5",
+                        refreshStatusBusy && "animate-spin"
+                      )}
+                      aria-hidden
+                    />
+                    {refreshStatusBusy
+                      ? s.refreshStatusChecking
+                      : s.refreshStatus}
+                  </Button>
+                  {onResetGeneration ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={refreshStatusBusy}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onResetGeneration();
+                      }}
+                      className="h-9 w-full border-slate-200 bg-white/90 text-xs font-semibold text-slate-700 shadow-sm hover:border-slate-300 hover:bg-white"
+                    >
+                      {s.refreshReset}
+                    </Button>
+                  ) : null}
+                  {refreshStatusHint ? (
+                    <p className="text-center text-[11px] leading-snug text-slate-600">
+                      {refreshStatusHint}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          ) : onRefreshStatus ? (
+            <div className="relative z-10 mt-1 flex w-full max-w-[18rem] flex-col items-stretch gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={refreshStatusBusy}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRefreshStatus();
+                }}
+                className="h-9 w-full gap-1.5 border-slate-300/90 bg-white/95 text-xs font-semibold text-slate-800 shadow-sm hover:bg-white"
+              >
+                <RefreshCw
+                  className={cn(
+                    "h-3.5 w-3.5",
+                    refreshStatusBusy && "animate-spin"
+                  )}
+                  aria-hidden
+                />
+                {refreshStatusBusy ? s.refreshStatusChecking : s.refreshStatus}
+              </Button>
+              {onResetGeneration ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={refreshStatusBusy}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onResetGeneration();
+                  }}
+                  className="h-9 w-full border-slate-200 bg-white/90 text-xs font-semibold text-slate-700 shadow-sm hover:border-slate-300 hover:bg-white"
+                >
+                  {s.refreshReset}
+                </Button>
+              ) : null}
+              {refreshStatusHint ? (
+                <p className="text-center text-[11px] leading-snug text-slate-600">
+                  {refreshStatusHint}
+                </p>
+              ) : null}
             </div>
           ) : null}
         </div>

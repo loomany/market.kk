@@ -328,7 +328,27 @@ export const pass2RemainderRu = {
   studioAssetPreview: {
     processing: "AI создаёт файл",
     countdownHint: "Осталось примерно",
+    countdownOvertimeHint: "Создание продолжается",
+    countdownOvertimeLine:
+      "Обычно хватает 5 минут. Если дольше — файл всё ещё создаётся, подождите или нажмите «Обновить статус».",
     failed: "Не удалось создать",
+    refreshStatus: "Обновить статус",
+    refreshStatusChecking: "Проверяем…",
+    refreshStillProcessing:
+      "Файл ещё создаётся на сервере — подождите или нажмите «Обновить статус» снова.",
+    refreshGenerationRunning:
+      "Генерация уже запущена на сервере. Таймер идёт — дождитесь готового видео или нажмите «Обновить статус».",
+    refreshLinkPending:
+      "Запускаем генерацию на сервере. Таймер идёт — это нормально, подождите немного.",
+    refreshAuthRequired:
+      "Войдите в аккаунт — без этого мы не можем подтянуть готовое видео с сервера.",
+    refreshNoFalLink:
+      "Связь с сервером генерации не установилась. Нажмите «Сбросить» и создайте видео заново.",
+    refreshLostSession:
+      "Задача не найдена на сервере. Если видео не создаётся — нажмите «Сбросить».",
+    refreshReset: "Сбросить",
+    refreshResetHint:
+      "Удалит зависший черновик и вернёт исходное фото — можно запустить создание заново.",
   },
   postProcessingActions: {
     whatCreate: "Что создать?",
@@ -677,7 +697,27 @@ export const pass2RemainderEn = {
   studioAssetPreview: {
     processing: "AI is creating your file",
     countdownHint: "About",
+    countdownOvertimeHint: "Still creating",
+    countdownOvertimeLine:
+      "Usually ready within 5 minutes. If it takes longer, we are still working — wait or tap Refresh status.",
     failed: "Could not create",
+    refreshStatus: "Refresh status",
+    refreshStatusChecking: "Checking…",
+    refreshStillProcessing:
+      "Still creating on the server — wait or tap Refresh status again.",
+    refreshGenerationRunning:
+      "Generation is running on the server. The timer is active — wait or tap Refresh status.",
+    refreshLinkPending:
+      "Starting generation on the server. The timer is running — please wait.",
+    refreshAuthRequired:
+      "Sign in to pull the finished video from the server.",
+    refreshNoFalLink:
+      "Could not link to the generation server. Tap Reset and try again.",
+    refreshLostSession:
+      "Task not found on the server. If nothing is running — tap Reset.",
+    refreshReset: "Reset",
+    refreshResetHint:
+      "Clears a stuck draft and restores the source photo so you can try again.",
   },
   postProcessingActions: {
     whatCreate: "What to create?",
@@ -1026,7 +1066,27 @@ export const pass2RemainderKk = {
   studioAssetPreview: {
     processing: "AI файл жасауда",
     countdownHint: "Шамамен қалды",
+    countdownOvertimeHint: "Жасалуда",
+    countdownOvertimeLine:
+      "Әдетте 5 минут жетеді. Ұзақ болса — файл әлі жасалуда, күтіңіз немесе күйді жаңартыңыз.",
     failed: "Жасалмады",
+    refreshStatus: "Күйін жаңарту",
+    refreshStatusChecking: "Тексеруде…",
+    refreshStillProcessing:
+      "Файл әлі серверде жасалуда — күтіңіз немесе күйді жаңартыңыз.",
+    refreshGenerationRunning:
+      "Генерация серверде қазірдің өзінде жүріп тұр. Таймерді күтіңіз немесе күйді жаңартыңыз.",
+    refreshLinkPending:
+      "Генерация серверде іске қосылуда. Таймер жүріп тұр — аз күтіңіз.",
+    refreshAuthRequired:
+      "Аккаунтқа кіріңіз — дайын бейнені серверден алу үшін.",
+    refreshNoFalLink:
+      "Генерация серверімен байланыс орнатылмады. «Қалпына келтіру» басыңыз.",
+    refreshLostSession:
+      "Тапсырма серверде табылмады. Жасалмаса — «Қалпына келтіру» басыңыз.",
+    refreshReset: "Қалпына келтіру",
+    refreshResetHint:
+      "Қатты күйді өшіреді және бастапқы фотоны қайтарады — қайта жасауға болады.",
   },
   postProcessingActions: {
     whatCreate: "Не жасау керек?",

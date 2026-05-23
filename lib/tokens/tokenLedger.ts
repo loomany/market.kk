@@ -5,6 +5,7 @@ import {
   resolveGenerationCost,
   type GenerationOperationType,
 } from "@/lib/tokens/generationCostConfig";
+import { normalizeTokenAmount } from "@/lib/tokens/tokenAmount";
 
 export type { GenerationOperationType };
 
@@ -61,9 +62,10 @@ export async function creditPurchasedTokens(
     throw new Error("Supabase admin client is not configured");
   }
 
+  const tokenAmount = normalizeTokenAmount(params.tokens);
   const { data, error } = await admin.rpc("credit_purchased_tokens", {
     p_user_id: params.userId,
-    p_tokens: params.tokens,
+    p_tokens: tokenAmount.toFixed(4),
     p_amount_cents: params.amountCents,
     p_currency: params.currency,
     p_provider: params.provider ?? "lemon_squeezy",
@@ -131,9 +133,15 @@ export async function spendUserTokens(
     throw new Error("Supabase admin client is not configured");
   }
 
+  const tokenAmount = normalizeTokenAmount(params.tokens);
+  if (tokenAmount <= 0) {
+    return { spent: false, balanceAfter: await getUserTokenBalance(params.userId) };
+  }
+
+  // Decimal string disambiguates numeric vs legacy integer overloads in Postgres.
   const { data, error } = await admin.rpc("spend_user_tokens", {
     p_user_id: params.userId,
-    p_tokens: params.tokens,
+    p_tokens: tokenAmount.toFixed(4),
     p_type: params.type ?? "spend",
     p_metadata: params.metadata ?? {},
   });

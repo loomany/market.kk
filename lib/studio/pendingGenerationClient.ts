@@ -12,6 +12,8 @@ export type PendingVideoGenerationJob = {
   parentAssetId: string;
   startedAt: string;
   body: VideoGenerateRequest & { clientAssetId: string };
+  falRequestId?: string;
+  falEndpoint?: string;
 };
 
 export type PendingImageGenerationJob = {
@@ -44,6 +46,8 @@ export type PendingTextOnlyVideoGenerationJob = {
   videoBody: VideoGenerateRequest & { clientAssetId: string };
   userPrompt: string;
   frameImageUrl?: string;
+  falRequestId?: string;
+  falEndpoint?: string;
 };
 
 export type PendingGenerationJob =

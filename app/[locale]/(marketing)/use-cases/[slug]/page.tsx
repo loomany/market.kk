@@ -74,7 +74,15 @@ export default async function UseCaseDetailPage({ params }: PageProps) {
         data={[
           breadcrumbJsonLd([
             { name: "Home", url: `/${locale}` },
-            { name: "Use cases", url: `/${locale}/use-cases` },
+            {
+              name:
+                locale === "ru"
+                  ? "Варианты использования"
+                  : locale === "kk"
+                    ? "Қолдану мысалдары"
+                    : "Use cases",
+              url: `/${locale}/use-cases`,
+            },
             { name: content.h1, url: `/${locale}/use-cases/${content.slug}` },
           ]),
           faqJsonLd(content.faq),
@@ -92,7 +100,12 @@ export default async function UseCaseDetailPage({ params }: PageProps) {
         ]}
       />
       <Link href={`/${locale}/use-cases`} className="text-sm font-semibold text-teal-700">
-        ← Use cases
+        ←{" "}
+        {locale === "ru"
+          ? "Варианты использования"
+          : locale === "kk"
+            ? "Қолдану мысалдары"
+            : "Use cases"}
       </Link>
       <h1 className="mt-6 text-4xl font-bold tracking-tight text-slate-950">
         {content.h1}

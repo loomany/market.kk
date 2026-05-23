@@ -106,6 +106,9 @@ export const pass2Ru = {
     comingSoon: "Скоро",
     modeVideo: "Видео",
     modeImage: "Изображение",
+    generationSettingsLocked:
+      "Идёт создание — настройки откроются, когда файл будет готов. Статус слева можно обновить.",
+    restoringEditor: "Восстанавливаем редактор…",
   },
   maskEditor: {
     coverageTooLarge: "Рамка слишком большая: оставьте внутри только товар (без всей фигуры модели и фона).",
@@ -288,6 +291,9 @@ export const pass2En = {
     comingSoon: "Soon",
     modeVideo: "Video",
     modeImage: "Image",
+    generationSettingsLocked:
+      "Creation in progress — settings unlock when the file is ready. Use refresh on the left for status.",
+    restoringEditor: "Restoring editor…",
   },
   maskEditor: {
     coverageTooLarge: "Frame too large: keep only the product inside (not the full model or background).",
@@ -467,6 +473,9 @@ export const pass2Kk = {
     comingSoon: "Жақында",
     modeVideo: "Видео",
     modeImage: "Сурет",
+    generationSettingsLocked:
+      "Жасалуда — баптаулар файл дайын болғанда ашылады. Күйді сол жақтан жаңартыңыз.",
+    restoringEditor: "Редактор қалпына келтірілуде…",
   },
   maskEditor: {
     coverageTooLarge: "Рамка тым үлкен: тек тауарды қалдырыңыз (толық фигура мен фон жоқ).",
