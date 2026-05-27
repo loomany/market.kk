@@ -691,7 +691,7 @@ export function ProcessedAssetsPanel({
     if (
       !isTextOnlySession &&
       processingMode === "video" &&
-      !/^https?:\/\//i.test(effectiveSourceImageUrl.trim())
+      !/^https?:\/\//i.test((effectiveSourceImageUrl ?? "").trim())
     ) {
       setError(pa.selectFileFirst);
       return;
