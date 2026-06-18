@@ -205,8 +205,18 @@ async function handleVideoGeneratePost(request: Request) {
       video: {
         url: "/demo/video-placeholder.svg",
         posterUrl: data.sourceImageUrl,
-        width: data.aspectRatio === "9:16" ? 1080 : 1200,
-        height: data.aspectRatio === "9:16" ? 1920 : 1200,
+        width:
+          data.aspectRatio === "9:16"
+            ? 1080
+            : data.aspectRatio === "1:1"
+              ? 1080
+              : 1200,
+        height:
+          data.aspectRatio === "9:16"
+            ? 1920
+            : data.aspectRatio === "1:1"
+              ? 1080
+              : 1200,
         duration: data.durationSeconds,
         format: "mock",
       },
