@@ -58,7 +58,7 @@ export const VIDEO_EDITORS: PostProcessingEditor[] = [
     description: "Максимальное качество для рекламы.",
     technicalModel: "fal-ai/veo3.1/image-to-video",
     pros: "Топ качество, точная передача движения.",
-    limitations: "Форматы 1:1, 9:16 и 16:9, дороже.",
+    limitations: "Только 9:16 и 16:9. Для квадрата 1:1 — MiniMax или Kling 1.5 Pro.",
     available: true,
   },
 ];

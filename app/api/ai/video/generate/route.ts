@@ -31,6 +31,18 @@ function isMockMode() {
   return process.env.AI_MOCK_MODE !== "0";
 }
 
+function friendlyFalVideoError(message: string): string {
+  const lower = message.toLowerCase();
+  if (
+    lower.includes("aspect_ratio") ||
+    lower.includes("aspect ratio") ||
+    lower.includes("1:1")
+  ) {
+    return "Veo поддерживает только 9:16 и 16:9. Для квадратного видео 1:1 выберите MiniMax или Kling 1.5 Pro.";
+  }
+  return "Не удалось создать видео. Проверьте изображение и попробуйте ещё раз.";
+}
+
 export async function POST(request: Request) {
   return wrapAiPost(request, "video", ROUTE_ID, handleVideoGeneratePost, {
     resolveCost: resolveVideoGenerateBillingCost,
@@ -170,11 +182,15 @@ async function handleVideoGeneratePost(request: Request) {
     variant.aspectRatioOptions.length > 0 &&
     !variant.aspectRatioOptions.includes(data.aspectRatio)
   ) {
+    const aspectMessage =
+      variant.provider === "veo" && data.aspectRatio === "1:1"
+        ? "Veo не поддерживает квадрат 1:1 — только 9:16 и 16:9. Для квадрата выберите MiniMax или Kling 1.5 Pro."
+        : "Эта видео-модель не поддерживает выбранный формат кадра.";
     return NextResponse.json(
       {
         ok: false,
         errorCode: "VALIDATION_ERROR",
-        message: "Эта видео-модель не поддерживает выбранный формат кадра.",
+        message: aspectMessage,
         estimatedCost,
       },
       { status: 400 }
@@ -346,7 +362,7 @@ async function handleVideoGeneratePost(request: Request) {
       {
         ok: false,
         errorCode: "FAL_VIDEO_GENERATION_FAILED",
-        message: "Не удалось создать видео. Проверьте изображение и попробуйте ещё раз.",
+        message: friendlyFalVideoError(message),
         estimatedCost,
       },
       { status: 500 }

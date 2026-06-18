@@ -147,16 +147,8 @@ export const VARIANTS_BY_PROVIDER: Record<VideoProviderId, VideoVariantId[]> = {
   veo: ["veo-3.1", "veo-3.1-fast", "veo-3-fast"],
 };
 
-type VeoFalAspectRatio = "16:9" | "9:16" | "1:1" | "auto";
-
-function mapVeoAspectRatio(aspectRatio: VideoAspectRatio): VeoFalAspectRatio {
-  if (
-    aspectRatio === "16:9" ||
-    aspectRatio === "9:16" ||
-    aspectRatio === "1:1"
-  ) {
-    return aspectRatio;
-  }
+function mapVeoAspectRatio(aspectRatio: VideoAspectRatio): "16:9" | "9:16" | "auto" {
+  if (aspectRatio === "16:9" || aspectRatio === "9:16") return aspectRatio;
   return "9:16";
 }
 
@@ -449,7 +441,7 @@ export const VIDEO_VARIANTS: Record<VideoVariantId, VideoVariantConfig> = {
       supportsReferenceVideoSound: false,
     },
     durationOptions: [4, 6, 8],
-    aspectRatioOptions: ["1:1", "9:16", "16:9"],
+    aspectRatioOptions: ["9:16", "16:9"],
     qualityOptions: [
       { id: "balanced", label: "720p", mapperValue: "720p" },
       { id: "high", label: "1080p", mapperValue: "1080p" },
@@ -476,7 +468,7 @@ export const VIDEO_VARIANTS: Record<VideoVariantId, VideoVariantConfig> = {
       supportsReferenceVideoSound: false,
     },
     durationOptions: [4, 6, 8],
-    aspectRatioOptions: ["1:1", "9:16", "16:9"],
+    aspectRatioOptions: ["9:16", "16:9"],
     qualityOptions: [
       { id: "balanced", label: "720p", mapperValue: "720p" },
       { id: "high", label: "1080p", mapperValue: "1080p" },
@@ -503,7 +495,7 @@ export const VIDEO_VARIANTS: Record<VideoVariantId, VideoVariantConfig> = {
       supportsReferenceVideoSound: false,
     },
     durationOptions: [4, 6, 8],
-    aspectRatioOptions: ["1:1", "9:16", "16:9"],
+    aspectRatioOptions: ["9:16", "16:9"],
     qualityOptions: [
       { id: "balanced", label: "720p", mapperValue: "720p" },
       { id: "high", label: "1080p", mapperValue: "1080p" },
