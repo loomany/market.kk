@@ -130,10 +130,7 @@ export function TokensPageClient({ locale }: { locale: IndexableLocale }) {
     checkout === "success" ? copy.success : checkout === "cancelled" ? copy.cancelled : null;
 
   return (
-    <div className="mx-auto w-full max-w-lg">
-      <h1 className="text-3xl font-bold tracking-tight text-slate-950">{copy.title}</h1>
-      <p className="mt-3 text-base leading-7 text-slate-600">{copy.subtitle}</p>
-
+    <div className="mx-auto mt-6 w-full max-w-lg">
       {statusBanner ? (
         <p className="mt-4 rounded-[16px] border border-teal-200 bg-teal-50 px-4 py-3 text-sm leading-6 text-teal-900">
           {statusBanner}

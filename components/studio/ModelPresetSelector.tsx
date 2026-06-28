@@ -107,19 +107,30 @@ function SettingField({
   label,
   description,
   notice,
+  htmlFor,
   children,
 }: {
   label: string;
   description?: string;
   notice?: ReactNode;
+  htmlFor?: string;
   children: ReactNode;
 }) {
   return (
     <div className="space-y-2">
       <div className="space-y-0.5 px-0.5">
-        <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-          {label}
-        </span>
+        {htmlFor ? (
+          <label
+            htmlFor={htmlFor}
+            className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500"
+          >
+            {label}
+          </label>
+        ) : (
+          <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            {label}
+          </span>
+        )}
         {description ? (
           <p className="text-xs leading-5 text-slate-500">{description}</p>
         ) : null}
@@ -177,11 +188,13 @@ function SelectField<T extends string>({
 }
 
 function CustomParamInput({
+  id,
   value,
   onChange,
   placeholder,
   disabled,
 }: {
+  id?: string;
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
@@ -189,6 +202,7 @@ function CustomParamInput({
 }) {
   return (
     <input
+      id={id}
       type="text"
       value={value}
       disabled={disabled}
@@ -443,8 +457,12 @@ export function ModelPresetSelector({
       >
         <div className="flex flex-col gap-4">
           {onModelDescriptionChange ? (
-            <SettingField label={m.sceneLabel}>
+            <SettingField
+              label={m.sceneLabel}
+              htmlFor="vitrina-model-scene-description"
+            >
               <textarea
+                id="vitrina-model-scene-description"
                 value={modelDescription ?? ""}
                 onChange={(event) =>
                   onModelDescriptionChange(event.target.value.slice(0, 500))
@@ -478,8 +496,10 @@ export function ModelPresetSelector({
           <SettingField
             label={mp.nationalityLabel}
             description={mp.nationalityDesc}
+            htmlFor="vitrina-model-nationality"
           >
             <CustomParamInput
+              id="vitrina-model-nationality"
               value={settings.modelNationality}
               disabled={isPromptLocked}
               placeholder={mp.nationalityPlaceholder}
