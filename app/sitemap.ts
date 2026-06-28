@@ -14,6 +14,13 @@ import { absoluteUrl, buildLanguageAlternates } from "@/lib/seo/site";
 
 const lastModified = new Date();
 
+/**
+ * Section index pages are currently editorially approved only in RU/EN.
+ * Individual approved KK pages still enter the sitemap through their own
+ * quality-gated collections below.
+ */
+const publishedSectionLocales = ["ru", "en"] as const satisfies readonly Locale[];
+
 function alternates(pathByLocale: Partial<Record<Locale, string>>) {
   return {
     languages: buildLanguageAlternates(pathByLocale),
@@ -41,10 +48,22 @@ function homePaths(): Partial<Record<Locale, string>> {
   ) as Partial<Record<Locale, string>>;
 }
 
-function sectionPaths(segment: string): Partial<Record<Locale, string>> {
+function sectionPaths(
+  segment: string,
+  locales: readonly Locale[] = indexableLocales,
+): Partial<Record<Locale, string>> {
   return Object.fromEntries(
-    indexableLocales.map((locale) => [locale, `/${locale}/${segment}`])
+    locales.map((locale) => [locale, `/${locale}/${segment}`])
   ) as Partial<Record<Locale, string>>;
+}
+
+function uniqueSitemapItems(items: MetadataRoute.Sitemap): MetadataRoute.Sitemap {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (seen.has(item.url)) return false;
+    seen.add(item.url);
+    return true;
+  });
 }
 
 function staticPathsForPage(page: (typeof staticSeoPages)[number]): Partial<Record<Locale, string>> {
@@ -59,25 +78,26 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const items: MetadataRoute.Sitemap = [];
 
   const home = homePaths();
-  const features = sectionPaths("features");
-  const platforms = sectionPaths("platforms");
-  const useCases = sectionPaths("use-cases");
-  const blog = sectionPaths("blog");
+  const features = sectionPaths("features", publishedSectionLocales);
+  const platforms = sectionPaths("platforms", publishedSectionLocales);
+  const useCases = sectionPaths("use-cases", publishedSectionLocales);
+  const blog = sectionPaths("blog", publishedSectionLocales);
   const aiSummary = sectionPaths("ai-summary");
-  const cost = sectionPaths("cost");
   const tokens = sectionPaths("tokens");
 
   for (const locale of indexableLocales) {
     items.push(entry(locale, home, 1, "weekly"));
+    if (locale !== "kk" || isKkAiSummaryApproved()) {
+      items.push(entry(locale, aiSummary, 0.65));
+    }
+    items.push(entry(locale, tokens, 0.68));
+  }
+
+  for (const locale of publishedSectionLocales) {
     items.push(entry(locale, features, 0.85));
     items.push(entry(locale, platforms, 0.8));
     items.push(entry(locale, useCases, 0.8));
     items.push(entry(locale, blog, 0.75));
-    if (locale !== "kk" || isKkAiSummaryApproved()) {
-      items.push(entry(locale, aiSummary, 0.65));
-    }
-    items.push(entry(locale, cost, 0.72));
-    items.push(entry(locale, tokens, 0.68));
   }
 
   for (const page of staticSeoPages) {
@@ -219,5 +239,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     }
   }
 
-  return items;
+  return uniqueSitemapItems(items);
 }

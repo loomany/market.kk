@@ -542,7 +542,7 @@ export const enBlogStage4Legacy: Record<string, EnBlogArticleContent> = {
     ],
     internalLinks: [
       { label: "Open studio", href: "/studio" },
-      { label: "Clothing on AI model", href: "/en/use-cases/clothing-on-model" },
+      { label: "Clothing on AI model", href: "/en/use-cases/clothing-on-ai-model" },
       { label: "Place clothing on an AI model", href: "/en/blog/how-to-place-clothing-on-an-ai-model" },
       { label: "Lingerie on an AI model", href: "/en/blog/lingerie-photos-on-an-ai-model" },
       { label: "Review AI photos before publishing", href: "/en/blog/how-to-review-ai-product-photos-before-publishing" },
@@ -652,7 +652,7 @@ export const enBlogStage4Legacy: Record<string, EnBlogArticleContent> = {
       { label: "Open studio", href: "/studio" },
       { label: "Pricing", href: "/en/cost" },
       { label: "Lingerie on AI model", href: "/en/use-cases/lingerie-on-ai-model" },
-      { label: "Clothing on AI model", href: "/en/use-cases/clothing-on-model" },
+      { label: "Clothing on AI model", href: "/en/use-cases/clothing-on-ai-model" },
       { label: "Review AI photos before publishing", href: "/en/blog/how-to-review-ai-product-photos-before-publishing" },
       { label: "Clothing photos on a model", href: "/en/blog/how-to-create-clothing-photos-on-a-model" },
       { label: "Wildberries product photos", href: "/en/blog/product-photos-for-wildberries" },

@@ -27,8 +27,24 @@ function readRobots() {
 function readSitemapModule() {
   const source = readFileSync("app/sitemap.ts", "utf8");
   assert(source.includes("indexableLocales"), "sitemap must use indexableLocales");
-  assert(source.includes('sectionPaths("cost")'), "sitemap must include pricing routes");
+  assert(source.includes("staticSeoPages"), "sitemap must include quality-gated static routes");
   assert(source.includes('sectionPaths("tokens")'), "sitemap must include tokens routes");
+}
+
+function checkNoLegacyUseCaseHref() {
+  for (const topic of blogTopics) {
+    const article = getArticleByTopicId(topic.id);
+    if (!article) continue;
+    for (const localized of Object.values(article.content)) {
+      if (!localized) continue;
+      for (const link of localized.internalLinks) {
+        assert(
+          link.href !== "/en/use-cases/clothing-on-model",
+          `${topic.id}: legacy clothing use-case href must not be published`
+        );
+      }
+    }
+  }
 }
 
 function checkPricingPage() {
@@ -157,6 +173,7 @@ function main() {
     ["examples noindex", checkExamplesNoindex],
     ["pricing page", checkPricingPage],
     ["published blog slugs", checkPublishedBlogSlugs],
+    ["legacy use-case hrefs", checkNoLegacyUseCaseHref],
     ["locale switch paths", checkLocaleSwitcherPaths],
     ["site URL policy", checkSiteUrlPolicy],
   ] as const;

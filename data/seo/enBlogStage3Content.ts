@@ -243,7 +243,7 @@ export const enBlogStage3P0: Record<string, EnBlogArticleContent> = {
     internalLinks: [
       { label: "Open studio", href: "/studio" },
       { label: "Pricing", href: "/en/cost" },
-      { label: "Clothing on model use case", href: "/en/use-cases/clothing-on-model" },
+      { label: "Clothing on model use case", href: "/en/use-cases/clothing-on-ai-model" },
       { label: "Fashion model photos", href: "/en/fashion-model-photos" },
       { label: "Clothing photos on a model", href: "/en/blog/how-to-create-clothing-photos-on-a-model" },
       { label: "Preserve the product in AI", href: "/en/blog/how-to-make-ai-preserve-the-product" },

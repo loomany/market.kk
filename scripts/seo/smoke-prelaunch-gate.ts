@@ -169,6 +169,21 @@ function auditSitemapEntries() {
 
   ok(`Generated ${entries.length} sitemap URL entries`);
 
+  const duplicateUrls = urls.filter((url, index) => urls.indexOf(url) !== index);
+  if (duplicateUrls.length > 0) {
+    fail(`Sitemap contains duplicate URLs: ${[...new Set(duplicateUrls)].join(", ")}`);
+  } else {
+    ok("Sitemap URL entries are unique");
+  }
+
+  for (const path of ["/kk/features", "/kk/platforms", "/kk/use-cases", "/kk/blog"]) {
+    if (paths.includes(path)) {
+      fail(`Noindex KK section must not be in sitemap: ${path}`);
+    } else {
+      ok(`Noindex KK section excluded from sitemap: ${path}`);
+    }
+  }
+
   for (const url of urls) {
     if (url.includes("localhost") || url.includes("your-domain.com")) {
       fail(`Sitemap contains non-production URL: ${new URL(url).pathname}`);
