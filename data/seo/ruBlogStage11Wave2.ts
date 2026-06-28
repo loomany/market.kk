@@ -1272,7 +1272,7 @@ export const ruBlogStage11Wave2: Record<string, RuBlogArticleContent> = {
       { label: "Открыть студию", href: "/studio" },
       { label: "Стоимость", href: "/ru/cost" },
       { label: "Удалить фон", href: "/ru/blog/kak-udalit-fon-s-foto-tovara" },
-      { label: "Очистка фото", href: "/ru/use-cases/ochistka-foto-tovara" },
+      { label: "Очистка фото", href: "/ru/use-cases/ochistka-tovarnogo-foto" },
       { label: "Kaspi", href: "/ru/blog/foto-tovarov-dlya-kaspi" },
       { label: "Качество AI", href: "/ru/quality" },
       { label: "Как работает", href: "/ru/how-it-works" },

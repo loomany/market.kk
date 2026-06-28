@@ -31,7 +31,14 @@ function readSitemapModule() {
   assert(source.includes('sectionPaths("tokens")'), "sitemap must include tokens routes");
 }
 
-function checkNoLegacyUseCaseHref() {
+const unpublishedInternalHrefs = new Set([
+  "/en/use-cases/clothing-on-model",
+  "/ru/blog/ai-product-photos-or-a-photoshoot-what-to-choose",
+  "/ru/blog/product-photos-for-wildberries",
+  "/ru/use-cases/ochistka-foto-tovara",
+]);
+
+function checkNoUnpublishedInternalHref() {
   for (const topic of blogTopics) {
     const article = getArticleByTopicId(topic.id);
     if (!article) continue;
@@ -39,8 +46,8 @@ function checkNoLegacyUseCaseHref() {
       if (!localized) continue;
       for (const link of localized.internalLinks) {
         assert(
-          link.href !== "/en/use-cases/clothing-on-model",
-          `${topic.id}: legacy clothing use-case href must not be published`
+          !unpublishedInternalHrefs.has(link.href),
+          `${topic.id}: unpublished internal href must not be linked: ${link.href}`
         );
       }
     }
@@ -173,7 +180,7 @@ function main() {
     ["examples noindex", checkExamplesNoindex],
     ["pricing page", checkPricingPage],
     ["published blog slugs", checkPublishedBlogSlugs],
-    ["legacy use-case hrefs", checkNoLegacyUseCaseHref],
+    ["unpublished internal hrefs", checkNoUnpublishedInternalHref],
     ["locale switch paths", checkLocaleSwitcherPaths],
     ["site URL policy", checkSiteUrlPolicy],
   ] as const;
