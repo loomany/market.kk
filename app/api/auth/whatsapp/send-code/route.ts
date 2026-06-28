@@ -4,6 +4,7 @@ import {
   checkCodeSendRateLimit,
   createSixDigitCode,
   hashCode,
+  isWhatsAppSendConfigured,
   normalizePhone,
   saveMemoryCode,
   sendWhatsAppCode,
@@ -48,11 +49,7 @@ export async function POST(request: Request) {
     );
   }
 
-  if (
-    !isMockMode() &&
-    process.env.GREEN_API_INSTANCE_ID &&
-    process.env.GREEN_API_TOKEN
-  ) {
+  if (!isMockMode() && isWhatsAppSendConfigured()) {
     try {
       assertPaidAiAllowed({
         provider: "green-api",
@@ -104,13 +101,38 @@ export async function POST(request: Request) {
         status: error.status,
       });
     }
+    const message = error instanceof Error ? error.message : "";
+    if (message === "EVOLUTION_NOT_CONFIGURED") {
+      return NextResponse.json(
+        {
+          ok: false,
+          errorCode: "EVOLUTION_NOT_CONFIGURED",
+          message: "Отправка WhatsApp не настроена на сервере.",
+        },
+        { status: 503 }
+      );
+    }
+    if (message === "WHATSAPP_PROVIDER_INVALID") {
+      return NextResponse.json(
+        {
+          ok: false,
+          errorCode: "WHATSAPP_PROVIDER_INVALID",
+          message: "Некорректная настройка провайдера WhatsApp.",
+        },
+        { status: 503 }
+      );
+    }
     throw error;
   }
   if (!sent.ok) {
+    const errorCode =
+      sent.delivery === "evolution"
+        ? "WHATSAPP_SEND_FAILED"
+        : "GREEN_API_SEND_FAILED";
     return NextResponse.json(
       {
         ok: false,
-        errorCode: "GREEN_API_SEND_FAILED",
+        errorCode,
         message: "Не удалось отправить код в WhatsApp. Попробуйте позже.",
       },
       { status: 502 }

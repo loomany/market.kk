@@ -1,6 +1,15 @@
 import "server-only";
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { assertPaidAiAllowed } from "@/lib/ai/paidAiGuard";
+import { sendEvolutionTextMessage, isEvolutionConfigured } from "@/lib/auth/evolution-api";
+import {
+  getWhatsAppProvider,
+  isWhatsAppSendConfigured,
+  type WhatsAppProvider,
+} from "@/lib/auth/whatsapp-provider";
+import { maskPhoneForLog } from "@/lib/auth/whatsapp-phone";
+
+export { getWhatsAppProvider, isWhatsAppSendConfigured, type WhatsAppProvider };
 
 export type StoredAuthCode = {
   phone: string;
@@ -112,6 +121,7 @@ export function consumeMemoryCode(phone: string, code: string) {
   return { ok: true as const };
 }
 
+
 /** Green API host for this instance (e.g. https://7107.api.greenapi.com). */
 export function getGreenApiBaseUrl(instanceId: string) {
   const fromEnv = process.env.GREEN_API_URL?.trim();
@@ -128,11 +138,63 @@ export function getGreenApiBaseUrl(instanceId: string) {
 }
 
 export async function sendWhatsAppCode(phone: string, code: string) {
-  const instanceId = process.env.GREEN_API_INSTANCE_ID;
-  const token = process.env.GREEN_API_TOKEN;
-
-  if (!instanceId || !token || process.env.AI_MOCK_MODE !== "0") {
+  if (process.env.AI_MOCK_MODE !== "0") {
     return { ok: true, delivery: "mock" as const };
+  }
+
+  let provider: WhatsAppProvider;
+  try {
+    provider = getWhatsAppProvider();
+  } catch {
+    throw new Error("WHATSAPP_PROVIDER_INVALID");
+  }
+
+  if (provider === "green") {
+    const instanceId = process.env.GREEN_API_INSTANCE_ID;
+    const token = process.env.GREEN_API_TOKEN;
+    if (!instanceId || !token) {
+      return { ok: true, delivery: "mock" as const };
+    }
+
+    assertPaidAiAllowed({
+      provider: "green-api",
+      route: "/api/auth/whatsapp/send-code",
+    });
+
+    const baseUrl = getGreenApiBaseUrl(instanceId);
+    const chatId = `${phone.replace(/\D/g, "")}@c.us`;
+    const message = `Vitrina AI: код входа ${code}. Он действует 10 минут.`;
+    const res = await fetch(
+      `${baseUrl}/waInstance${instanceId}/sendMessage/${token}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chatId, message }),
+      }
+    );
+
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      console.error("[green-api] sendMessage failed", {
+        provider: "green",
+        phone_masked: maskPhoneForLog(phone),
+        status: "fail",
+        http_status: res.status,
+        detail: detail.slice(0, 200),
+      });
+      return { ok: false, delivery: "green-api" as const };
+    }
+
+    console.info("[green-api] sendMessage ok", {
+      provider: "green",
+      phone_masked: maskPhoneForLog(phone),
+      status: "success",
+    });
+    return { ok: true, delivery: "green-api" as const };
+  }
+
+  if (!isEvolutionConfigured()) {
+    throw new Error("EVOLUTION_NOT_CONFIGURED");
   }
 
   assertPaidAiAllowed({
@@ -140,29 +202,11 @@ export async function sendWhatsAppCode(phone: string, code: string) {
     route: "/api/auth/whatsapp/send-code",
   });
 
-  const baseUrl = getGreenApiBaseUrl(instanceId);
-  const chatId = `${phone.replace(/\D/g, "")}@c.us`;
-  const res = await fetch(
-    `${baseUrl}/waInstance${instanceId}/sendMessage/${token}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chatId,
-        message: `Vitrina AI: код входа ${code}. Он действует 10 минут.`,
-      }),
-    }
-  );
-
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    console.error("[green-api] sendMessage failed", {
-      status: res.status,
-      baseUrl,
-      detail: detail.slice(0, 500),
-    });
-    return { ok: false, delivery: "green-api" as const };
+  const message = `Vitrina AI: код входа ${code}. Он действует 10 минут.`;
+  const result = await sendEvolutionTextMessage(phone, message);
+  if (!result.ok) {
+    return { ok: false, delivery: "evolution" as const };
   }
 
-  return { ok: true, delivery: "green-api" as const };
+  return { ok: true, delivery: "evolution" as const };
 }
