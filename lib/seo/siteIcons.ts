@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 /** Stable icon URLs for tabs, mobile home screen, Google/Yandex SERP favicons. */
 export const siteIconAssets = {
   favicon: "/favicon.ico",
+  // Versioned to bypass any previously cached 404 for the newly introduced SVG.
+  svg: "/favicon.svg?v=20260630",
   icon16: "/icon-16.png",
   icon32: "/icon-32.png",
   icon48: "/icon-48.png",
@@ -18,6 +20,7 @@ export function createSiteIconsMetadata(): Pick<Metadata, "icons"> {
     icons: {
       icon: [
         { url: siteIconAssets.favicon, sizes: "any" },
+        { url: siteIconAssets.svg, type: "image/svg+xml" },
         { url: siteIconAssets.icon16, sizes: "16x16", type: "image/png" },
         { url: siteIconAssets.icon32, sizes: "32x32", type: "image/png" },
         { url: siteIconAssets.icon48, sizes: "48x48", type: "image/png" },
