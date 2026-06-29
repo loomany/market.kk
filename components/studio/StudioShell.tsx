@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { Locale } from "@/lib/i18n/localeConfig";
 import {
@@ -193,7 +193,6 @@ import type { ProductMaskApplyResult } from "./ProductMaskEditor";
 import { ProductSelectionPanel } from "./ProductSelectionPanel";
 import { StudioWorkflowRail } from "./StudioWorkflowRail";
 import { StudioWorkflowStep } from "./StudioWorkflowStep";
-import { ProcessedAssetsPanel } from "./ProcessedAssetsPanel";
 import {
   StudioLocaleProvider,
   useStudioCopy,
@@ -214,6 +213,23 @@ import {
   type StudioResultImage,
   type StudioSessionAsset,
 } from "./types";
+
+const ProcessedAssetsPanel = lazy(
+  () =>
+    import("./ProcessedAssetsPanel").then(
+      (module) => ({ default: module.ProcessedAssetsPanel }),
+    ),
+);
+
+function ProcessedAssetsPanelFallback() {
+  return (
+    <div
+      className="min-h-80 animate-pulse rounded-2xl border border-border/70 bg-muted/30"
+      aria-busy="true"
+      aria-live="polite"
+    />
+  );
+}
 
 async function readJsonResponse<T>(
   res: Response,
@@ -2480,17 +2496,19 @@ function StudioShellInner({
         />
 
         {isPostProcessingMode ? (
-          <ProcessedAssetsPanel
-            assets={sessionAssets}
-            mockMode={mockMode}
-            paidAiRunsAllowed={paidAiRunsAllowed}
-            promptLocale={promptLocale}
-            requireAuthForGeneration={requireAuthForGeneration}
-            onTokenBillingError={setTokenBilling}
-            onDeleteAsset={deleteSessionAsset}
-            onAssetCreated={addSingleAssetToSession}
-            onUpdateAsset={updateSessionAsset}
-          />
+          <Suspense fallback={<ProcessedAssetsPanelFallback />}>
+            <ProcessedAssetsPanel
+              assets={sessionAssets}
+              mockMode={mockMode}
+              paidAiRunsAllowed={paidAiRunsAllowed}
+              promptLocale={promptLocale}
+              requireAuthForGeneration={requireAuthForGeneration}
+              onTokenBillingError={setTokenBilling}
+              onDeleteAsset={deleteSessionAsset}
+              onAssetCreated={addSingleAssetToSession}
+              onUpdateAsset={updateSessionAsset}
+            />
+          </Suspense>
         ) : (
         <div
           className={cn(
